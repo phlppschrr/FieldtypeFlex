@@ -83,7 +83,7 @@ foreach($cases as $kind => [$nativeType, $settings, $definition, $values, $predi
 		foreach(['<2026-01-01', '<=2026-04-08 14:30:00'] as $predicate) {
 			$expected = $find($n->name . $predicate);
 			$same($expected, $find($rowField->name . '.events.event.value' . $predicate), "row date $predicate excludes blank values like native");
-			$same($expected, $find($rowField->name . '.events.event="value' . $predicate . '"'), "same-row date $predicate excludes blank values like native");
+			$same($expected, $find('@' . $rowField->name . '.events.event.value' . $predicate), "same-row date $predicate excludes blank values like native");
 		}
 	}
 	foreach($predicates as $predicate) {

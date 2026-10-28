@@ -41,6 +41,7 @@ final class FlexInspection {
 				foreach($schema->properties() as $name => $def) {
 					$item = ['kind' => $def['kind'], 'input' => $def['input']->className(), 'multiple' => $def['multiple'], 'languages' => (bool) ($def['languages'] ?? false), 'renamedFrom' => $def['renamedFrom']];
 					foreach($def['types'] ?? [] as $key => $type) $item['types'][$key] = $describe($type['schema']);
+					if($def['customFields'] ?? null) $item['customFields'] = $describe($def['customFields']);
 					$out[$name] = $item;
 				}
 				return $out;

@@ -213,10 +213,9 @@ Unknown Flex row type: %s,Unbekannter Flex-Zeilentyp: %s,,site/modules/Fieldtype
 Invalid Flex collection path,Ungültiger Flex-Sammlungspfad,,site/modules/FieldtypeFlex/src/FlexQuery.php,c85048f815dc0dff6a09afe563d5afd1
 Flex counts require a number,Flex-Anzahlwerte benötigen eine Zahl,,site/modules/FieldtypeFlex/src/FlexQuery.php,773bd704517bad0c92de788bf5eda45a
 Flex row type selectors require = or != and a known type or blank,Flex-Zeilentypselektoren benötigen = oder != und einen bekannten Typ oder einen leeren Wert,,site/modules/FieldtypeFlex/src/FlexQuery.php,d40728388ddba3a629a689b0df5eab84
-A row collection supports blank or same-row selectors,Eine Zeilensammlung unterstützt Leer- oder Selektoren für dieselbe Zeile,,site/modules/FieldtypeFlex/src/FlexQuery.php,58ce744a11c1e6a52a5821a6795076d6
-Same-row selectors require a type and a quoted selector string,Selektoren für dieselbe Zeile benötigen einen Typ und eine Selektorzeichenkette in Anführungszeichen,,site/modules/FieldtypeFlex/src/FlexQuery.php,cf37c965cbb91d25721d1021bb39d6ac
+Use blank collection checks or type-qualified @ selectors,Verwenden Sie Leerprüfungen für Sammlungen oder typqualifizierte @-Selektoren,,site/modules/FieldtypeFlex/src/FlexQuery.php,c30f390915798f7692a8bc36a20f8198
+Use type-qualified @ selectors for same-row conditions,Verwenden Sie typqualifizierte @-Selektoren für Bedingungen in derselben Zeile,,site/modules/FieldtypeFlex/src/FlexQuery.php,43101bfc85c15bbe35160bc02f17261f
 Empty same-row selector,Leerer Selektor für dieselbe Zeile,,site/modules/FieldtypeFlex/src/FlexQuery.php,c7eb22c1491b103ed129c17c77536e71
-Same-row selectors require one property path,Selektoren für dieselbe Zeile benötigen einen Eigenschaftspfad,,site/modules/FieldtypeFlex/src/FlexQuery.php,e362cdea83c95e10b155de5e4bc00a39
 Unsupported Flex selector operator: %s,Nicht unterstützter Flex-Selektoroperator: %s,,site/modules/FieldtypeFlex/src/FlexQuery.php,8f21f0e26f2e9232fe8937fd1e96df5e
 Repeated leaf sorting is ambiguous; sort the set count,Die Sortierung nach wiederholten Eigenschaften ist mehrdeutig; sortieren Sie nach der Anzahl der Sammlung,,site/modules/FieldtypeFlex/src/FlexQuery.php,868f07b3538015d9d91cf93499c97d4c
 Sorting multi-selection Flex properties is ambiguous,Die Sortierung nach Flex-Mehrfachauswahleigenschaften ist mehrdeutig,,site/modules/FieldtypeFlex/src/FlexQuery.php,29866319ac4c068b1035f357ca69e54c
@@ -427,3 +426,17 @@ Invalid Flex row visibility,Ungültige Flex-Row-Sichtbarkeit,,site/modules/Field
 Undo removal,Entfernen rückgängig machen,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,5b92e819d882b56fac9257489cb3400a
 Invalid Flex row removal,Ungültige Flex-Row-Löschmarkierung,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,210477ec9451ce0d33970012963d17ff
 Remove all items?,Alle Einträge entfernen?,,site/modules/FieldtypeFlex/InputfieldFlex.module.php,0ba1cc4a44ed1aace333e9865c70f93c
+Reserved Flex media metadata name: %s,Reservierter Name für Flex-Medienmetadaten: %s,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,026142c4b491be3be2135b16e0ff1ac3
+Rows are not supported in customFields,Rows werden in customFields nicht unterstützt,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,f931653670b56d45fa84849854f3f866
+customFields.description useLanguages contradicts the media noLang setting,useLanguages in customFields.description widerspricht der noLang-Einstellung des Mediums,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,f8bba465830550adad009bc6150c7355
+Unsupported customFields input: %s,Nicht unterstützte customFields-Eingabe: %s,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,7a36f38fe8aae4e43b79bee29bc08118
+Renames between native description/tags and custom values are unsupported,Umbenennungen zwischen nativen description/tags und benutzerdefinierten Werten werden nicht unterstützt,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,849d99517da9ae1505cc50f0641c7a74
+"customFields.description requires Text, Textarea or TinyMCE","customFields.description erfordert Text, Textarea oder TinyMCE",,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,be141db7b2ca6f40b448c23c2f08281a
+"customFields.tags requires a plain text, tag or choice input","customFields.tags erfordert eine einfache Text-, Tag- oder Auswahleingabe",,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,537ba7299ae485fa9aedab42334ff6c2
+customFields.tags option keys must be unambiguous native tags,Optionsschlüssel von customFields.tags müssen eindeutige native Tags sein,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,7d99312270cc128438da64e6f5395896
+customFields requires a File or Image property,customFields erfordert eine File- oder Image-Eigenschaft,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,72ebcd1942351f13b8dbbfaa881c22de
+customFields must be an array or InputfieldWrapper,customFields muss ein Array oder InputfieldWrapper sein,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,f3d94f39e0ca35a7fc5cfe5d5811600d
+Edit Flex metadata on the original file,Bearbeite Flex-Metadaten an der Originaldatei,,site/modules/FieldtypeFlex/src/FlexMedia.php,1aefe2c59617bc1b7b9c230d5c4a633d
+Invalid Flex custom metadata property map,Ungültige Eigenschaftszuordnung für benutzerdefinierte Flex-Metadaten,,site/modules/FieldtypeFlex/src/FlexMedia.php,b552a39f59ffc16b85e63ae0e24adf8b
+Incomplete Flex metadata submission; reload and check the PHP input limits,Unvollständige Flex-Metadaten; neu laden und die PHP-Eingabelimits prüfen,,site/modules/FieldtypeFlex/src/InputfieldFlexMedia.php,61833ed7b3135fb4b22fd106bbe29909
+customFields Page inputs require InputfieldSelect or InputfieldAsmSelect,Page-Eingaben in customFields erfordern InputfieldSelect oder InputfieldAsmSelect,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,978879c7cea02aa1427294df26918cbe

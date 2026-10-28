@@ -93,7 +93,7 @@ class FlexQuery extends Wire {
 			return $this->matchPage($query, $subfield, $operator, $value, $rootDef);
 		}
 		if($rootDef && $rootDef['kind'] === 'rows') {
-			return $this->matchRows($query, $subfield, $operator, $value, $rootDef);
+			return $this->matchRows($query, $subfield, $operator, $value);
 		}
 		if($rootDef && in_array($rootDef['kind'], ['file', 'image'], true)) {
 			$parts = explode('.', $subfield);
@@ -344,11 +344,81 @@ class FlexQuery extends Wire {
 		return "COALESCE((SELECT JSON_LENGTH(JSON_EXTRACT(flex_media.data,$path)) FROM `$table` AS flex_media WHERE flex_media.pages_id=pages.id),0)";
 	}
 
-	private function matchRows($query, string $path, string $operator, $value, array $definition) {
+	private function matchRows($query, string $path, string $operator, $value) {
+		if($query->group !== null) throw new PageFinderSyntaxException('Flex @ group was not normalized by PageFinder');
 		$this->type->storage()->requireRowSchema();
 		$query->set('joinType', 'leftjoin');
-		$query->where($this->rowsPredicate($query, $path, $operator, $value, $this->type->getDefinitions($query->field)));
+		$defs = $this->type->getDefinitions($query->field);
+		$query->where($this->rowsPredicate($query, $path, $operator, $value, $defs));
 		return $query;
+	}
+
+	/**
+	 * Normalize @ groups before PageFinder applies per-selector negation/OR values.
+	 * This also compiles each group once, independently of its number of clauses.
+	 * @internal
+	 */
+	public function prepareRowGroups(Selectors $selectors): void {
+		$groups = [];
+		foreach($selectors as $selector) {
+			if($selector->group === null || $selector->quote === '(') continue;
+			foreach($selector->fields() as $path) {
+				$field = $this->wire()->fields->get(explode('.', $path, 2)[0]);
+				if(!$field || !$field->type instanceof FieldtypeFlex) continue;
+				$key = $field->name . '@' . $selector->group;
+				if(!isset($groups[$key])) $groups[$key] = ['field' => $field, 'selectors' => $this->wire(new Selectors())];
+				$groups[$key]['selectors']->add($selector);
+			}
+		}
+		$replacements = [];
+		foreach($groups as $group) {
+			$replacements[] = [$group['selectors'], $this->groupRowConditions($group['selectors'], $this->type->getDefinitions($group['field']), $group['field']->name . '.')];
+		}
+		foreach($replacements as [$originals, $replacement]) {
+			foreach($originals as $selector) $selectors->remove($selector);
+			foreach($replacement as $selector) $selectors->add($selector);
+		}
+	}
+
+	/** Group direct row conditions at each SQL recursion level, using native Selectors only. */
+	private function groupRowConditions(Selectors $selectors, FlexFieldDefs $defs, string $prefix = ''): Selectors {
+		$result = $this->wire(new Selectors());
+		$groups = [];
+		foreach($selectors as $selector) {
+			$fields = $selector->fields();
+			if(count($fields) !== 1 || ($prefix === '' && $selector->group !== null) || !preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*$/D', $fields[0]) || in_array($selector->quote, ['[', '(', '{'], true) || $selector->altOperators) {
+				throw new PageFinderSyntaxException('Unsupported Flex @ selector path or grouping');
+			}
+			$parts = explode('.', $prefix === '' ? $fields[0] : substr($fields[0], strlen($prefix)));
+			$name = array_shift($parts);
+			$def = $defs->property($name);
+			$rows = ($def['kind'] ?? '') === 'rows';
+			if($rows && ($parts[0] ?? '') === '_type') throw new PageFinderSyntaxException('Flex @ selectors use explicit row types, not collection _type predicates');
+			// Child counts/blank checks belong to the current parent, not a child
+			// that would itself have to exist. Only leaf paths introduce a scope.
+			if(!$rows || count($parts) < 2 || (count($parts) === 2 && $parts[1] === 'count')) {
+				if($prefix !== '') throw new PageFinderSyntaxException('Flex @ selectors require a type-qualified row property path');
+				$result->add($selector);
+				continue;
+			}
+			$type = array_shift($parts);
+			if(!isset($def['types'][$type])) throw new PageFinderSyntaxException('Unknown Flex @ row type: ' . $type);
+			$scope = $prefix . $name . '.' . $type;
+			if(isset($groups[$name]) && $groups[$name]->field !== $scope) {
+				throw new PageFinderSyntaxException('One Flex @ group cannot require different types of the same row; use named groups');
+			}
+			if(!isset($groups[$name])) {
+				$groups[$name] = $this->wire(new SelectorEqual($scope, [$this->wire(new Selectors())]));
+				$groups[$name]->quote = '"'; // Internal AST, not a native Page sub-selector.
+				$result->add($groups[$name]);
+			}
+			$condition = clone $selector;
+			$condition->field = implode('.', $parts);
+			$condition->not = $selector->not; // Native setField() resets prefix negation.
+			$condition->group = null;
+			$groups[$name]->values(true)[0]->add($condition);
+		}
+		return $result;
 	}
 
 	/** Compile a schema-qualified path with explicit ancestor correlation. */
@@ -434,26 +504,23 @@ class FlexQuery extends Wire {
 			$predicate = $this->rowLeaf($query, $leaf, $schema->properties(), $op, $value, $alias);
 		} else if($value === '') {
 			if(!in_array($operator, ['=', '!='], true)) {
-				throw new PageFinderSyntaxException($this->_('A row collection supports blank or same-row selectors'));
+				throw new PageFinderSyntaxException($this->_('Use blank collection checks or type-qualified @ selectors'));
 			}
 			$negate = $operator === '=';
 		} else {
-			if(!$schema || !in_array($operator, ['=', '!='], true) || !is_string($value)) {
-				throw new PageFinderSyntaxException($this->_('Same-row selectors require a type and a quoted selector string'));
+			if(!$schema || $operator !== '=' || !$value instanceof Selectors) {
+				throw new PageFinderSyntaxException($this->_('Use type-qualified @ selectors for same-row conditions'));
 			}
-			$selectors = $this->wire(new Selectors($value));
+			$selectors = $this->groupRowConditions($value, $schema);
 			if(!count($selectors)) {
 				throw new PageFinderSyntaxException($this->_('Empty same-row selector'));
 			}
 			$conditions = [];
 			foreach($selectors as $selector) {
 				$fields = $selector->fields();
-				if(count($fields) !== 1 || $selector->quote === '[') {
-					throw new PageFinderSyntaxException($this->_('Same-row selectors require one property path'));
-				}
 				$choices = [];
 				$childName = explode('.', $fields[0], 2)[0];
-				foreach($selector->values() as $choice) {
+				foreach($selector->values(true) as $choice) {
 					if(($schema->property($childName)['kind'] ?? '') === 'rows') {
 						$choices[] = $this->rowsPredicate($query, $fields[0], $selector->operator, $choice, $schema, $schemaPath . '.' . $type . '.', $alias);
 					} else {
@@ -464,7 +531,6 @@ class FlexQuery extends Wire {
 				$conditions[] = $selector->not ? "NOT $condition" : $condition;
 			}
 			$predicate = implode(' AND ', $conditions);
-			$negate = $operator === '!=';
 		}
 		return ($negate ? 'NOT ' : '') . "EXISTS (SELECT 1 $from AND ($predicate))";
 	}
@@ -581,7 +647,7 @@ class FlexQuery extends Wire {
 							'name'      => $type,
 							'label'     => $typeDefinition['label'],
 							'input'     => 'text',
-							'operators' => ['=', '!='],
+							'operators' => ['=""', '!=""'],
 							'options'   => [],
 							'subfields' => $typeFields,
 						];

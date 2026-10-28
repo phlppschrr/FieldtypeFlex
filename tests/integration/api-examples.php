@@ -8,8 +8,15 @@ if(PHP_SAPI !== 'cli' || !isset($same, $createField)) {
 // Execute the actual reference snippets in the existing disposable suite fixture.
 $api = file_get_contents(dirname(__DIR__, 2) . '/API.md');
 preg_match_all('/```php\n(.*?)```/s', $api, $matches);
-$same(26, count($matches[1]), 'all API PHP examples have an execution context');
+$same(31, count($matches[1]), 'all API PHP examples have an execution context');
+$metadataExamples = array_values(array_filter($matches[1], static fn($code) => str_starts_with($code, '// Per-file metadata definition.') || str_starts_with($code, '// Existing image in the gallery.')));
+$matches[1] = array_values(array_filter($matches[1], static fn($code) => !in_array($code, $metadataExamples, true)));
 $blocks = array_combine(range(1, count($matches[1])), $matches[1]);
+$loadedSearchExample = $blocks[15];
+$nestedSameRowExample = $blocks[23];
+$excludedRowsExample = $blocks[24];
+unset($blocks[15], $blocks[23], $blocks[24]);
+$blocks = array_combine(range(1, count($blocks)), array_values($blocks));
 $rowTitleFragment = $blocks[9];
 $visibilityExample = $blocks[11];
 $allRowsExample = $blocks[12];
@@ -47,7 +54,8 @@ $rowSchema = $snippet($fragment($blocks[8]))['result'];
 $mediaSchema = $snippet($fragment($blocks[14]))['result'];
 $renameSchema = $snippet($fragment($blocks[7]))['result'];
 $inheritSchema = $snippet($fragment(str_replace('rich_text_source', $sourceField->name, $blocks[20])))['result'];
-$schema = $base + $rowSchema + $mediaSchema + $inheritSchema + [
+$metadataSchema = $snippet($fragment($metadataExamples[0]))['result'];
+$schema = $base + $rowSchema + $mediaSchema + $inheritSchema + $metadataSchema + [
 	'summary' => ['type' => 'text'],
 	'appearance' => ['type' => 'select', 'label' => 'Appearance & style', 'options' => ['featured' => 'Featured & selected']],
 	'starts_on' => ['type' => 'datetime', 'dateInputFormat' => 'd.m.Y', 'dateOutputFormat' => 'd.m.Y'],
@@ -94,6 +102,11 @@ $same($beforeCount + 1, $r['count'], 'API type count includes current rows');
 $execute(12);
 $fresh = $wire->pages->getFresh($id)->getUnformatted($name);
 $same('A note', $fresh->sections->first()->blocks->first()->notes->first()->text, 'API nested example persists third-level value');
+$searchCode = str_replace('$page->content', '$page->' . $name, $loadedSearchExample);
+$r = $snippet($searchCode, ['block' => $fresh->sections->first()->blocks->first()] + $context);
+$assert($r['images'] instanceof FlexRows && $r['intro'] instanceof FlexRows, 'API loaded search returns Row collections');
+$same(1, count($r['intro']), 'API loaded same-row search matches the existing row');
+$same(0, count($r['notes']), 'API nested loaded search uses its concrete parent collection');
 $inputs = $wire->wire(new InputfieldWrapper());
 $execute(13, compact('inputs'));
 $nativeDefs = new FlexFieldDefs($apiField, $page, $inputs);
@@ -106,18 +119,25 @@ imagepng($im, $imagePath);
 imagedestroy($im);
 $page->of(false);
 $page->get($name)->hero->add($imagePath);
+$page->get($name)->gallery->add($imagePath);
 $page->save($name);
 $page->of(true);
 $r = $execute(15);
 $assert($r['image'] instanceof Pageimage && $r['images'] instanceof FlexImages, 'API formatted single and raw collection example types');
 $assert($r['output'] !== '' && count($r['images']) === 1, 'API image resize creates a usable variation URL');
+$snippet(str_replace(['$page->content', "'content'"], ['$page->' . $name, "'$name'"], $metadataExamples[1]), $context);
+$same('Example Photographer', $wire->pages->getFresh($id)->getUnformatted($name)->gallery->first()->copyright, 'API per-file custom metadata example persists direct values');
+$page->of(false);
 $localPDF = $trackFile(dirname(__DIR__, 2) . '/.dev/api-example-' . bin2hex(random_bytes(5)) . '.pdf');
 file_put_contents($localPDF, "%PDF-1.4\n%%EOF\n");
 $snippet(str_replace(['$page->content', "'content'", '/absolute/path/to/document.pdf'], ['$page->' . $name, "'$name'", $localPDF], $blocks[16]), $context);
 $same(1, count($wire->pages->getFresh($id)->getUnformatted($name)->downloads), 'API local import persists with field save');
 $execute(17);
 $execute(18);
-$assert($wire->pages->findIDs("id=$id, $name.blocks.text=\"heading=Introduction, body*=ProcessWire\"") === [$id], 'API same-row selector matches saved row');
+$snippet(str_replace('content.', "$name.", $nestedSameRowExample), $context);
+$r = $snippet(str_replace('content.', "$name.", $excludedRowsExample), $context);
+$assert($r['matches'] instanceof PageArray && !$r['matches']->has($page), 'API native owner-ID exclusion removes the matching Page');
+$assert($wire->pages->findIDs("id=$id, @$name.blocks.text.heading=Introduction, @$name.blocks.text.body*=ProcessWire") === [$id], 'API same-row selector matches saved row');
 // Prove the distinction between independent predicates and a single concrete row.
 $page->of(false);
 $page->get($name)->blocks->removeAll();
@@ -125,7 +145,7 @@ $page->get($name)->blocks->addRow('text', ['heading' => 'Introduction']);
 $page->get($name)->blocks->addRow('text', ['body' => 'ProcessWire']);
 $page->save($name);
 $same([$id], $wire->pages->findIDs("id=$id, $name.blocks.text.heading=Introduction, $name.blocks.text.body*=ProcessWire"), 'separate API row predicates can match different rows');
-$same([], $wire->pages->findIDs("id=$id, $name.blocks.text=\"heading=Introduction, body*=ProcessWire\""), 'API same-row selector rejects split matches');
+$same([], $wire->pages->findIDs("id=$id, @$name.blocks.text.heading=Introduction, @$name.blocks.text.body*=ProcessWire"), 'API same-row selector rejects split matches');
 $copy = $wire->pages->clone($page);
 $pages[] = $copy;
 $execute(21, compact('copy'));

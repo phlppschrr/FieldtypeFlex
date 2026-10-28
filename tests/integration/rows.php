@@ -86,9 +86,9 @@ $throws(fn() => $formatted->slides->first()->set('heading', 'Bad'), 'formatted r
 $same('Intro <one>', $formatted->rawArray()['slides']['items'][1]['values']['heading'], 'formatted row view does not contaminate storage');
 $same([$id], $wire->pages->findIDs("id=$ids, $name.slides.item.heading=Other"), 'nested row leaf selectors match any row');
 $same([$id], $wire->pages->findIDs("id=$ids, $name.slides.item.heading=Intro <one>, $name.slides.item.price>10"), 'independent row predicates may match different rows');
-$same([], $wire->pages->findIDs("id=$ids, $name.slides.item=\"heading=Intro <one>, price>10\""), 'same-row predicates reject deliberate cross-row false positive');
-$same([$id], $wire->pages->findIDs("id=$ids, $name.slides.item=\"heading=Other, price>10\""), 'quoted same-row selector requires one matching row');
-$same([$id], $wire->pages->findIDs("id=$ids, $name.slides.item=\"price!=20\""), 'same-row numeric inequality follows scalar negative semantics');
+$same([], $wire->pages->findIDs("id=$ids, @$name.slides.item.heading=Intro <one>, @$name.slides.item.price>10"), 'same-row predicates reject deliberate cross-row false positive');
+$same([$id], $wire->pages->findIDs("id=$ids, @$name.slides.item.heading=Other, @$name.slides.item.price>10"), '@ same-row selector requires one matching row');
+$same([$id], $wire->pages->findIDs("id=$ids, @$name.slides.item.price!=20"), 'same-row numeric inequality follows scalar negative semantics');
 $same([$second->id], $wire->pages->findIDs("id=$ids, $name.slides.item.heading!=Other"), 'negative row predicate includes absent collection but excludes matching row');
 $same([$second->id], $wire->pages->findIDs("id=$ids, $name.slides.item.heading="), 'row leaf blank means no populated row');
 $same([$id], $wire->pages->findIDs("id=$ids, $name.slides.item.heading!="), 'row leaf nonblank means at least one populated row');
@@ -236,7 +236,7 @@ $second->{$name}->slides->addRow('item', [
 	'price'   => '',
 ]);
 $second->save($name);
-$same([$second->id], $wire->pages->findIDs("id={$second->id}, $name.slides.item=\"price!=20\""), 'same-row numeric inequality includes a blank leaf');
+$same([$second->id], $wire->pages->findIDs("id={$second->id}, @$name.slides.item.price!=20"), 'same-row numeric inequality includes a blank leaf');
 $minField = $createField('flex_row_min', [
 	'items' => [
 		'type'       => 'rows',

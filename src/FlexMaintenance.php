@@ -148,7 +148,7 @@ final class FlexMaintenance extends Wire {
 						unset($aggregate);
 					}
 					foreach($renames as $rename) {
-						unset($rename['patchAddress']);
+						unset($rename['patchAddress'], $rename['containers'], $rename['property']);
 						$result['renames'][] = ['pageId' => $id] + $rename;
 					}
 					if($issues) {
@@ -231,17 +231,15 @@ final class FlexMaintenance extends Wire {
 	private function transformDocument(\stdClass $document, string $operation, array $paths, array $renames, array $orphans): \stdClass {
 		$edits = $operation === 'rename' ? $renames : array_filter($orphans, static fn($item) => in_array($item['path'], $paths, true));
 		foreach($edits as $edit) {
-			$parts = explode('.', $edit['patchAddress'] ?? $edit['address']);
 			$scope = $document;
-			while(count($parts) > 1) {
-				$set = array_shift($parts); $id = array_shift($parts);
+			foreach($edit['containers'] as $container) {
 				$found = false;
-				foreach($scope->{$set}->items as $row) {
-					if($row->id === $id) { $scope = $row->values; $found = true; break; }
+				foreach($scope->{$container['property']}->items as $item) {
+					if($item->id === $container['id']) { $scope = $item->values; $found = true; break; }
 				}
-				if(!$found) throw new WireException('Checked JSON row address no longer exists');
+				if(!$found) throw new WireException('Checked JSON container no longer exists');
 			}
-			$name = $parts[0];
+			$name = $edit['property'];
 			if($operation === 'rename') {
 				$target = substr($edit['to'], strrpos('.' . $edit['to'], '.'));
 				$scope->{$target} = $scope->{$name};
@@ -258,12 +256,13 @@ final class FlexMaintenance extends Wire {
 		foreach($defs->properties() as $name => $def) {
 			$item = ['kind' => $def['kind'], 'renamedFrom' => $def['renamedFrom']];
 			foreach($def['types'] ?? [] as $key => $type) $item['types'][$key] = $this->schema($type['schema']);
+			if($def['customFields'] ?? null) $item['customFields'] = $this->schema($def['customFields']);
 			$schema[$name] = $item;
 		}
 		return $schema;
 	}
 
-	private function walk(array $raw, \stdClass $document, FlexFieldDefs $defs, string $schema, string $address, string $storedSchema, string $storedAddress, string $operation, array $paths, array &$issues, array &$orphans, array &$renames): array {
+	private function walk(array $raw, \stdClass $document, FlexFieldDefs $defs, string $schema, string $address, string $storedSchema, string $storedAddress, string $operation, array $paths, array &$issues, array &$orphans, array &$renames, array $containers = []): array {
 		$properties = $defs->properties();
 		$sources = [];
 		$storedNames = [];
@@ -273,7 +272,7 @@ final class FlexMaintenance extends Wire {
 				if(!array_key_exists($old, $raw)) continue;
 				if(!array_key_exists($name, $raw)) $storedNames[$name] ??= $old;
 				$previous = array_key_exists($name, $raw) ? $name : $storedNames[$name];
-				$renames[] = ['from' => $storedSchema . $old, 'to' => $schema . $name, 'address' => $storedAddress . $old, 'patchAddress' => $address . $old];
+				$renames[] = ['from' => $storedSchema . $old, 'to' => $schema . $name, 'address' => $storedAddress . $old, 'patchAddress' => $address . $old, 'containers' => $containers, 'property' => $old];
 				if($old !== $previous && ($raw[$old] !== $raw[$previous]
 					|| $this->documentRevision($document->{$old}) !== $this->documentRevision($document->{$previous}))) {
 					$issues[] = ['kind' => 'conflicts', 'path' => $schema . $old, 'address' => $storedAddress . $old, 'message' => 'Different old and new values'];
@@ -291,7 +290,7 @@ final class FlexMaintenance extends Wire {
 			$storedName = $operation === 'rename' ? ($storedNames[$name] ?? $name) : $name;
 			$location = $storedAddress . $storedName;
 			if(!isset($properties[$targetName])) {
-				$orphans[] = ['path' => $path, 'address' => $location, 'media' => count(FlexMedia::records([$name => $value]))];
+				$orphans[] = ['path' => $path, 'address' => $location, 'media' => count(FlexMedia::records([$name => $value])), 'containers' => $containers, 'property' => $name];
 				if($operation === 'cleanup' && in_array($path, $paths, true)) unset($raw[$name]);
 				continue;
 			}
@@ -299,6 +298,15 @@ final class FlexMaintenance extends Wire {
 			if($operation === 'check' && in_array($def['kind'], ['file', 'image'], true) && $value !== null && $value !== '' && $value !== []) {
 				$marker = $def['kind'] === 'image' ? FlexStorage::IMAGES_FORMAT : FlexStorage::FILES_FORMAT;
 				if(!FlexMedia::validEnvelope($value, $marker)) $issues[] = ['kind' => 'errors', 'category' => 'envelope', 'path' => $path, 'address' => $location, 'message' => 'Invalid stored media envelope'];
+			}
+			if(in_array($def['kind'], ['file', 'image'], true) && is_array($value) && isset($value['items'])) {
+				foreach($value['items'] as $ordinal => &$meta) {
+					if(!array_key_exists('values', $meta)) continue;
+					$metadataDocument = $document->{$storedName}->items[$ordinal]->values ?? null;
+					if(!$metadataDocument instanceof \stdClass) throw new WireException('Stored custom metadata must be a JSON object');
+					$meta['values'] = $this->walk($meta['values'], $metadataDocument, $def['customFields'], "$path.", "$patchLocation.{$meta['id']}.", "$storedSchema$storedName.", "$location.{$meta['id']}.", $operation, $paths, $issues, $orphans, $renames, array_merge($containers, [['property' => $name, 'id' => $meta['id'], 'kind' => 'media']]));
+				}
+				unset($meta);
 			}
 			if($def['kind'] !== 'rows') continue;
 			if(!is_array($value) || ($value['_flex'] ?? '') !== FlexStorage::ROWS_FORMAT) {
@@ -313,7 +321,7 @@ final class FlexMaintenance extends Wire {
 					continue;
 				}
 				$rowDocument = (object) $documentRows[$ordinal]->values;
-				$row['values'] = $this->walk($row['values'], $rowDocument, $def['types'][$rowType]['schema'], "$path.$rowType.", "$patchLocation.{$row['id']}.", "$storedSchema$storedName.$rowType.", "$location.{$row['id']}.", $operation, $paths, $issues, $orphans, $renames);
+				$row['values'] = $this->walk($row['values'], $rowDocument, $def['types'][$rowType]['schema'], "$path.$rowType.", "$patchLocation.{$row['id']}.", "$storedSchema$storedName.$rowType.", "$location.{$row['id']}.", $operation, $paths, $issues, $orphans, $renames, array_merge($containers, [['property' => $name, 'id' => $row['id'], 'kind' => 'rows']]));
 			}
 			unset($row);
 		}

@@ -41,6 +41,7 @@ final class FlexLazy {
 			if(method_exists($input, 'getOptions')) $effective['options'] = $plain($input->getOptions());
 			$properties[$name] = [$plain($definition['settings']), $effective];
 			foreach($definition['types'] ?? [] as $type => $entry) $properties[$name]['types'][$type] = self::signature($entry['schema']);
+			if($definition['customFields'] ?? null) $properties[$name]['customFields'] = self::signature($definition['customFields']);
 		}
 		return $cache[$defs] = hash('sha256', json_encode([$defs->structure(), $properties], JSON_THROW_ON_ERROR));
 	}

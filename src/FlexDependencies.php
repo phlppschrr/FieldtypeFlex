@@ -21,7 +21,7 @@ final class FlexDependencies {
 	}
 
 	/** Resolve a selector field, leaving comparison syntax and values to the core. */
-	public static function fieldName(string $name, ?FlexValue $value, string $inputName, string $prefix, array $names, Page $page, Field $field): string {
+	public static function fieldName(string $name, ?FlexValue $value, string $inputName, string $prefix, array $names, Page $page, Field $field, ?string $parentAddress = null): string {
 		[$scope, $path] = array_pad(explode('.', $name, 2), 2, '');
 		if($path !== '' && in_array($scope, ['parent', 'root', 'page', 'forpage'], true)) {
 			if(!preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*(?:\.count)?$/D', $path)) {
@@ -33,8 +33,8 @@ final class FlexDependencies {
 			}
 			$address = '';
 			if($scope === 'parent') {
-				if(!$value instanceof FlexRow) throw self::error($field, __('A parent dependency requires a Flex row'));
-				$address = implode('.', array_slice(explode('.', $value->address()), 0, -2));
+				if($parentAddress === null && !$value instanceof FlexRow) throw self::error($field, __('A parent dependency requires a Flex row'));
+				$address = $parentAddress ?? implode('.', array_slice(explode('.', $value->address()), 0, -2));
 			}
 			return FlexPath::inputPrefix($inputName, $address) . $path;
 		}

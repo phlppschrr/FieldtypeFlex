@@ -147,7 +147,16 @@ class InputfieldFlex extends Inputfield {
 		// Repeaters preload only their direct subfields. Flex is atomic to the outer form,
 		// so preload its native children even when the item HTML will arrive later via AJAX.
 		try {
-			foreach($this->inputs()->getAll(['withWrappers' => true]) as $child) {
+			// Core's Repeater asset preload uses an unsuffixed field name. It must
+			// not consume a root field's POST draft when both use the same Field.
+			if($parent === null && $this->hasPage instanceof RepeaterPage && $this->name === $this->hasField->name) {
+				$value = $this->hasPage->getUnformatted($this->hasField->name);
+				$name = $this->name . '_repeater' . $this->hasPage->id;
+				$assets = $this->hasField->type->getDefinitions($this->hasField, $this->hasPage)->getInputfields($value, $name . '__', '', $value, null, $name);
+			} else {
+				$assets = $this->inputs();
+			}
+			foreach($assets->getAll(['withWrappers' => true]) as $child) {
 				if($child->renderReady($child->parent, $renderValueMode)) {
 					$loaded = true;
 				}

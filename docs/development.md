@@ -226,3 +226,29 @@ Double-click a pending row to undo all sibling marks without a dialog. Check a
 nested collection and `minItems=1` (one active row remains), then Save and verify
 that only marked rows were deleted through fresh PHP readback. Include unopened
 lazy rows so the bulk action does not require loading their bodies.
+
+## File/Image custom metadata verification
+
+Run `ddev flex-test metadata` for direct/native bridge values, dates, languages,
+formatters, independent copies, selective saves, stale metadata, outer rollback,
+SQL failure, raw renames/orphans/cleanup, adapter validation and native per-file
+processing. Include `media admin repeaters maintenance public-api translations`
+for the surrounding lifecycle, editor, inspection and executable examples.
+
+Browser checks use isolated root/nested File/Image properties and a natively
+AJAX-loaded Repeater, including the same Flex Field on root and Repeater owners.
+Verify required failure/recovery, description/tags appearing once, unchecked and
+empty multi-choice controls, dependencies, rename/duplicate/replacement, upload
+with initially blank required metadata and an image-dialog refresh after unsaved
+metadata changes. Verify native Core Original and Default/Konkat. Read saved JSON,
+asset identities and original/variation hashes independently; inspect console
+warnings/errors. The existing maxFiles=1 replacement stages the new file and
+preserves pending metadata; `overwrite` remains unsupported.
+
+Include TinyMCE (normal and inline), pending edits across an image-dialog refresh,
+required-rich-text error recovery, Hidden transport, Markup-only definitions and
+single/multiple Page selection through Select/AsmSelect. Compare blank/dereference/unpublished Page behavior
+with native FieldtypePage and check mutable reference-container isolation.
+
+Keep temporary scripts and browser fixtures under the ignored .dev/ directory.
+Remove registered test modules, Fields and Pages after verification.

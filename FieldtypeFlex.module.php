@@ -115,6 +115,9 @@ class FieldtypeFlex extends Fieldtype implements FieldtypeHasFiles, FieldtypeHas
 		// Core discards a third sort component before getMatchQuerySort(). Validate
 		// its meaning while the original selectors still exist; root collections sort by count.
 		$this->addHookBefore('PageFinder::getQuery', $this, 'validateSortPaths');
+		$this->addHookBefore('PageFinder::getQuery', function(HookEvent $event) {
+			(new FlexQuery($this))->prepareRowGroups($event->arguments(0));
+		});
 		$this->addHookBefore('InputfieldSelector::render', function() {
 			$names = [];
 			foreach($this->wire()->fields as $field) {
@@ -400,16 +403,29 @@ class FieldtypeFlex extends Fieldtype implements FieldtypeHasFiles, FieldtypeHas
 			!($file instanceof FlexPagefile || $file instanceof FlexPageimage)
 			|| $file->page !== $page
 			|| (int) $file->field->id !== (int) $field->id
+			|| ($file instanceof Pageimage && $file->getOriginal() !== null)
 			|| $file->formatted()
 			|| $page->of()
 			|| $page->get('_version')
 		) {
 			throw new WireException($this->_('Save an unformatted, owned Flex file on a live page'));
 		}
-		$allowed = ['description', 'tags', 'filedata', 'modified', 'modified_users_id'];
+		$allowed = ['description', 'tags', 'filedata', 'values', 'modified', 'modified_users_id'];
 		foreach($columns as $column) {
 			if(!in_array($column, $allowed, true)) {
 				throw new WireException($this->_('Unsupported Flex file metadata column'));
+			}
+		}
+		// A retained file can outlive pending removal of its containing Row.
+		// Resolve optional root tracking before writing, never after commit.
+		$root = $page->getUnformatted($field->name);
+		$attached = false;
+		if($root instanceof FlexValue) {
+			try {
+				[$owner, $leaf] = FlexPath::resolve($root, $file->pagefiles->address());
+				$attached = $owner->getUnformatted($leaf)->get($file->basename()) === $file;
+			} catch(WireException $error) {
+				// Unrelated pending tree edits are not part of this file save.
 			}
 		}
 		$meta = FlexMedia::describe($file, $file->assetId());
@@ -417,6 +433,7 @@ class FieldtypeFlex extends Fieldtype implements FieldtypeHasFiles, FieldtypeHas
 		$this->storage()->requireTransactional($field);
 		$committed = $this->storage()->atomic(function() use ($page, $field, $file, $meta, $columns, $allowed) {
 			$raw = $this->storage()->persisted($page, $field, true);
+			$previousRevision = FlexStorage::revision($raw);
 			$collection =& FlexPath::rawProperty($raw, $file->pagefiles->address());
 			$found = false;
 			foreach($collection['items'] ?? [] as $n => $stored) {
@@ -425,7 +442,8 @@ class FieldtypeFlex extends Fieldtype implements FieldtypeHasFiles, FieldtypeHas
 						throw new WireException($this->_('Flex file changed; reload before saving metadata'));
 					}
 					foreach($columns ?: $allowed as $key) {
-						$collection['items'][$n][$key] = $meta[$key];
+						if(array_key_exists($key, $meta)) $collection['items'][$n][$key] = $meta[$key];
+						else unset($collection['items'][$n][$key]);
 					}
 					$found = true;
 					break;
@@ -444,8 +462,10 @@ class FieldtypeFlex extends Fieldtype implements FieldtypeHasFiles, FieldtypeHas
 			]);
 			$this->storage()->projectRows($page, $field, $raw);
 			$this->media()->sync($page, $field, $raw);
-			return $collection['items'][$n];
+			return ['item' => $collection['items'][$n], 'previous' => $previousRevision, 'revision' => FlexStorage::revision($raw)];
 		});
+		if($attached && $root->expectedRevision() === $committed['previous']) $root->expectedRevision($committed['revision']);
+		$committed = $committed['item'];
 		$file->baseline($committed);
 		if(FlexStorage::revision($committed) === FlexStorage::revision($meta)) {
 			$file->resetTrackChanges();

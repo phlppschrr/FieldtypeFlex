@@ -269,17 +269,26 @@ class FlexStorage extends Wire {
 			if(!is_array($value)) {
 				return $value;
 			}
-			if(($value['_flex'] ?? '') === FlexStorage::ROWS_FORMAT) {
-				foreach($value['items'] as &$row) {
-					$row['values'] = (object) $convert($row['values'], $depth + 3);
-				}
-				unset($row);
-				return $value;
-			}
+			// Rebuild rather than mutate copies: rawProperty() can leave PHP
+			// references inside a nested envelope during a selective file save.
+			$result = [];
+			$envelope = in_array($value['_flex'] ?? '', [self::ROWS_FORMAT, self::FILES_FORMAT, self::IMAGES_FORMAT], true);
 			foreach($value as $key => $item) {
-				$value[$key] = $convert($item, $depth + 1);
+				if($envelope && $key === 'items') {
+					$items = [];
+					foreach($item as $index => $entry) {
+						$map = [];
+						foreach($entry as $name => $leaf) {
+							$map[$name] = $name === 'values' ? (object) $convert($leaf, $depth + 3) : $convert($leaf, $depth + 3);
+						}
+						$items[$index] = $map;
+					}
+					$result[$key] = $items;
+				} else {
+					$result[$key] = $convert($item, $depth + 1);
+				}
 			}
-			return $value;
+			return $result;
 		};
 		return json_encode((object) array_map($convert, $raw), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR, FlexPath::JSON_DEPTH);
 	}

@@ -310,7 +310,7 @@ class WireTest_FieldtypeFlex extends WireTest {
 		$this->expect('three-level roundtrip', 'Grandchild', $value->items->first()->nested->first()->nested->first()->heading);
 		$this->expect('full nested identity', $parent->address() . '.nested.' . $child->rowId(), $value->items->first()->nested->first()->address());
 		$this->expect('deep selector', [$page->id], $this->wire()->pages->findIDs("id=$page->id, $nestedName.items.text.nested.text.nested.text.heading=Grandchild"));
-		$this->expect('parent-correlated count', [$page->id], $this->wire()->pages->findIDs("id=$page->id, $nestedName.items.text=\"heading=Parent, nested.text.count=1\""));
+		$this->expect('parent-correlated count', [$page->id], $this->wire()->pages->findIDs("id=$page->id, @$nestedName.items.text.heading=Parent, @$nestedName.items.text.nested.text.count=1"));
 		$copy = $value->items->duplicateRow($parent->rowId());
 		$this->expect('nested duplicate regenerates child ID', true, $copy->nested->first()->rowId() !== $child->rowId());
 		$this->expect('nested duplicate regenerates grandchild ID', true, $copy->nested->first()->nested->first()->rowId() !== $grandchild->rowId());
@@ -345,11 +345,12 @@ class WireTest_FieldtypeFlex extends WireTest {
 			'items.text.heading=Intro'             => [$full->id],
 			'items.text.heading!=Intro'            => [$blank->id],
 			'items.text.heading=""'               => [$blank->id],
-			'items.text="heading=Intro, price>10"' => [],
-			'items.text="heading=Other, price>10"' => [$full->id],
+			'@items.text.heading=Intro, @items.text.price>10' => [],
+			'@items.text.heading=Other, @items.text.price>10' => [$full->id],
 			'items.quote.heading=Other'            => [],
 		] as $selector => $expected) {
-			$this->expect($selector, $expected, $this->wire()->pages->findIDs("id=$ids, include=all, $name.$selector"));
+			$qualified = str_starts_with($selector, '@') ? str_replace('@', "@$name.", $selector) : "$name.$selector";
+			$this->expect($selector, $expected, $this->wire()->pages->findIDs("id=$ids, include=all, $qualified"));
 		}
 	}
 
@@ -411,12 +412,25 @@ class WireTest_FieldtypeFlex extends WireTest {
 				'type'       => $kind,
 				'extensions' => $kind === 'image' ? 'png' : 'txt',
 				'maxFiles'   => 1,
+				'customFields' => [
+					'copyright' => ['type' => 'text'],
+					'year' => ['type' => 'integer'],
+					'licenses' => ['type' => 'selectMultiple', 'options' => ['web' => 'Web', 'print' => 'Print']],
+					'token' => ['type' => 'hidden'],
+					'help' => ['type' => 'markup', 'value' => '<p>Portable metadata help</p>'],
+					'reference' => ['type' => 'page', 'derefAsPage' => 2, 'inputfield' => 'InputfieldSelect'],
+				],
 			],
 		]);
 		$page = $this->createPage();
 		$name = $field->name;
 		$page->getUnformatted($name)->asset->add($path);
 		$page->getUnformatted($name)->asset->first()->description = 'Portable description';
+		$page->getUnformatted($name)->asset->first()->copyright = 'Portable credit';
+		$page->getUnformatted($name)->asset->first()->year = 0;
+		$page->getUnformatted($name)->asset->first()->licenses = ['print', 'web'];
+		$page->getUnformatted($name)->asset->first()->token = 'Portable hidden value';
+		$page->getUnformatted($name)->asset->first()->reference = $this->wire()->pages->get(1);
 		$page->save($name);
 		$page = $this->reload($page);
 		$files = $page->getUnformatted($name)->asset;
@@ -424,6 +438,15 @@ class WireTest_FieldtypeFlex extends WireTest {
 		$this->expect('native collection', true, $files instanceof Pagefiles);
 		$this->expect('original roundtrip', hash_file('sha256', $path), hash_file('sha256', $file->filename()));
 		$this->expect('metadata roundtrip', 'Portable description', $file->description);
+		$this->expect('direct custom metadata roundtrip', 'Portable credit', $file->copyright);
+		$this->expect('zero custom metadata roundtrip', 0, $file->year);
+		$this->expect('ordered metadata choices', ['print', 'web'], $file->licenses);
+		$this->expect('native metadata bridge', 'Portable credit', $file->getFieldValue('copyright', false));
+		$this->expect('hidden metadata roundtrip', 'Portable hidden value', $file->token);
+		$this->expect('Page metadata roundtrip', 1, (int) $file->reference->id);
+		$file->copyright = 'Saved file credit';
+		$this->expect('native file saves custom metadata', true, $file->save());
+		$this->expect('native file metadata reload', 'Saved file credit', $this->reload($page)->getUnformatted($name)->asset->first()->copyright);
 		$original = $file->filename();
 		if($kind === 'image') {
 			$this->expect('native image', true, $file instanceof Pageimage);

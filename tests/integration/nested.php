@@ -91,7 +91,12 @@ if(!isset($same, $assert, $throws)) {
 		$deep->heading = 'Deep edit';
 		$assert($read->isChanged($field->name), 'deepest mutation marks root page field changed');
 		$read->save($field->name);
-		$find = static fn(string $selector) => $wire->pages->findIDs('id=' . $id . ', ' . $field->name . '.' . $selector);
+		$find = static function(string $selector) use ($wire, $field, $id): array {
+			$selectors = $wire->wire(new Selectors($selector));
+			foreach($selectors as $condition) $condition->field = $field->name . '.' . $condition->field;
+			$selectors->add($selectors->create('id', '=', $id));
+			return $wire->pages->findIDs($selectors);
+		};
 		$same([$id], $find('nodes.item.nodes.item.nodes.item.nodes.item.nodes.item.heading="Deep edit"'), 'PageFinder accepts five-level leaf paths');
 		$same([$id], $find('nodes.item.nodes.item.nodes.item.nodes.item.nodes.item.number=5'), 'deep selectors retain numeric typing');
 		$same([$id], $find('nodes.item.nodes.item.nodes.item.count=1'), 'global count reaches a third-level collection');
@@ -116,10 +121,12 @@ if(!isset($same, $assert, $throws)) {
 		$b->nodes->addRow('item', ['heading' => 'Z', 'number' => 3]);
 		$read->save($field->name);
 		$same([$id], $find('nodes.item.nodes.count=3'), 'global child count aggregates across parents');
-		$same([], $find('nodes.item="heading=A, nodes.item.heading=Y"'), 'same-row query cannot combine parent A and children of B');
-		$same([$id], $find('nodes.item="heading=B, nodes.item.heading=Y, nodes.item.count=2"'), 'same-row child predicates correlate with their parent');
-		$same([], $find('nodes.item.nodes.item="heading=Y, number=3"'), 'terminal same-row predicates cannot combine different children');
-		$same([$id], $find('nodes.item.nodes.item="heading=Y, number=2"'), 'terminal same-row predicates match one child');
+		$same([], $find('@nodes.item.heading=A, @nodes.item.nodes.item.heading=Y'), 'same-row query cannot combine parent A and children of B');
+		$same([$id], $find('@nodes.item.heading=B, @nodes.item.nodes.item.heading=Y, @nodes.item.nodes.item.count=2'), 'same-row child predicates correlate with their parent');
+		$same([], $find('@nodes.item.nodes.item.heading=Y, @nodes.item.nodes.item.number=3'), 'terminal same-row predicates cannot combine different children');
+		$same([$id], $find('@nodes.item.nodes.item.heading=Y, @nodes.item.nodes.item.number=2'), 'terminal same-row predicates match one child');
+		$same([$id], $wire->pages->findIDs("id=$id, @{$field->name}.nodes.item.heading=A, @{$field->name}.$path=Deep edit"), '@ correlates every ancestor through five levels');
+		$same([], $wire->pages->findIDs("id=$id, @{$field->name}.nodes.item.heading=B, @{$field->name}.$path=Deep edit"), '@ rejects combining a deep descendant with an unrelated ancestor');
 		$copy = $value->nodes->duplicateRow($a->rowId());
 		$assert($copy->rowId() !== $a->rowId(), 'subtree duplication creates a new parent ID');
 		$assert($copy->nodes->first()->rowId() !== $a->nodes->first()->rowId(), 'subtree duplication creates new child IDs');
@@ -142,8 +149,8 @@ if(!isset($same, $assert, $throws)) {
 		$throws(fn() => $admin->row($draft, 'nodes.' . str_repeat('a', 32) . '.nodes', $child->rowId(), $value), 'draft rejects a forged parent chain');
 		$admin->forget($draft);
 
-		$same([$id], $find('nodes.item="heading=B, nodes.item=\'heading=Y, number=2\'"'), 'recursive quoted same-row expression keeps both parent and child scope');
-		$same([], $find('nodes.item="heading=A, nodes.item=\'heading=Y, number=2\'"'), 'recursive quoted same-row rejects a child of another parent');
+		$same([$id], $find('@nodes.item.heading=B, @nodes.item.nodes.item.heading=Y, @nodes.item.nodes.item.number=2'), 'recursive @ same-row expression keeps both parent and child scope');
+		$same([], $find('@nodes.item.heading=A, @nodes.item.nodes.item.heading=Y, @nodes.item.nodes.item.number=2'), 'recursive @ same-row rejects a child of another parent');
 
 		$read = $wire->pages->getFresh($id);
 		$read->of(false);
@@ -268,7 +275,7 @@ if(!isset($same, $assert, $throws)) {
 		$same([$empty->id], $findEmpty('nodes.item.nodes.item.heading!=Missing'), 'negative deep selector includes missing canonical field row');
 		$same([$empty->id], $findEmpty('nodes.item.nodes.item.heading=""'), 'blank deep selector includes missing canonical field row');
 		$same([$empty->id], $findEmpty('nodes.item.nodes.item.count=0'), 'zero deep count includes missing ancestors');
-		$same([], $findEmpty('nodes.item="nodes.item.count=0"'), 'same-row count needs an existing parent');
+		$same([], $wire->pages->findIDs('id=' . $empty->id . ', @' . $field->name . '.nodes.item.nodes.count=0'), 'same-row count needs an existing parent');
 
 		$replaceField = clone $field;
 		$replaceSchema = $schemaFor(2);

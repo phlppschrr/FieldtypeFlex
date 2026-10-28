@@ -14,7 +14,7 @@ Define your field structure in PHP or JSON, edit everything together in Page Edi
 
 - **One field, one JSON value.** Store related properties together without creating a separate ProcessWire field for every value.
 - **ProcessWire selectors.** Query individual properties, typed rows and collection counts with `$pages->find()`.
-- **Files and images.** Manage media directly in Flex and use ProcessWire-compatible `Pagefile` and `Pageimage` objects, including image resizing and variations.
+- **Files and images.** Manage media directly in Flex and use ProcessWire-compatible `Pagefile` and `Pageimage` objects, including image resizing, variations and [per-file custom metadata](API.md#per-file-custom-fields).
 - **Typed, nested rows.** Build sortable content blocks with different schemas, similar in concept to RepeaterMatrix. Nest row collections to create more complex structures.
 
 Flex uses native ProcessWire Inputfields for editing, including validation, conditional dependencies, Page references, TinyMCE and multilingual text. Flex fields can also be used inside native ProcessWire Repeater items.
@@ -178,6 +178,9 @@ $pages->find('content.blocks._type=image');
 
 // Find pages with at least three blocks
 $pages->find('content.blocks.count>=3');
+
+// Both conditions must match the same text row
+$pages->find('@content.blocks.text.heading=Introduction, @content.blocks.text.body*=ProcessWire');
 ```
 
 You can also work directly with specific row types:
@@ -186,9 +189,20 @@ You can also work directly with specific row types:
 // Existing image rows, in their current order
 $images = $page->content->blocks->rowsOfType('image');
 
+// Search already loaded rows, retaining their order and identity
+$matchingImages = $page->content->blocks->find('_type=image');
+$galleries = $page->content->blocks->find('_type=image, photo.count>=3');
+
 // Number of text rows
 $count = $page->content->blocks->countOfType('text');
 ```
+
+`FlexRows::find()` returns Rows from a loaded Page, including unsaved values;
+`$pages->find()` returns Pages matching saved database values. Flex uses `_type`
+for Row metadata in selectors, preserving `type` as a normal content property.
+See [loaded collection search](API.md#searching-a-loaded-collection) for formatting,
+visibility and differences from Repeater Matrix, and
+[same-row selectors](API.md#operators-and-matching-semantics) for native Core limits.
 
 Root Page-reference properties can also query supported native fields on referenced pages. See [Page-reference traversal](API.md#root-page-reference-traversal) for details.
 

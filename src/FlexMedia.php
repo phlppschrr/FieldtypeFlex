@@ -4,24 +4,32 @@
 trait FlexOwnedFile {
 	private string $flexAssetId = '';
 	private array $flexBaseline = [];
+	private ?FlexValue $flexValues = null;
+	private bool $flexHasValues = false;
 
 	/** Read canonical descriptions for cloning, revision checks and persistence. @internal */
 	public function rawDescription($language = null) {
-		return parent::description($language);
+		$source = $this->metadataOriginal();
+		return $source !== $this ? $source->rawDescription($language) : parent::description($language);
 	}
 
 	/** Format description reads without changing native multilingual metadata. */
 	public function description($language = null, $value = null) {
 		if(is_array($language) || ($value !== null && !($language === true && $value === true))) {
-			$this->pagefiles->assertWritable();
+			$this->assertMetadataWritable();
 		}
-		$description = parent::description($language, $value);
+		$source = $this->metadataOriginal();
+		$description = $source !== $this ? $source->description($language, $value) : parent::description($language, $value);
+		if($source !== $this) return $description;
 		if($value !== null || is_array($language) || $language === true) return $description;
 		return $this->pagefiles->formatDescription($description);
 	}
 
 	/** Apply the same output rules to native language-specific property reads. */
 	public function get($key) {
+		if($this->flexAssetId !== '' && $this->metadataSchema()->property((string) $key) && !in_array($key, ['description', 'tags'], true)) return $this->getFieldValue($key);
+		$source = $this->metadataOriginal();
+		if($source !== $this && ($key === 'tags' || preg_match('/^description\d*$/D', (string) $key))) return $source->get($key);
 		$value = parent::get($key);
 		return is_string($key) && preg_match('/^description\d+$/D', $key)
 			? $this->pagefiles->formatDescription((string) $value) : $value;
@@ -102,7 +110,7 @@ trait FlexOwnedFile {
 	 */
 	public function filedata($key = '', $value = null) {
 		if(is_array($key) || $key === false || $key === null || $value !== null) {
-			$this->pagefiles->assertWritable();
+			$this->assertMetadataWritable();
 		}
 		return parent::filedata($key, $value);
 	}
@@ -115,11 +123,124 @@ trait FlexOwnedFile {
 	 * @return $this
 	 */
 	public function set($key, $value) {
+		if($this->flexAssetId !== '' && $this->metadataSchema()->property((string) $key) && !in_array($key, ['description', 'tags'], true)) {
+			$this->setFieldValue($key, $value);
+			return $this;
+		}
 		if($this->flexAssetId !== '' && (str_starts_with((string) $key, 'description') || in_array($key, ['tags', 'filedata'], true))) {
-			$this->pagefiles->assertWritable();
+			$this->assertMetadataWritable();
 		}
 		return parent::set($key, $value);
 	}
+
+	/** Original metadata stays authoritative for existing variation instances. */
+	private function metadataOriginal(): Pagefile {
+		return $this instanceof Pageimage && $this->original ? $this->original : $this;
+	}
+
+	private function assertMetadataWritable(): void {
+		$this->pagefiles->assertWritable();
+		if($this->metadataOriginal() !== $this) throw new WireException($this->_('Edit Flex metadata on the original file'));
+	}
+
+	private function metadataSchema(): FlexFieldDefs {
+		return $this->pagefiles->metadataSchema();
+	}
+
+	/** Hydrate once through Flex's existing scalar/date/language pipeline. @internal */
+	public function hydrateCustomValues(array $values, bool $present = true): void {
+		$this->flexHasValues = $present;
+		$this->flexValues = new FlexValue($this->page, $this->field, $this->metadataSchema(), $values, $this->pagefiles->address() . '.' . $this->assetId());
+	}
+
+	/** Canonical ordinary metadata, including retained unknown properties. @internal */
+	public function rawCustomValues(): ?array {
+		$source = $this->metadataOriginal();
+		if($source !== $this) return $source->rawCustomValues();
+		$raw = $this->flexValues ? $this->flexValues->rawArray() : [];
+		unset($raw['description'], $raw['tags']);
+		return $raw || $this->flexHasValues ? $raw : null;
+	}
+
+	/** Read declared fields; unknown names match native getFieldValue() (null). */
+	public function getFieldValue($name, $formatted = null) {
+		$source = $this->metadataOriginal();
+		if($source !== $this) {
+			$value = $source->getFieldValue($name, $formatted ?? $this->pagefiles->metadataFormatted());
+			return $value instanceof PageArray || $value instanceof LanguagesPageFieldValue ? clone $value : $value;
+		}
+		if(!$this->metadataSchema()->property((string) $name)) return null;
+		$formatted = $formatted ?? $this->pagefiles->metadataFormatted();
+		if($name === 'description') return $formatted ? $this->pagefiles->formatDescription($this->rawDescription(), true) : $this->rawDescription();
+		if($name === 'tags') return (string) $this->tags;
+		if(!$this->flexValues) $this->hydrateCustomValues([], false);
+		// Unformatted language and PageArray objects stay live only on writable originals.
+		if(!$formatted && !$this->formatted() && !$this->page->of()) return $this->flexValues->getUnformatted($name);
+		$view = clone $this->flexValues;
+		$view->of((bool) $formatted);
+		return $view->get($name);
+	}
+
+	/** Set declared fields; unknown names match native setFieldValue() (false). */
+	public function setFieldValue($name, $value, $changed = null) {
+		if(!$this->metadataSchema()->property((string) $name)) return false;
+		$this->assertMetadataWritable();
+		if($name === 'description') {
+			if($value instanceof LanguagesPageFieldValue || is_array($value)) $this->description($value instanceof LanguagesPageFieldValue ? $this->descriptionMap($value) : $value);
+			else $this->description(null, (string) $value);
+		} else if($name === 'tags') $this->tags = is_array($value) ? implode(' ', $value) : $value;
+		else {
+			if(!$this->flexValues) $this->hydrateCustomValues([], false);
+			$this->flexValues->set($name, $value);
+			$this->trackChange($name);
+			$this->pagefiles->trackChange('item');
+		}
+		return true;
+	}
+
+	private function descriptionMap(LanguagesPageFieldValue $value): array {
+		$map = [];
+		foreach($this->wire()->languages as $language) $map[$language->isDefault() ? 0 : $language->id] = $value->getLanguageValue($language);
+		return $map;
+	}
+
+	/** Detached native editor values combine ordinary metadata with native slots. @internal */
+	public function metadataInputValue(): FlexValue {
+		$raw = $this->rawCustomValues() ?? [];
+		$schema = $this->metadataSchema();
+		if($schema->property('description')) {
+			$raw['description'] = $this->rawDescription();
+			if($schema->property('description')['languages']) {
+				$raw['description'] = [];
+				foreach($this->wire()->languages as $language) $raw['description'][$language->id] = $this->rawDescription($language);
+			}
+		}
+		if($schema->property('tags')) {
+			$raw['tags'] = $schema->property('tags')['multiple'] ? $this->tags(true) : $this->tags();
+		}
+		return new FlexValue($this->page, $this->field, $schema, $raw, $this->pagefiles->address() . '.' . $this->assetId());
+	}
+
+	public function tags($value = null) {
+		$source = $this->metadataOriginal();
+		if($value !== null && !is_bool($value)) $this->assertMetadataWritable();
+		return $source !== $this ? $source->tags($value) : parent::tags($value);
+	}
+
+	public function isChanged($what = '') {
+		return parent::isChanged($what) || ($this->flexValues && $this->flexValues->isChanged($what));
+	}
+
+	public function resetTrackChanges($trackChanges = true) {
+		if($this->flexValues) $this->flexValues->resetTrackChanges($trackChanges);
+		return parent::resetTrackChanges($trackChanges);
+	}
+
+	public function __clone() {
+		parent::__clone();
+		if($this->flexValues) $this->flexValues = clone $this->flexValues;
+	}
+
 }
 
 class FlexPagefile extends Pagefile {
@@ -138,10 +259,11 @@ trait FlexMediaCollection {
 	private array $pendingCopies = [];
 	private string $flexDraft = '';
 	private bool $rawDescriptions = false;
+	private ?FlexFieldDefs $flexMetadataSchema = null;
 
 	/** Run native description formatters against a transient property Field. @internal */
-	public function formatDescription(string $description): string {
-		if(!$this->formatted() || $this->rawDescriptions) return $description;
+	public function formatDescription(string $description, bool $force = false): string {
+		if(!$force && (!$this->formatted() || $this->rawDescriptions)) return $description;
 		$field = $this->wire(new Field());
 		$field->type = $this->wire()->modules->get($this instanceof Pageimages ? 'FieldtypeImage' : 'FieldtypeFile');
 		$leaf = substr(strrchr('.' . $this->flexAddress, '.'), 1);
@@ -149,7 +271,7 @@ trait FlexMediaCollection {
 		foreach($this->flexDefinition['settings'] ?? [] as $key => $value) {
 			if(!in_array($key, ['id', 'name', 'type', 'value', 'inheritField'], true)) $field->set($key, $value);
 		}
-		$names = $field->textformatters ?? [];
+		$names = $this->metadataSchema()->property('description')['settings']['textformatters'] ?? $field->textformatters ?? [];
 		foreach($names as $name) {
 			$formatter = $this->wire()->modules->get($name);
 			if($formatter instanceof Textformatter) $formatter->formatValue($this->page, $field, $description);
@@ -188,6 +310,7 @@ trait FlexMediaCollection {
 		$this->setField($nativeField);
 		$this->flexAddress = $address;
 		$this->flexDefinition = $definition;
+		$this->flexMetadataSchema = $definition['customFields'] ?? null;
 		if($raw instanceof Pagefiles) {
 			$source = $raw;
 			$raw = $raw instanceof self ? $raw->rawArray() : [
@@ -263,6 +386,16 @@ trait FlexMediaCollection {
 		return $this->flexDefinition;
 	}
 
+	/** Shared evaluated schema; an absent definition still retains unknown values. @internal */
+	public function metadataSchema(): FlexFieldDefs {
+		return $this->flexMetadataSchema ??= new FlexFieldDefs($this->field, $this->page, []);
+	}
+
+	/** Formatting state shared by direct metadata reads and native bridges. @internal */
+	public function metadataFormatted(): bool {
+		return $this->formatted() && !$this->rawDescriptions;
+	}
+
 	/**
 	 * Get the versioned File or Image envelope marker.
 	 *
@@ -319,9 +452,10 @@ trait FlexMediaCollection {
 			}
 		}
 		$file->bindAsset($meta['id']);
+		$file->hydrateCustomValues($meta['values'] ?? [], array_key_exists('values', $meta));
 		$file->isNew(false);
 		$file->resetTrackChanges();
-		$file->baseline($this->page->id ? FlexMedia::describe($file, $meta['id']) : $meta);
+		$file->baseline($meta);
 		return $file;
 	}
 
@@ -804,6 +938,26 @@ class FlexMedia extends Wire {
 		$this->type = $type;
 	}
 
+	/** Reserve native methods, documented properties and technical state. @internal */
+	public static function reservedName(string $name): bool {
+		if(preg_match('/^(?:description[0-9]+|_.*|flex.*)$/iD', $name) || in_array(strtolower($name), ['id', 'sort', 'values', 'customfields'], true)) return true;
+		static $reserved = null;
+		if($reserved === null) {
+			$reserved = [];
+			foreach([FlexPagefile::class, FlexPageimage::class] as $class) {
+				$reflect = new \ReflectionClass($class);
+				foreach($reflect->getMethods() as $method) $reserved[strtolower(ltrim($method->name, '_'))] = true;
+				foreach($reflect->getProperties() as $property) $reserved[strtolower($property->name)] = true;
+				// Native magic properties are part of the public contract too.
+				for($r = $reflect; $r; $r = $r->getParentClass()) {
+					preg_match_all('/@property(?:-read|-write)?\s+\S+\s+\$(\w+)/', $r->getDocComment() ?: '', $matches);
+					foreach($matches[1] as $property) $reserved[strtolower($property)] = true;
+				}
+			}
+		}
+		return isset($reserved[strtolower($name)]);
+	}
+
 	/** Shared envelope shape used before hydration and by raw diagnostics. @internal */
 	public static function validEnvelope($raw, string $marker): bool {
 		return is_array($raw) && ($raw['_flex'] ?? '') === $marker
@@ -830,6 +984,7 @@ class FlexMedia extends Wire {
 		) {
 			throw new WireException(__('Invalid Flex file metadata'));
 		}
+		if(array_key_exists('values', $meta) && (!is_array($meta['values']) || ($meta['values'] && array_is_list($meta['values'])) || array_key_exists('description', $meta['values']) || array_key_exists('tags', $meta['values']))) throw new WireException(__('Invalid Flex custom metadata property map'));
 	}
 
 	/**
@@ -863,6 +1018,7 @@ class FlexMedia extends Wire {
 			'filesize'          => (int) ($file->page->id && !$file->page->get('_cloning') ? $file->get('filesize') : ($file->getArray()['filesize'] ?? 0)),
 			'filedata'          => $file->filedata(),
 		];
+		if(($file instanceof FlexPagefile || $file instanceof FlexPageimage) && $file->rawCustomValues() !== null) $meta['values'] = $file->rawCustomValues();
 		self::validateMeta($meta);
 		return $meta;
 	}

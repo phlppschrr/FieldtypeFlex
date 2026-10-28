@@ -102,6 +102,28 @@ deferred. Unformatted PHP inspection remains available.
 
 Selector values are bound parameters. Property names, operators, type keys and JSON paths are validated against the active schema before SQL is built. Blank, negative and count queries account for absent fields and row ancestors. Same-row expressions correlate every condition to one concrete row and its descendants.
 
+Before PageFinder compiles individual predicates, Flex normalizes its `@` groups
+by field/group name using native Selector objects. The same small grouping
+helper introduces child collection/type scopes at each SQL recursion level;
+there is no separate schema walker or intermediate array tree. Shared ancestors and descendants each receive one concrete
+row correlation. The correlated SQL compiler consumes this tree directly;
+selector values are never interpolated into new selector source. This avoids Core
+per-predicate negation and multi-dot rewriting changing the meaning of a group.
+Blank inner values use `values(true)` so an empty selector value remains a real
+predicate. Public quoted same-row strings are rejected; the internal tree is not
+a second selector syntax. No new projection, schema or persistence format is required.
+
+`FlexRows::find()` is a separate in-memory boundary. It validates direct paths
+against the evaluated collection schema, then applies native `Selector::matches()` to each Row and builds
+a new membership map of the existing Row objects. Native WireArray control names
+such as `sort` are not interpreted as directives; a declared property with that
+name remains searchable without reordering the collection. It never deep-clones Rows or
+resets their change tracking. Its formatted backing map contains only selected
+visible Rows, preventing later unformatting from resurrecting excluded members.
+Leaf comparisons use unformatted values (including full media collections), while
+the current Rows view controls visibility and child counts. Native in-memory
+comparison quirks, including zero/blank equality, are distinct from SQL semantics.
+
 Root Page-reference traversal resolves one terminal native Field from an explicit
 supported-type list and delegates its predicate to PageFinder. Target inclusion,
 static reference restrictions and negative/blank semantics follow native custom
@@ -257,3 +279,60 @@ render directly, so nested children can opt in without partial parent transport.
 Schemas changing mid-editor are rejected; row types remain immutable. Error rows
 render from their processed input trees. No cached fragment HTML or cross-request
 schema evaluation is introduced.
+
+## Per-file metadata
+
+Each evaluated File/Image definition owns a `customFields` FlexFieldDefs schema.
+Metadata leaves reuse a privately held FlexValue for normalization, dates,
+languages, defaults, formatting, unknown values and strict renames. The real
+Page/Field context is retained; native metadata Templates and Core's fieldValues
+cache are not used. Native names are reserved by the actual Pagefile/Pageimage
+API and documented magic properties. The ordinary scalar input allowlist
+also accepts native TinyMCE, HTML Textarea, Hidden and Page references. Markup
+and ordinary fieldsets only organize the editor. Rows, descendant media and
+unsupported third-party inputs remain rejected.
+
+Each files:1/images:1 item may add an ordinary `values` property map. The encoder
+rebuilds arrays without mutating nested PHP references and keeps even empty maps
+as JSON objects, while multi-choice values remain lists.
+Native description, tags and filedata retain their existing slots. Old envelopes
+without values remain valid and need no eager rewrite. The map participates in
+canonical revisions and byte/database-depth budgets without an ownership-table
+schema change. Whole-field search still uses basename, description and tags.
+
+The owned file bridge shares raw export/hydration across field saves, metadata
+saves, clones, baselines and drafts. Hydration baselines retain exact persisted
+metadata rather than inserting new schema defaults. Selective native saves do
+not reset pending custom values. A save of the actual cached file can advance
+its owning root's matching optimistic revision; detached views and already stale
+roots cannot advance it. Variations delegate metadata reads to their original
+and reject divergent metadata writes. Scalar values never become filedata, so
+changing them does not schedule variation cleanup.
+
+Native per-file inputs replace getItemInputfields/processItemInputfields.
+Description/tags adapters edit the existing native slots, independently suppress
+native rendering and POST processing, and retain native language/tag methods.
+Metadata names include outer input, Row address and stable asset identity. The
+small dependency resolver accepts an explicit containing-scope address; bare,
+parent/root and page/forpage conditions still run through InputfieldForm. Per-item
+completeness controls reject truncated saves, with required validation deferred
+until editor Save and skipped for deleted items. Cached native trees retain
+validation errors. Refresh and single-file staged replacement preserve current
+controls (including unchecked/empty values), with an explicit transfer only for
+the existing maxFiles=1 operation.
+TinyMCE saveReady synchronizes normal/inline transports before snapshots; the
+native destroy/init lifecycle rebuilds editors only in the affected media scope.
+Inline markup is restored with its transport value. Hidden inputs carry their
+asset/property attributes directly because they have no wrapper. Native Page
+adapters store IDs and reuse dereference, validation and formatting rules; live
+PageArray mutation is confined to unformatted originals, with independent
+containers in copies, formatted views and variation reads. Metadata has no SQL
+selectors or Page-reference traversal. The basic Page editor allowlist is Select
+and AsmSelect; widgets with independent AJAX/tree selection lists are rejected
+until their additional refresh state is supported.
+
+Raw maintenance enters each asset values map with schema paths independent of
+asset identities. Checked patches carry explicit container/property/ID steps for
+Rows and media instead of using the Row-only FlexPath resolver. Schema fingerprints
+include metadata; original JSON object/list distinctions, locks and stale-preview
+checks remain in force. Diagnostics inspect raw maps without hydrating defaults.

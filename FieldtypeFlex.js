@@ -489,6 +489,59 @@
             updateActions($set);
         }
     });
+    // Snapshot actual native controls, including unchecked and empty multi-value inputs.
+    // A single-file replacement explicitly transfers the addressed file's metadata;
+    // ordinary refreshes match full names containing the stable asset scope.
+    function mediaMetadata($scope) {
+        // Native saveReady also synchronizes inline TinyMCE's hidden transport input.
+        $scope.find('.InputfieldTinyMCE').trigger('saveReady');
+        var inline = $scope.find('.InputfieldTinyMCEEditor.InputfieldTinyMCEInline').map(function() {
+            return {id:this.id, suffix:this.id.split('__').slice(2).join('__'), html:$(this).html(), loaded:$(this).hasClass('InputfieldTinyMCELoaded'),
+                property:$(this).closest('[data-flex-metadata-property]').attr('data-flex-metadata-property')};
+        }).get();
+        var controls = $scope.find(':input').filter(function() {
+            return this.name && (/^(description[0-9]*|tags|focus)_/.test(this.name) || $(this).closest('[data-flex-metadata]').length);
+        }).map(function() {
+            return {name:this.name, value:$(this).val(), type:this.type, checked:this.checked,
+                property:$(this).closest('[data-flex-metadata-property]').attr('data-flex-metadata-property'),
+                suffix:this.name.split('__').slice(2).join('__'), native:(this.name.match(/^(description[0-9]*|tags)_/) || [])[1]};
+        }).get();
+        var errors = $scope.find('[data-flex-metadata-property].InputfieldStateError').map(function() {
+            return {id:this.id, property:$(this).attr('data-flex-metadata-property'),
+                markup:$(this).find('> .InputfieldContent > .InputfieldError').map(function() { return this.outerHTML; }).get().join('')};
+        }).get();
+        return {controls:controls, errors:errors, inline:inline};
+    }
+    function restoreMediaMetadata($scope, snapshot, replacement) {
+        snapshot.controls.forEach(function(item) {
+            $scope.find(':input').filter(function() {
+                var match = this.name === item.name;
+                if(replacement && item.property) match = $(this).closest('[data-flex-metadata-property]').attr('data-flex-metadata-property') === item.property && this.name.split('__').slice(2).join('__') === item.suffix;
+                else if(replacement && item.native) match = (this.name.match(/^(description[0-9]*|tags)_/) || [])[1] === item.native;
+                return match && (!/^(checkbox|radio)$/.test(item.type) || this.value === item.value);
+            }).each(function() {
+                if(/^(checkbox|radio)$/.test(item.type)) this.checked = item.checked;
+                else $(this).val(item.value);
+            });
+        });
+        snapshot.errors.forEach(function(item) {
+            var $wrapper = $scope.find('[data-flex-metadata-property]').filter(function() {
+                return replacement ? $(this).attr('data-flex-metadata-property') === item.property : this.id === item.id;
+            });
+            $wrapper.addClass('InputfieldStateError ui-state-error');
+            if(!$wrapper.find('.InputfieldError').length) $wrapper.children('.InputfieldContent').prepend(item.markup);
+        });
+        snapshot.inline.forEach(function(item) {
+            $scope.find('.InputfieldTinyMCEEditor.InputfieldTinyMCEInline').filter(function() {
+                return replacement ? $(this).closest('[data-flex-metadata-property]').attr('data-flex-metadata-property') === item.property && this.id.split('__').slice(2).join('__') === item.suffix : this.id === item.id;
+            }).each(function() {
+                $(this).html(item.html);
+                // Inline editors have no server-rendered input. Recreate TinyMCE's
+                // native transport even if the editor is never focused again.
+                if(item.loaded && window.InputfieldTinyMCE) window.InputfieldTinyMCE.init(this, 'flex.mediaMetadata');
+            });
+        });
+    }
     async function upload(input, files) {
         var $upload = $(input).closest('[data-flex-upload="1"]'), $field = $upload.closest('.Inputfield');
         var token = csrf();
@@ -517,8 +570,14 @@
                         $list.insertBefore($upload);
                         $field.find('.InputfieldFileListPlaceholder').remove();
                     }
-                    if(Number($field.find('.InputfieldFileMaxFiles, .InputfieldImageMaxFiles').first().val()) === 1) $list.children('li').remove();
-                    $list.append(item.markup);
+                    var replacement = Number($field.find('.InputfieldFileMaxFiles, .InputfieldImageMaxFiles').first().val()) === 1;
+                    var metadata = replacement ? mediaMetadata($list) : null;
+                    if(replacement) {
+                        if(window.InputfieldTinyMCE) window.InputfieldTinyMCE.destroyEditorsIn($list);
+                        $list.children('li').remove();
+                    }
+                    var $item = $(item.markup).appendTo($list);
+                    if(metadata) restoreMediaMetadata($item, metadata, true);
                 }
                 $field.removeClass('InputfieldFileEmpty').addClass('InputfieldStateChanged');
                 setup($field);
@@ -556,10 +615,10 @@
                 headers:{'X-Requested-With':'XMLHttpRequest','X-FIELDNAME':$upload.attr('data-fieldname'),'X-FLEX-DRAFT':draft}, body:data});
             var result = await response.json();
             if(!response.ok || result.error) throw new Error(result.message || message('unableToRefreshImage', 'Unable to refresh image'));
-            var edits = $field.find(':input').serializeArray();
+            var metadata = mediaMetadata($field);
+            if(window.InputfieldTinyMCE) window.InputfieldTinyMCE.destroyEditorsIn($field);
             $field.find('> .InputfieldContent').html(result.html);
-            // Preserve metadata controls whose file identity did not change.
-            edits.forEach(function(item) { if(/^(description|tags|focus)_/.test(item.name)) $field.find(':input').filter(function() { return this.name === item.name; }).val(item.value); });
+            restoreMediaMetadata($field, metadata, false);
             setup($field); $field.addClass('InputfieldStateChanged');
             $('iframe.ui-dialog-content').dialog('close');
         } catch(error) { $('<p role="alert" class="flex-upload-status"></p>').text(error.message).appendTo($field); }

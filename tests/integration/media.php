@@ -153,7 +153,7 @@ $assert($value->slides->first()->photo->first()->filename() !== $value->slides->
 $same([$id], $wire->pages->findIDs("id=$ids, $mediaName.hero.count=1"), 'root media count selector matches committed files');
 $same([$second->id], $wire->pages->findIDs("id=$ids, $mediaName.hero.count=0"), 'absent root media count is zero');
 $same([$id], $wire->pages->findIDs("id=$ids, $mediaName.slides.item.photo.count>0"), 'row media count selector resolves complete nested path');
-$same([$id], $wire->pages->findIDs("id=$ids, $mediaName.slides.item=\"title=Photo row, photo.count>0\""), 'same-row matching supports media counts');
+$same([$id], $wire->pages->findIDs("id=$ids, @$mediaName.slides.item.title=Photo row, @$mediaName.slides.item.photo.count>0"), 'same-row matching supports media counts');
 $same([$second->id, $id], $wire->pages->findIDs("id=$ids, sort=$mediaName.hero.count"), 'media count sorting');
 $same('number', $type->getSelectorInfo($media)['subfields']['hero.count']['input'], 'media count exposed to selector discovery');
 $manifestProperty = (new \ReflectionClass($type->media()))->getProperty('manifest');

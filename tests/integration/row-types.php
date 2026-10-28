@@ -94,6 +94,9 @@ $same('number', $typedSaved->blocks->getById($typedNumberRow->rowId())->rowType(
 $same('image', $typedSaved->blocks->getById($typedImageRow->rowId())->rowType(), 'image row type survives save and reload');
 $same('image', $typedSaved->blocks->getById($typedEmptyImageRow->rowId())->rowType(), 'each row retains its explicit type after reload');
 $same(5, count($typedSaved->blocks), 'collection count includes rows of every type');
+$same(1, count($typedSaved->blocks->find('_type=text, value*=Seventeen')), 'runtime type selection validates same-named text properties in their own schema');
+$same(2, count($typedSaved->blocks->find('_type=number, value>=17')), 'runtime type selection validates same-named numeric properties in their own schema');
+$same(1, count($typedSaved->blocks->find('_type=image, photo.count=1')), 'runtime type selection supports a property absent from other types');
 
 $typedDefs = $type->getDefinitions($typedField, $typedFreshPage);
 $textProperty = $typedDefs->property('blocks.text.value');
@@ -128,6 +131,11 @@ $findTyped = static function(string $selector, ?int $pageId = null) use($wire, $
 	$scope = $pageId ?? $typedIds;
 	return $wire->pages->findIDs("id=$scope, $selector");
 };
+$findWithoutRows = static function(string $selector, int $pageId) use ($wire): array {
+	$excluded = $wire->pages->findIDs("id=$pageId, $selector");
+	$excluded = implode('|', $excluded) ?: '0';
+	return $wire->pages->findIDs("id=$pageId, id!=$excluded");
+};
 $same([$id], $findTyped("$typedName.blocks.text.value=Seventeen"), 'text leaf query is scoped to its type');
 $same([$id], $findTyped("$typedName.blocks.number.value=17"), 'integer leaf query is scoped to its type');
 $same([], $findTyped("$typedName.blocks.text.value=17"), 'same-named numeric data does not satisfy the text type query');
@@ -147,21 +155,21 @@ $same([$id], $findTyped("$typedName.blocks.image.photo.count=0", $id), 'numeric 
 $same([$typedBlankMediaId], $findTyped("$typedName.blocks.image.photo.count=0", $typedBlankMediaId), 'numeric media count zero matches an empty media row');
 $same([], $findTyped("$typedName.blocks.image.photo.count=0", $second->id), 'numeric media count zero needs a row of the requested type');
 $same([$id], $findTyped("$typedName.blocks.image.caption=With photo, $typedName.blocks.image.photo.count=0"), 'independent typed selectors may match different image rows');
-$same([], $findTyped("$typedName.blocks.image=\"caption=With photo, photo.count=0\""), 'same-row typed query rejects conditions met by different rows');
-$same([$id], $findTyped("$typedName.blocks.image=\"caption=No photo, photo.count=0\""), 'same-row typed query matches one blank media row');
-$same([$id], $findTyped("$typedName.blocks.image!=\"caption=With photo, photo.count=0\"", $id), 'negative same-row query is true when no row satisfies both conditions');
-$same([$id], $findTyped("$typedName.blocks.image!=\"caption=Missing, photo.count>0\"", $id), 'negative media quantifier is true when no typed row satisfies its predicate');
-$same([], $findTyped("$typedName.blocks.image!=\"caption=No photo, photo.count=0\"", $id), 'negative same-row query is false when a row satisfies both conditions');
-$same([$second->id], $findTyped("$typedName.blocks.image!=\"photo.count>0\"", $second->id), 'negative media quantifier includes a page without typed rows');
-$same([$typedBlankMediaId], $findTyped("$typedName.blocks.image!=\"photo.count>0\"", $typedBlankMediaId), 'negative media quantifier includes a blank media row');
+$same([], $findTyped("@$typedName.blocks.image.caption=With photo, @$typedName.blocks.image.photo.count=0"), 'same-row typed query rejects conditions met by different rows');
+$same([$id], $findTyped("@$typedName.blocks.image.caption=No photo, @$typedName.blocks.image.photo.count=0"), 'same-row typed query matches one blank media row');
+$same([$id], $findWithoutRows("@$typedName.blocks.image.caption=With photo, @$typedName.blocks.image.photo.count=0", $id), 'negative same-row query is true when no row satisfies both conditions');
+$same([$id], $findWithoutRows("@$typedName.blocks.image.caption=Missing, @$typedName.blocks.image.photo.count>0", $id), 'negative media quantifier is true when no typed row satisfies its predicate');
+$same([], $findWithoutRows("@$typedName.blocks.image.caption=No photo, @$typedName.blocks.image.photo.count=0", $id), 'negative same-row query is false when a row satisfies both conditions');
+$same([$second->id], $findWithoutRows("@$typedName.blocks.image.photo.count>0", $second->id), 'negative media quantifier includes a page without typed rows');
+$same([$typedBlankMediaId], $findWithoutRows("@$typedName.blocks.image.photo.count>0", $typedBlankMediaId), 'negative media quantifier includes a blank media row');
 $same([$second->id], $findTyped("$typedName.blocks.image.photo=", $second->id), 'blank typed media selector includes a page without typed rows');
 $same([$typedBlankMediaId], $findTyped("$typedName.blocks.image.photo=", $typedBlankMediaId), 'blank typed media selector finds a type with no populated media');
 $same([], $findTyped("$typedName.blocks.image.photo=", $id), 'blank typed media selector excludes a populated media row');
 $same([$second->id], $findTyped("$typedName.blocks.image.count=0", $second->id), 'per-type row count zero includes an absent set projection');
 $same([$second->id], $findTyped("$typedName.blocks.text.value!=Seventeen", $second->id), 'negative typed leaf includes a page without any set row');
 $same([$typedBlankMediaId], $findTyped("$typedName.blocks.text.value=", $typedBlankMediaId), 'blank typed leaf ignores other row types');
-$same([], $findTyped("$typedName.blocks.text=\"value!=Seventeen\"", $id), 'inner negative predicate tests an existing row of the specified type');
-$same([$id], $findTyped("$typedName.blocks.number=\"value!=18\"", $id), 'inner negative predicate uses the numeric type schema');
+$same([], $findTyped("@$typedName.blocks.text.value!=Seventeen", $id), 'inner negative predicate tests an existing row of the specified type');
+$same([$id], $findTyped("@$typedName.blocks.number.value!=18", $id), 'inner negative predicate uses the numeric type schema');
 $throws(fn() => $findTyped("$typedName.blocks._type=missing"), 'type selector rejects unknown type names');
 $throws(fn() => $findTyped("$typedName.blocks._type*=text"), 'type selector rejects unsupported operators');
 $throws(fn() => $findTyped("$typedName.blocks=\"value=Seventeen\""), 'nonblank same-row selector requires an explicit type');
@@ -175,7 +183,7 @@ $same('number', $typedInfo['subfields']['blocks.image.count']['input'], 'selecto
 $same('number', $typedInfo['subfields']['blocks.count']['input'], 'selector discovery retains total row count');
 $assert(isset($typedInfo['subfields']['blocks._type']), 'selector discovery exposes the type selector');
 $same(['""' => 'No rows', 'text' => 'Text', 'number' => 'Number', 'image' => 'Image'], $typedInfo['subfields']['blocks._type']['options'], 'type selector options include only blank and declared row types');
-$same('text', $typedInfo['subfields']['blocks.text']['input'], 'type group accepts blank and same-row selector input');
+$same(['=""', '!=""'], $typedInfo['subfields']['blocks.text']['operators'], 'type group offers only native blank operators');
 $same('select', $typedInfo['subfields']['blocks']['input'], 'row set exposes a blank collection control');
 $same(['""' => 'No rows'], $typedInfo['subfields']['blocks']['options'], 'row set blank control has no unsupported value choices');
 $same('select', $typedInfo['subfields']['blocks.image.photo']['input'], 'typed media exposes only its blank selector');
@@ -241,10 +249,12 @@ if($blankMediaOptions) {
 	}
 }
 $same('No media', $renderedBlankMediaOptions['""'] ?? '', 'native selector renders only the blank media choice');
-$selectorWithTypeGroup = $renderNativeTypedSelector("$typedName.blocks.text=\"value=Seventeen\"");
-$same("$typedName.blocks.text", $selectedSubfield($selectorWithTypeGroup), 'native selector exposes the type-group blank and same-row control');
+$selectorWithTypeGroup = $renderNativeTypedSelector("$typedName.blocks.text=");
+$same("$typedName.blocks.text", $selectedSubfield($selectorWithTypeGroup), 'native selector exposes the type-group blank control');
 $typeGroupValue = $selectorWithTypeGroup->query("//li[contains(concat(' ', normalize-space(@class), ' '), ' selector-row ')][not(contains(concat(' ', normalize-space(@class), ' '), ' selector-template-row '))]//input[contains(concat(' ', normalize-space(@class), ' '), ' input-value-text ')]");
-$assert($typeGroupValue && $typeGroupValue->length === 1, 'native selector uses text input for same-row type expressions');
+$assert($typeGroupValue && $typeGroupValue->length === 1, 'native selector renders the value control for native blank operators');
+$typeOperators = $selectorWithTypeGroup->query("//li[contains(concat(' ', normalize-space(@class), ' '), ' selector-row ')][not(contains(concat(' ', normalize-space(@class), ' '), ' selector-template-row '))]//select[contains(concat(' ', normalize-space(@class), ' '), ' select-operator ')]/option");
+$same(['=""', '!=""'], array_map(static fn($option) => $option->getAttribute('value'), iterator_to_array($typeOperators)), 'native selector cannot choose a nonblank type-group operator');
 $nativeSubfieldOptions = $selectorWithTypeGroup->query("//select[contains(concat(' ', normalize-space(@class), ' '), ' select-subfield ')]/option");
 $hasGeneratedIdAlias = false;
 $typedLeafLabels = [];

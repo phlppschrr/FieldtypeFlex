@@ -339,6 +339,91 @@ class FlexRows extends WireArray implements \JsonSerializable {
 	}
 
 	/**
+	 * Search the loaded view using native in-memory selectors and raw leaf values.
+	 * Results share row objects, but have independent membership and order.
+	 * `_type` selects metadata; `type` remains an ordinary content property.
+	 *
+	 * @param string|array|Selectors $selector
+	 * @return FlexRows
+	 */
+	public function find($selector) {
+		$selectors = $selector instanceof Selectors ? clone $selector : $this->wire(new Selectors($selector));
+		$types = array_keys($this->definition['types']);
+		foreach($selectors as $condition) {
+			if($condition->field !== '_type') continue;
+			$this->validateFindSelector($condition, $types);
+			$types = array_filter($types, static fn($type) => $condition->matches($type));
+		}
+		foreach($selectors as $condition) {
+			$this->validateFindSelector($condition, $types ?: array_keys($this->definition['types']));
+		}
+		$result = $this->makeNew();
+		foreach($this->data as $key => $row) {
+			foreach($selectors as $condition) {
+				$value = $this->findValue($row, $condition->field);
+				$value = is_array($value) ? $this->wire()->sanitizer->flatArray($value) : (string) $value;
+				if(!$condition->matches($value)) continue 2;
+			}
+			$result->data[$key] = $row;
+		}
+		$result->formatted = $this->formatted;
+		if($result->formatted) $result->allRows = $result->data;
+		return $result;
+	}
+
+	/** Validate even empty collections; never fall through to WireData internals. */
+	private function validateFindSelector(Selector $selector, array $types): void {
+		if(count($selector->fields()) !== 1 || $selector->group !== null || in_array($selector->quote, ['[', '(', '{'], true) || $selector->altOperators) {
+			throw new WireException('FlexRows::find() requires one direct property or count path per condition');
+		}
+		$name = $selector->field;
+		foreach($selector->values(true) as $value) {
+			if(!is_scalar($value)) throw new WireException('FlexRows::find() requires scalar selector values');
+		}
+		$operators = ['=', '!='];
+		if($name !== '_type') {
+			$parts = explode('.', $name);
+			if(!preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*(?:\.count)?$/D', $name)) {
+				throw new WireException('Invalid FlexRows::find() property path');
+			}
+			$definitions = [];
+			foreach($types as $type) {
+				$def = $this->definition['types'][$type]['schema']->property($parts[0]);
+				if($def) $definitions[] = $def;
+			}
+			if(!$definitions) throw new WireException('Unknown FlexRows::find() property: ' . $name);
+			foreach($definitions as $def) {
+				$countable = in_array($def['kind'], ['file', 'image', 'rows'], true);
+				if(count($parts) > 1 && !$countable) throw new WireException('Use .count only on Flex media or rows');
+				$allowed = $countable || $def['multiple'] ? ['=', '!='] : ['=', '!=', '*=', '%=', '^=', '$=', '%^=', '%$=', '~=', '~|='];
+				if(count($parts) > 1 || in_array($def['kind'], ['integer', 'float', 'date', 'page'], true) && !$def['multiple']) {
+					$allowed = ['=', '!=', '>', '>=', '<', '<='];
+				}
+				if(!in_array($selector->operator, $allowed, true)) throw new WireException('Unsupported FlexRows::find() operator');
+				foreach($selector->values(true) as $value) {
+					if(count($parts) === 1 && $countable && $value !== '') throw new WireException('Use a FlexRows media/rows count or blank selector');
+					if((count($parts) > 1 || in_array($def['kind'], ['integer', 'float', 'date', 'page'], true) && $value !== '') && !is_numeric($value)) {
+						throw new WireException('Numeric FlexRows selectors require a number');
+					}
+				}
+				$operators = $allowed;
+			}
+		}
+		if(!in_array($selector->operator, $operators, true)) throw new WireException('Unsupported FlexRows::find() operator');
+	}
+
+	/** Native PageArray also compares unformatted values, independently of output. */
+	private function findValue(FlexRow $item, string $property) {
+		if($property === '_type') return $item->rowType();
+		$parts = explode('.', $property);
+		if(!$item->hasProperty($parts[0])) return count($parts) > 1 ? 0 : '';
+		$value = $item->getUnformatted($parts[0]);
+		if(count($parts) > 1) return count($value);
+		if($value instanceof Pagefiles || $value instanceof self) return count($value) ? '1' : '';
+		return $value;
+	}
+
+	/**
 	 * Get direct rows of a type in collection order, retaining object identity.
 	 * Unknown types return an empty list. Validate explicitly to avoid PHP scalar
 	 * coercion for callers that do not enable strict_types.

@@ -1,6 +1,8 @@
-# FieldtypeFlex API
+# FieldtypeFlex
 
-FieldtypeFlex stores structured properties in one ProcessWire field and exposes them through `FlexValue`, `FlexRows`, `FlexRow`, and ProcessWire-compatible media objects. This reference covers the supported definition and runtime APIs. For installation and a first example, see [README.md](README.md). For shared ProcessWire APIs, see the [ProcessWire API reference](https://processwire.com/api/ref/).
+FieldtypeFlex stores structured properties in one ProcessWire field. Retrieve the module with `$modules->get('FieldtypeFlex')`; read field values through `$page->content` as shown below. This reference covers definitions, runtime values, selectors and maintenance.
+
+Start with [README.md](README.md) for installation and a complete example; see the [configuration catalog](examples/README.md) for reusable definitions. The editor uses InputfieldFlex and InputfieldFlexRows; shared input APIs are documented in [[Inputfield]] and [[InputfieldForm]].
 
 - [Value types](#value-types)
 - [Reading and writing values](#reading-and-writing-values)
@@ -66,11 +68,11 @@ $raw = $page->content->rawArray();     // Canonical unformatted data
 $json = json_encode($page->content);  // Unformatted JSON view
 ```
 
-`getArray()` and iteration retain runtime objects such as `FlexRows`, Page references and media objects (media may be a single object when formatted). Language objects are retained only with formatting off; formatted language reads are strings, and unformatted date reads are timestamps. Neither array method accepts a property argument. `rawArray()` recursively serializes their canonical data; `(string) $value` and `json_encode($value)` use that same unformatted representation. These are **not** HTML-safe rendering methods. They expose logical persistence data, not the exact database JSON bytes: empty PHP property arrays serialize as `[]`, while database storage preserves property maps as `{}`.
+`getArray()` and iteration expose known runtime properties in the current formatting state, retaining objects such as Rows, Page references and media collections. A row exposes its own properties; `FlexRows::getArray()` is keyed by stable row IDs.
 
-`getArray()` contains known properties only; `rawArray()` always retains unknown stored keys. Both describe current memory, including unsaved edits, and neither saves nor refreshes data. Returned runtime objects are not independent deep copies. A row’s `getArray()` contains its own properties; `FlexRows::getArray()` is inherited from WireArray and keyed by stable row IDs.
+`rawArray()`, `(string) $value` and `json_encode($value)` export canonical unformatted data, including unknown keys and hidden rows. A `FlexRow` exports its content properties; its ID, type and visibility are included in the containing collection's envelope. JSON includes media metadata, never file bytes. These exports are **not HTML-safe** or a way to copy owned media between Pages.
 
-The JSON contains row IDs, types, values and media metadata—not uploaded file bytes. Flex owns its media storage separately and maintains derived data needed for selectors. Do not edit canonical envelopes or selector projections directly, or use serialized media metadata to copy files between pages.
+Both array methods describe current memory, including unsaved edits; neither saves, refreshes nor returns a deep copy. Neither accepts a property argument. JSON exports describe logical data rather than exact database bytes: empty PHP property arrays encode as `[]`, while storage preserves property maps as `{}`. Do not edit storage envelopes or selector projections directly.
 
 ## Reading and writing values
 
@@ -85,7 +87,7 @@ $page->content->set('summary', 'An example');
 $page->save('content');
 ```
 
-Unknown ordinary property reads return `null`; writes to unknown properties throw `WireException`. Inherited WireData API lookups remain available; use `hasProperty()` on a row or inspect its definitions to test schema membership. Direct API assignments normalize Flex values but do not invoke every native editor validation or purification step. Native validation and dependencies run during editor processing.
+Unknown ordinary property reads return `null`; unknown writes throw `WireException`. Inherited [[WireData]] lookups remain available; use a row's `hasProperty()` or inspect definitions for schema membership. API assignments normalize values; native editor validation, purification and dependencies run during form processing. Validate application input before assigning it.
 
 | `FlexValue` method | Purpose |
 | --- | --- |
@@ -101,9 +103,11 @@ Unknown ordinary property reads return `null`; writes to unknown properties thro
 | `of(?bool $formatted = null): bool` | Read or change this value's formatting state; returns previous state |
 | `isChanged($name = ''): bool` | Inspect change tracking |
 
-`hasValue()` is independent of output formatting. Empty strings, `null`, `false`, empty collections and `NullPage` count as empty; numeric `0` and string `'0'` count as populated. A multilingual property is populated if any language has content. A rows collection is populated only when a row has meaningful leaf content, not merely an ID and type. Media is counted from its entries without checking file existence on disk. Whitespace is content; this is not an editor-required validation check.
+`hasValue()` checks canonical content regardless of formatting or row visibility. Empty strings, `null`, `false`, empty collections, `NullPage` and unchecked checkboxes are empty. Numeric `0` and string `'0'` otherwise count as content, as does whitespace. Any populated language or row leaf counts; row identity alone does not. Media entries count without checking files on disk. This is separate from editor-required validation.
 
-`isChanged()` also checks nested rows, PageArrays, language values and media; pass a direct property name to inspect that property. Read helpers do not mark data changed. Page-formatted values are cloned views. Reacquire `$page->content` after `$page->of(false)` before editing; a previously retained formatted value stays formatted. `getUnformatted()` bypasses conversion for one property, but does not make a formatted value or its nested objects writable. Setters require both the value and owning Page to be unformatted. An unchecked checkbox is logically empty even though its default runtime value is integer `0`.
+`isChanged()` includes nested Rows, PageArrays, language values and media; a direct property name limits the check. Read helpers do not mark changes.
+
+Page-formatted values are cloned views. Reacquire `$page->content` after `$page->of(false)` before editing: retained formatted values stay formatted. `getUnformatted()` bypasses one property's output conversion, but does not make the value or its nested objects writable. Setters require both the value and owning Page to be unformatted.
 
 ### Property and option labels
 
@@ -115,15 +119,19 @@ $value->optionLabel('appearance', 'featured');  // Explicit option label
 $value->getOptions('appearance');               // Key => translated label map
 ```
 
-`optionLabel()` returns `''` for unknown choices and array selections. Omitting its second argument resolves the current single selection; explicitly passing `null` selects the empty-string option key. To resolve a multiple selection, iterate its keys and call `optionLabel()` for each. These helpers are also available on `FlexRow` and follow the current user language and formatting state. `label()` returns `''` for an unknown property; `getOptions()` returns `[]` for unknown/non-choice properties and omits optgroup headings and separators. Zero and blank option keys are valid. Formatted property and option labels are always HTML entity-encoded; unformatted labels stay raw. Option *keys* are never automatically encoded. Reads do not change the stored option keys.
+`optionLabel()` without a second argument resolves the current single selection. Explicit `null` selects the empty-string key; blank and zero keys are valid. Unknown choices and array selections return `''`; resolve multiple selections one key at a time.
 
-Schema paths such as `blocks.text.appearance` can inspect a nested definition with `label()`, `getOptions()` or an explicit-key `optionLabel()`. Omitting the key on such a path returns `''`: a schema path identifies no concrete row. Use the row object for its current selection.
+These helpers also work on `FlexRow`. `label()` returns `''` for unknown properties; `getOptions()` returns `[]` for unknown/non-choice properties and omits optgroups/separators. Labels follow the current language and are entity-encoded when formatted; option keys remain raw.
+
+Type-qualified schema paths such as `blocks.text.appearance` support label/option lookup. `optionLabel()` needs an explicit key on such a path: only a concrete row has a current selection.
 
 ### Dates, numbers, and text
 
-Datetime properties return Unix timestamps with output formatting off, like native `FieldtypeDatetime`. `rawArray()` and stored JSON still use canonical `Y-m-d` or `Y-m-d H:i:s` strings without a UTC offset. PHP/site timezone applies; use ISO values for reproducible selectors. Formatted reads use the current-language `dateOutputFormat`, then the default `dateOutputFormat`; an empty format or `U` returns a timestamp, as in the core. Blank/null/false/zero inputs become `''`. Canonical ISO inputs are recognized before localized editor formats; Unix integers, numeric timestamp strings and `DateTime` objects are also accepted. A timestamp’s time component is preserved even without a time editor.
+Datetime returns Unix timestamps unformatted and uses current-language/default `dateOutputFormat` when formatted; an empty format or `U` returns a timestamp. JSON uses `Y-m-d` or `Y-m-d H:i:s` without an offset, in PHP/site timezone. Assign canonical ISO strings, timestamps, numeric timestamp strings or `DateTime` objects. ISO input takes precedence over localized editor formats. Blank/null/false/zero becomes `''`; time is preserved even without a time editor. Use ISO dates in SQL selectors.
 
-Integers and floats remain numeric on output. Direct assignments normalize numeric strings, reject non-numeric input with `WireException`, and apply configured Float `precision` on assignment and hydration (`2` by default; null, blank or negative disables rounding). Blank or null numeric input becomes `''`; normal PHP/JSON floating-point precision applies. Text without configured or inherited formatters remains unchanged on formatted reads. Configure `TextformatterEntities` for HTML text content or escape output in the template; HTML textarea and TinyMCE markup are preserved. Email and URL properties use the native sanitizers on API assignment, including the input’s IDN/relative-URL settings; Toggle normalizes native yes/no/other values to integers. Text-valued inputs can configure native ProcessWire Textformatters; see [Textformatters](#textformatters).
+Integer/Float normalize numeric strings and reject non-numeric input with `WireException`; blank/null becomes `''`. Float `precision` rounds on assignment and hydration (`2` by default; null, blank or negative disables rounding). Normal PHP/JSON floating-point precision applies.
+
+Email/URL assignments use native sanitizers and their IDN/relative-URL settings; Toggle normalizes native yes/no/other values. Text and rich HTML use the configured [Textformatters](#textformatters); absent formatters leave text unescaped.
 
 ### Page references
 
@@ -135,22 +143,16 @@ Single references accept Page/PageArray, ID, path/name or native selector input.
 
 ### Limits of native compatibility
 
-The integration suite compares real native fields against Flex properties,
-including assignment, blank values, both formatting states and save/reload.
-It does not establish complete emulation of every Fieldtype setting:
+Flex reuses native Inputfields and selected Fieldtype behavior, with these boundaries:
 
-| Area | Explicit difference |
+| Area | Difference |
 | --- | --- |
-| Plain Text/Textarea, Email/URL output | Flex delegates to native output formatting for text-valued properties even without a formatter list. As in native fields, `TextformatterEntities` must be configured for automatic HTML text escaping. Flex keeps its own JSON persistence rather than native Fieldtype storage. |
-| HTML / TinyMCE | Common HTML values match; native Textarea markup-QA and link abstraction are not provided by Flex’s storage layer. Native output `htmlOptions` apply on formatted reads, including when no formatter list is configured. |
-| Integer / Float | Flex always preserves explicit zero, Native Integer requires `zeroNotEmpty=1` to retain zero on save; native Float already retains zero. It rejects invalid/non-numeric API inputs rather than applying native permissive conversion or returning blank. |
-| Datetime | Runtime types match; JSON keeps ISO strings. Invalid API dates raise `WireException` instead of the native blank fallback; localized input parsing remains supported. |
-| Checkbox | Default `1`/`0` matches native Checkbox. Custom non-empty checked/unchecked scalars are a Flex/Inputfield extension; native FieldtypeCheckbox stores `1`/`0`. |
-| Toggle | Default native integer/blank mode matches. FieldtypeToggle’s optional boolean/string/entity `formatType` modes are not applied. |
-| Select, Radios, multiple choices, AsmSelect, TextTags | Flex exposes keys (string/string array); native FieldtypeOptions exposes a SelectableOptionArray in both formatting states. Native option-object methods/IDs are not a Flex API. |
-| File / Image | Native-compatible objects and modes `0..2` match within configured limits; Flex owns copies, staged originals, metadata and cleanup. Native string output, remote imports and the other unsupported media settings remain excluded below. |
-| Multilingual text | Raw language objects and formatted strings match. JSON stores language-ID maps rather than native language columns; plain-mode fallback remains Flex-specific. |
-| Rows / fieldsets / Markup | Rows are Flex structures, not native Repeater Pages. Ordinary fieldsets and Markup organize the editor without their own stored value. |
+| Text / HTML | Native output options apply, but storage-time Textarea markup QA and link abstraction do not. Configure Textformatters explicitly for HTML text escaping. |
+| Integer / Float / Datetime | Integer/Float preserve explicit zero. Invalid numbers/dates raise `WireException` rather than using permissive native conversion or blank fallback. |
+| Checkbox / Toggle | Custom checkbox scalars are supported. Toggle's optional boolean/string/entity `formatType` modes are not applied. |
+| Choices | Values are raw keys, not native FieldtypeOptions objects or option IDs. |
+| File / Image | Compatible objects use Flex-owned storage; see [media restrictions](#adding-saving-and-ownership). |
+| Rows / layout | Rows are not Repeater Pages. Ordinary fieldsets and Markup have no stored value. |
 
 ## Definitions
 
@@ -197,7 +199,7 @@ $tree = $defs->getInputfields();
 
 `FlexField::defs(?Page $page = null): FlexFieldDefs` uses a NullPage context when no Page is supplied. `getPropertyInputfield(string $name): ?Inputfield` returns a fresh configured Inputfield, or null for an unknown path; `getInputfields()` returns a fresh input tree. Native Inputfield methods are preferred when inspecting native input settings.
 
-Each type’s `children` may be an array or native wrapper, including nested `InputfieldFlexRows`. `getPropertyInputfield()` also accepts nested type-qualified schema paths. Internal schema metadata arrays are not the stable inspection API; prefer fresh native Inputfields for inspecting input settings.
+Nested schema paths include each collection and type, such as `sections.section.blocks.text.heading`. Internal schema metadata arrays are not the stable inspection API; inspect fresh native Inputfields instead.
 
 A field without a definition may initially be empty. If an automatic definition disappears after the field contains data, Flex refuses further saves rather than replacing stored values with an empty schema. Invalid definitions report the field and source and block Page Edit saves while preserving submitted values for correction.
 
@@ -210,9 +212,11 @@ A field without a definition may initially be empty. If an automatic definition 
 ],
 ```
 
-`renamedFrom` resolves old keys on read and persists new keys on individual saves, including nested rows. Equal values merge; conflicting old/new values throw `WireException`. Field configuration saves never migrate data, so selectors may see old keys until stored owners are migrated.
+`renamedFrom` accepts one old name or an array of old names. It resolves old keys on read and persists new keys on individual saves, including nested rows. Equal values merge; conflicting old/new values throw `WireException`. Field configuration saves never migrate data; migrate stored owners before relying on selectors for the new keys.
 
-Unknown properties, nested data and owned media **always survive ordinary saves**; the old `flexPrune` switch is removed. Use [maintenance](#maintenance-apis) to apply bulk renames or explicitly remove unknown keys. Prefer complete definitions for all Page/role contexts and native collapsed/Locked input states; dynamically omitted properties complicate orphan discovery.
+Unknown properties, nested data and owned media **always survive ordinary saves**. Use [maintenance](#maintenance-apis) to apply bulk renames or explicitly remove unknown keys. Prefer complete definitions for all Page/role contexts and native collapsed/Locked input states; dynamically omitted properties complicate orphan discovery.
+
+<a id="repeatable-rows-and-native-media"></a>
 
 ## Rows
 
@@ -239,7 +243,7 @@ Unknown properties, nested data and owned media **always survive ordinary saves*
             'label'    => __('Image'),
             'rowTitle' => '{caption}',
             'children' => [
-                'photo'   => ['type' => 'image', 'maxFiles' => 1],
+                'photo'   => ['type' => 'image', 'maxFiles' => 3],
                 'caption' => ['type' => 'text'],
             ],
         ],
@@ -263,26 +267,11 @@ Type keys start with a lowercase ASCII letter and contain lowercase letters, dig
 'rowTitle' => '[{@path} › {@type}] #n: _{heading|title}_',
 ```
 
-Square brackets group plain text and/or tokens: `[Context]`, `[{heading}]` and
-`[{@path} › {@type}]` render at reduced opacity. `[_{heading}_]` combines a badge
-with de-emphasis. Groups do not nest; unmatched brackets remain literal. Brackets
-in field values stay literal and cannot change formatting. Empty groups render
-no elements. Normal titles and badges retain the theme's full header text color;
-only bracketed groups are dimmed.
+Square-bracket groups do not nest; unmatched brackets and brackets in field values stay literal. `[_{heading}_]` combines a badge with de-emphasis. Empty groups disappear. Custom titles add no automatic type badge; use `_{@type}_` for one.
 
-Custom titles have no automatic type badge: include `_{@type}_` to request one,
-or use `{@type}` for plain text. `{heading}` alone shows only the property value. Missing and whitespace-only values are empty. Standalone
-separator runs (`/`, `|`, `:`, `;`, comma, dashes and `›`) at empty edges are removed;
-separators around an omitted middle token collapse to one. Field values themselves
-are never changed as separators or reinterpreted as template syntax. A wholly empty
-custom title falls back to `#n`. Absent or blank `rowTitle` retains the existing
-default header with the type badge and type label plus row number.
+Missing and whitespace-only values are empty. Separators at empty edges disappear; separators around omitted middle tokens collapse to one. An empty custom title falls back to `#n`. An absent or blank `rowTitle` uses the default type badge, label and row number.
 
-Values use native display labels where available, resolve the editor's language,
-strip markup and are escaped as text. Badges are generated by Flex, never supplied
-as field HTML. Editing referenced inputs and reordering rows updates titles;
-TinyMCE uses its native change events. Breadcrumbs depend only on ancestor types
-and remain unchanged when ancestor field values or row numbers change.
+Values use native display labels in the editor's language, with markup stripped and text escaped. Input edits and reordering update titles; `{@path}` depends only on ancestor types.
 
 Use these `FieldtypeFlex` constants for `rowCollapse`:
 
@@ -292,37 +281,17 @@ Use these `FieldtypeFlex` constants for `rowCollapse`:
 | `FieldtypeFlex::ROW_COLLAPSE_ALL` | `1` | All rows closed |
 | `FieldtypeFlex::ROW_EXPAND_ALL` | `3` | All rows open |
 
-The matching integers and numeric strings are also accepted; invalid values fall back to `FieldtypeFlex::ROW_COLLAPSE_EXISTING`. Rows with input errors remain open. Invalid non-string labels and row titles use their normal defaults. `minItems` and `maxItems` apply across all types; `maxItems=0` means no per-collection maximum within the field's resource budgets.
+The matching integers and numeric strings are also accepted; invalid values fall back to `FieldtypeFlex::ROW_COLLAPSE_EXISTING`. Rows with input errors remain open. Invalid non-string labels and row titles use their normal defaults. `minItems` and `maxItems` must be nonnegative integers and apply across all types; `minItems` cannot exceed a nonzero maximum. `maxItems=0` adds no per-collection maximum within field budgets.
 
 ### Optional lazy row bodies
 
-Set `rowLazyLoad => true` on a Rows definition (or `$rows->rowLazyLoad = true`
-on a native InputfieldFlexRows definition). The default is `false`; only the
-boolean `true` enables it. This is independent of `rowCollapse`: collapse chooses
-the initial open/closed state; lazy loading defers eligible closed row bodies
-until they are opened. Expanded, new and validation-error rows render directly.
+Set `rowLazyLoad => true` on a Rows definition (or `$rows->rowLazyLoad = true` on a native InputfieldFlexRows). Only boolean `true` enables it; the default is `false`. Eligible closed rows load their bodies on opening. Expanded, new and validation-error rows render directly; `rowCollapse` still controls the initial state.
 
-The first implementation supports ordinary native Text, Textarea, Email, URL,
-Integer, Float, Checkbox, Select, SelectMultiple, Checkboxes and Radios, including
-ordinary fieldsets. Rows containing nested collections, media, rich-text editors,
-date/Page inputs, multilingual inputs, custom Inputfield classes, native AJAX
-collapse modes or custom nonempty unchecked checkbox values render directly.
-A nested collection can independently opt in for its eligible child rows.
-Eligibility is per row type; mixed collections keep their existing editor behavior
-for unsupported types. Native assets still preload once per declared type.
+Eligible types contain only native Text, Textarea, Email, URL, Integer, Float, Checkbox, Select, SelectMultiple, Checkboxes or Radios, optionally in ordinary fieldsets. Nested collections, media, rich text, date/Page inputs, multilingual or custom inputs, native AJAX collapse modes and nonzero custom unchecked checkbox values render directly. Nested collections can opt in independently for their eligible child rows.
 
-Opening uses an authenticated, CSRF-protected editor request. Saving validates
-all retained rows through native Inputfields, including unopened values against
-current `showIf`/`requiredIf` sources. Unopened values and unknown properties are
-preserved; loaded checkboxes and choices clear normally when absent. Loading a
-body does not save content. A failed load offers Retry and blocks saving until
-resolved; issued body markers protect against missing/truncated input. Changed
-schemas or stale content require reloading the editor. The no-JavaScript link
-loads the full editor with `flex_eager=1`.
+Unopened values still undergo native validation and dependencies on Save. Unknown properties survive. Loading does not save content; a failed load offers Retry and blocks saving until resolved. Changed schemas or stale content require reloading. Without JavaScript, use the full-editor link (`flex_eager=1`).
 
-This reduces initial row input construction, HTML and DOM size, not JSON hydration,
-definition evaluation, asset downloads or validation work at save time. Measure
-representative fields before enabling it.
+Lazy loading reduces initial input construction and DOM size, not value hydration or save-time validation. See [lazy-loading verification](docs/development.md#lazy-row-verification).
 
 ### `FlexRow`: inspect a row
 
@@ -347,12 +316,7 @@ $row->setHidden(true);
 $page->save('content');
 ```
 
-Rows are visible by default. The optional boolean `hidden` belongs to the row
-inside the existing `rows:1` envelope, outside its content properties. Missing
-metadata means visible; nonboolean stored metadata is rejected. Showing a row
-removes the optional flag on canonical export. Duplicating copies its state.
-Visibility changes require an unformatted value and Page and participate in normal
-change tracking, revision checks and field saves.
+Rows are visible by default. `isHidden()` reports the row's own state, independent of ancestors. `setHidden()` requires an unformatted value and Page and saves with the owning field. Duplicating copies visibility.
 
 With output formatting enabled, iteration, `getArray()`, `getById()`, `first()`,
 `count()` and type helpers expose only visible rows, recursively. Hiding a parent
@@ -363,67 +327,19 @@ field to access **all rows**, including hidden ones:
 $allRows = $page->getUnformatted('content')->blocks;
 ```
 
-`rawArray()` and JSON serialization retain every row even on a formatted view.
-Canonical content checks (`hasValue()`), storage, maintenance, media ownership,
-`minItems`/`maxItems` and resource budgets still include hidden content. Formatting
-never prunes data or copies/deletes media. Hidden content is an editorial state,
-not an access-control boundary; do not use raw export as filtered frontend output.
+Collection `rawArray()` and JSON serialization retain all backing rows even on a formatted view. `hasValue()`, maintenance, media ownership, collection limits and resource budgets include hidden content. Visibility is an editorial state, not an access-control boundary.
 
-The editor always includes every row. The eye button immediately before Remove
-changes the current form, persisted with ordinary Page Save. Hidden rows have a
-native theme's faded header and a struck-through title; hover and keyboard focus
-restore full header contrast. Open bodies and all actions remain usable.
-Native required/dependency validation still applies, including lazy unopened rows.
-Submitted visibility survives native validation errors.
+The editor includes every row. The eye button changes visibility on ordinary Save; hidden inputs remain editable and undergo native validation. Visibility survives validation errors.
 
-Row selectors, type selectors, same-row expressions, counts and count sorting use
-only rows whose own flag **and every ancestor's flag** are visible. Negative and
-blank queries use this same set: a collection of hidden rows is query-empty.
-A visible matching row still matches beside hidden rows. Flex whole-field text
-search excludes hidden subtrees while retaining ordinary root properties.
-
-Native `include=all` controls PageFinder's Page status/access handling and does
-**not** include hidden Flex rows. There is currently no SQL opt-out. For explicit
-all-row inspection, first select suitable owner Pages using ordinary Page/root
-criteria, then use the unformatted PHP collection above. Paginating/counting those
-owners is not equivalent to an SQL row predicate. An SQL opt-out would require
-retaining a second projection or adding visibility columns plus ancestor-aware
-query context and a separate whole-field text-search path. That additional API
-is deferred rather than overloading native `include` semantics.
-
-Existing installations require no schema migration, envelope version change or
-initial rebuild: all pre-feature rows lack the flag and remain visible, so their
-existing projections are already correct. Normal writes atomically replace row
-and text projections with canonical JSON. The internal bounded
-`FlexStorage::rebuildRows()` repair path now rebuilds **both** projections under
-one per-owner lock/transaction, without rewriting canonical data or touching media.
-It is an implementation repair tool, not a new public maintenance duty.
+SQL row/type predicates, same-row groups, counts and count sorting include only rows visible through **every ancestor**. Hidden-only collections are query-empty for blank/negative tests. Whole-field text search excludes hidden subtrees but retains root properties. Native `include=all` does not include hidden Flex rows; no all-row SQL option exists. Select owner Pages by other criteria and inspect unformatted PHP values when needed.
 
 ### Removing rows in Page Edit
 
-Remove marks a row for deletion in the current form. It stays at its position,
-collapses, and uses the native theme's warning header with a struck-through title.
-The same trash button becomes **Undo removal** (`aria-pressed=true`); undo restores
-the row and its unsaved inputs. Only trash and expand/collapse remain in its header.
-Pending body inputs are inactive; undo restores their previous input states.
+Remove marks a row in the current form and changes its trash button to **Undo removal**. Undo restores its position and unsaved inputs. Leaving without saving discards the mark; only a successful owning-field Save deletes the row, subtree and associated media references. Validation errors preserve marks and undo.
 
-Double-click Remove to mark all siblings in that collection after a native
-confirmation, respecting `minItems`. Double-click Undo removal to undo all sibling
-marks without confirmation. Other collections and nested child marks are unchanged.
+Double-click Remove to mark siblings in the current collection after confirmation, respecting `minItems`. Double-click Undo removal to undo sibling marks without confirmation. Other collections and nested child marks are unchanged.
 
-Only an ordinary successful owning-field save deletes the marked row and its
-subtree through the existing transactional projection/media path. A failed
-validation retains the mark, edited inputs and undo action without deleting stored
-content or media. Pending rows are excluded from native leaf validation and from
-the collection that would be saved; minimum/maximum checks use the remaining rows.
-A marked row therefore frees a slot for a replacement. Undo remains available;
-restoring too many rows must be corrected before Save. Hidden rows that are **not**
-marked still count toward all limits as usual.
-
-The mark is editor transport only: there is no persisted deletion flag, trash
-collection or change to the PHP `removeRow()` API. Leaving without saving discards
-the mark. Registered unsaved rows, nested rows and unopened lazy bodies use the
-same mechanism, with existing draft/revision/permission checks.
+Marked rows do not undergo leaf validation or count toward the saved collection's limits, so they free space for replacements. Undo may require correcting `maxItems` before Save. Hidden unmarked rows still count. PHP `removeRow()` changes the in-memory collection directly and also requires a field save to persist.
 
 ### `FlexRows`: add, find, filter, and reorder
 
@@ -441,23 +357,46 @@ $page->save('content');
 
 | Method | Result |
 | --- | --- |
-| `addRow(string $type, array $values = [])` | Appends a new typed `FlexRow` with a generated ID |
-| `getById(string $id)` | `FlexRow|null` with the requested stable ID |
-| `rowsOfType($type)` | Numeric `FlexRow[]` in current order |
-| `countOfType($type)` | Number of direct matching rows |
+| `addRow(string $type, array $values = []): FlexRow` | Append a typed row with a generated ID |
+| `getById(string $id): ?FlexRow` | Find by stable ID; null when absent |
+| `find($selector): FlexRows` | New selection of existing rows using in-memory selectors; preserves order and object identity |
+| `rowsOfType($type): array` | Numeric `FlexRow[]` in current order |
+| `countOfType($type): int` | Number of direct matching rows |
 | `duplicateRow(string $id): FlexRow` | Appends an independent typed copy with new descendant IDs and media copies |
 | `moveRow(string $id, ?string $before = null): self` | Move before another sibling ID, or to the end; same ID is a no-op |
 | `removeRow(string $id): self` | Remove a row by ID; unknown ID is a no-op |
-| `rawArray()` | Canonical rows data; not a separate persistence API |
+| `rawArray(): array` | Canonical rows envelope, including hidden rows |
 
 ```php
 $images = $page->content->blocks->rowsOfType('image');
 $count = $page->content->blocks->countOfType('text');
 ```
 
-`rowsOfType()` returns **the existing objects**, not clones or a second owned collection; the array is a snapshot of the current order. Both type helpers consider only direct rows, do not query the database, return `[]`/`0` for an unknown type string and throw `TypeError` for non-string arguments. Mutations to selected Row objects affect their owning collection, subject to normal output-formatting checks.
+Type helpers inspect direct rows only, including unsaved edits. They return `[]`/`0` for unknown type strings and throw `TypeError` for non-string arguments. `rowsOfType()` returns existing objects in a numeric array; edits affect the owning rows under normal formatting guards.
 
-`addRow()` requires a declared type; unknown types raise `FlexDefinitionException`. Unknown IDs in `duplicateRow()` or either argument of `moveRow()` raise `WireException`; `getById()` returns null. Mutations with output formatting enabled and collection-limit violations also raise `WireException`. Maximum limits apply when adding/hydrating; minima are enforced on field save, so temporary underfilled collections can be edited. Sorting/removal affects siblings only. A single type or `maxItems=1` still returns a collection and does not create an implicit row. Guard `first()` against false on empty collections.
+`addRow()` rejects unknown types with `FlexDefinitionException`. `duplicateRow()` and `moveRow()` reject unknown IDs with `WireException`; `removeRow()` ignores them. Formatting guards and collection-limit violations raise `WireException`. Maxima apply when adding/hydrating; minima apply on field save. A single type or `maxItems=1` still returns a collection without an implicit row. `first()` returns false when empty.
+
+#### Searching a loaded collection
+
+```php
+$blocks = $page->content->blocks;
+$images = $blocks->find('_type=image');
+$galleries = $blocks->find('_type=image, photo.count>=3');
+$intro = $blocks->find('_type=text, heading=Introduction, body*=ProcessWire');
+
+// Search a nested collection directly, within this concrete parent row.
+$notes = $block->notes->find('_type=note, text*=Sources');
+```
+
+`find()` accepts a selector string, native selector array or `Selectors`. It searches loaded direct rows, including unsaved values, and returns a new `FlexRows` selection with the same keys, order, objects and formatting state. Chaining searches the previous selection; an empty selector selects the current view. The source membership and change tracking remain unchanged. Row objects are shared: edit selected unformatted rows normally, but change collection membership on the original owned collection.
+
+`_type` selects Row metadata; `type` selects an ordinary content property. Within selectors, `_type` takes precedence over any same-named content property; read that content directly on the Row. `_type=unknown` matches no rows; `_type!=unknown` retains all rows in the current view.
+
+Every condition applies to the same direct row. Supported paths are `_type`, direct properties and media/child collection `.count`. Search a child's collection directly for child properties. OR values and prefix negation work. Arbitrary traversal, type-qualified paths, `@`, OR field names, groups, alternate operators and sorting/pagination directives are unsupported. Media/Rows without `.count` allow only blank checks. Type conditions use `=`/`!=`; counts use numeric operators; scalar and membership operators follow the [operator lists](#operators-and-matching-semantics), with numeric IDs for Page references. An explicit `_type` condition narrows schema validation. Invalid paths/operators raise `WireException`, even on an empty collection.
+
+Comparisons use **unformatted leaf values** and native in-memory `Selector::matches()`. Textformatters and single-image output do not affect matches/counts. Dates require numeric Unix timestamps. Native in-memory zero/blank equality differs from SQL: `number=0` can match a blank numeric property.
+
+The source formatting state controls row visibility and nested counts. Formatted results omit hidden rows; subsequently unformatting a result does not restore excluded members. Returned rows retain their original formatting state. Use native selector escaping or selector arrays for dynamic values.
 
 <a id="nested-repeatables-and-resource-limits"></a>
 
@@ -475,7 +414,7 @@ $page->save('content');
 
 The example assumes the nested `sections → blocks → notes` schema in [examples/08-rows.php](examples/08-rows.php). Paths for schema lookup and selectors include each type, for example `sections.section.blocks.text.heading`.
 
-Native `InputfieldWrapper` definitions use `InputfieldFlexRows` instead of the array/JSON type keyword:
+Native [[InputfieldWrapper]] definitions use InputfieldFlexRows instead of the array/JSON type keyword. Each type's `children` accepts an array or native wrapper, including nested InputfieldFlexRows:
 
 ```php
 $rows = $modules->get('InputfieldFlexRows');
@@ -544,29 +483,69 @@ $page->save('content');
 
 File imports require readable local paths; remote URLs are rejected. New uploads and changes to original images are staged until the owning Flex field saves. The owning Page and Field remain responsible for the media, including inside native Repeater items. Copying across owners or duplicating rows creates independent media copies. Deletion of originals is deferred until canonical data commits.
 
-Native collection iteration, `first()`, filename lookup with `get()`, `add()`, `delete()`/`deleteAll()`, `rename()` and `clone($file)` are available. File objects expose native URLs, filenames, size, descriptions, tags and filedata; images provide `size()`, `width()`, `height()`, `crop()` and `focus()`. Use the [Pagefiles](https://processwire.com/api/ref/pagefiles/), [Pagefile](https://processwire.com/api/ref/pagefile/) and [Pageimage](https://processwire.com/api/ref/pageimage/) references for these native APIs. Copies retain metadata and receive independent asset ownership.
+Native collection iteration, `first()`, filename lookup with `get()`, `add()`, `delete()`/`deleteAll()`, `rename()` and `clone($file)` are available. File objects expose native URLs, filenames, size, descriptions, tags and filedata; images provide `size()`, `width()`, `height()`, `crop()` and `focus()`. See [[Pagefiles]], [Pagefile](https://processwire.com/api/ref/pagefile/) and [[Pageimage]] for these native APIs. Copies retain metadata and receive independent asset ownership.
 
-`$file->rename('test.png')` and `$files->rename($file, 'test.png')` return the effective basename. Rename preserves the file object, asset ID, collection order and metadata. An available name is retained exactly after native filename sanitization; a suffix is added only for a conflict with page files, reserved Flex names or existing image variations. Original bytes and existing native image variations are copied to the new names while the previously committed files remain available. Save the owning Flex field to commit the rename; cleanup of the former names follows commit. A failed save leaves the previous canonical names and files intact. Uploads, replacements and duplicates retain their independent-copy naming and ownership behavior.
+`$file->rename('test.png')` and `$files->rename($file, 'test.png')` return the effective basename after native sanitization and collision handling. Rename preserves asset identity, order and metadata, and copies original bytes and variations to staged names. Save the owning field to commit; a failed save retains the previously committed names/files.
 
-For an already committed file, `$file->save()` saves its metadata independently of other pending Flex edits; concurrent metadata changes are checked for conflicts. Use `$type->saveFile($page, $field, $file, ['description'])` on the module instance for selected metadata columns (`description`, `tags`, `filedata`, `modified`, `modified_users_id`).
+For an already committed file, `$file->save()` saves its metadata independently of other pending Flex edits; concurrent metadata changes are checked for conflicts. Use `$type->saveFile($page, $field, $file, ['description'])` on the module instance for selected metadata columns (`description`, `tags`, `filedata`, `values`, `modified`, `modified_users_id`).
 
-File/Image definitions support `extensions`, `maxFiles` (default `0`), `maxFilesize` (bytes, `0` means no extra limit), native image dimension limits, descriptions and free tags (`useTags`). Native upload/editor processing applies input-specific validation; local imports enforce readable paths, allowed extensions, size and count, and must be validated appropriately for your application. File extensions must be configured. Default Image upload formats are: JPG/JPEG, GIF and PNG (not WebP). WebP derivatives may be generated when the installed ProcessWire image engine supports them; that does not enable WebP original uploads. Overwrite mode, archive extraction (`unzip`), property-level `useLanguages`, predefined tags, custom metadata templates and native string media output are not supported. Native language-aware descriptions use `noLang`; this is separate from multilingual text properties. TinyMCE drag-and-drop uploads require a regular ProcessWire Image field as their destination.
+File/Image settings include `extensions`, `maxFiles` (default `0`, unlimited), `maxFilesize` (bytes; `0` means no extra limit), native image dimensions, descriptions and free tags (`useTags`). Local imports enforce readable paths, extensions, size and count; native editor processing adds input-specific validation.
 
-Media descriptions use native `Textformatter` modules on formatted reads.
-Configure an ordered `textformatters` list on the File/Image property, or inherit
-the list from a native Field. An absent list or `[]` leaves descriptions unescaped;
-Flex does not add any formatter automatically.
-For example, `'textformatters' => ['TextformatterEntities']` allows
-`alt="<?= $image->description ?>"` in a formatted template. `inheritField` copies
-native File/Image description formatter lists; an explicit property list wins.
+File properties require extensions. Image defaults are JPG/JPEG, GIF and PNG; configure WebP explicitly for original uploads. WebP derivatives depend on the installed image engine. Unsupported settings: overwrite, archive extraction (`unzip`), property `useLanguages`, predefined tags, custom metadata templates and string media output. Native language-aware descriptions use `noLang`. TinyMCE drag/drop uploads require a regular ProcessWire Image field as destination.
 
-Formatting applies to `description` and `description($language)` after native
-language selection/fallback, including nested Rows and image variations. Each
-read starts from raw metadata, so repeated reads do not encode twice and changing
-the current language works on the same output view. `description(true)` and
-`description(true, true)` retain native raw JSON/all-language export semantics.
-Canonical metadata, revisions and change tracking remain unchanged. This setting
-formats descriptions only; tags and filedata retain their existing output behavior.
+File/Image `textformatters` format descriptions after native language selection/fallback. Configure them explicitly or through `inheritField`; an absent list or `[]` leaves descriptions unescaped. For example, `'textformatters' => ['TextformatterEntities']` makes a formatted description suitable for an HTML attribute.
+
+Formatting applies to `description` and `description($language)`, including variations. Repeated reads start from raw metadata. `description(true)` and `description(true, true)` retain native raw JSON/all-language exports. Tags, filedata, canonical metadata and change tracking are unaffected.
+
+### Per-file custom fields
+
+Set `customFields` on a File/Image property to define metadata without creating database Fields or metadata Templates. PHP arrays, JSON and native wrappers use the same definition rules; for a native Image/File Inputfield, assign an array or InputfieldWrapper to its `customFields` setting.
+
+```php
+// Per-file metadata definition.
+'gallery' => [
+    'type' => 'image',
+    'customFields' => [
+        'description' => ['type' => 'textarea', 'label' => 'Image description'],
+        'tags' => ['type' => 'checkboxes', 'options' => ['web' => 'Website', 'print' => 'Print']],
+        'copyright' => ['type' => 'text', 'textformatters' => ['TextformatterEntities']],
+        'year' => ['type' => 'integer'],
+        'body' => ['type' => 'TinyMCE'],
+        'author' => ['type' => 'page', 'inputfield' => 'InputfieldSelect', 'derefAsPage' => 2, 'parent_id' => 1],
+        'token' => ['type' => 'hidden'],
+        'help' => ['type' => 'markup', 'value' => '<p>Enter the image credits.</p>'],
+    ],
+],
+```
+
+```php
+// Existing image in the gallery.
+$page->of(false);
+$image = $page->content->gallery->first();
+$image->copyright = 'Example Photographer';
+$image->year = 2026;
+$page->save('content');
+$page->of(true);
+echo $page->content->gallery->first()->copyright;
+```
+
+Supported inputs are Text, Textarea (plain or HTML), TinyMCE, Hidden, Page, Email, URL, Integer, Float, Select, Radios, SelectMultiple, Checkboxes, AsmSelect, Checkbox, Toggle, Datetime and TextTags, grouped with ordinary fieldsets if needed. Markup displays editor content without storing a value. Leaves share one metadata scope per file. Their values follow the [Flex value types](#value-types): raw keys/lists, numeric zero, timestamps and multilingual text. Labels, defaults, native settings, compatible `inheritField`, `required`, `showIf` and `requiredIf` apply. Rows, nested media and unsupported third-party inputs are rejected in `customFields`.
+
+TinyMCE uses the existing native rich-text and language pipeline, including inline mode. Pending editor content survives image refreshes and the existing single-file replacement. Its upload destination remains a regular ProcessWire Image field. Page metadata uses native `InputfieldSelect` (default) or `InputfieldAsmSelect`; other Page selection widgets are rejected. The [Page-reference value rules](#value-types) apply: `derefAsPage` selects Page/PageArray, selections store IDs, and mutations on an unformatted original's PageArray are saved with the file or owning field. Reference containers are independent in copies and formatted views. Page metadata has no SQL selectors or Page-reference traversal.
+
+`$image->getFieldValue('copyright', false)` explicitly returns an unformatted value; `true` formats it and `null` follows the file view. `$image->setFieldValue('copyright', 'Name')` returns bool. Unknown bridge names return `null`/`false`; retained unknown data does not become a declared API property. Native bookkeeping remains native. Formatted views are read-only. Native property/method names, language-description aliases and internal names are reserved, with `description` and `tags` as explicit exceptions.
+
+A custom `description` input edits the existing native description. Use Text, Textarea or TinyMCE. Its language mode inherits media `noLang`; an explicit contradictory mode is rejected. Its formatter list overrides media description formatters, including `[]`; otherwise the media list applies once. Other custom text fields have independent language modes.
+
+A custom `tags` input edits the existing native tags string. Text, TextTags and choice inputs are supported; choice keys must be unambiguous native tags (letters, digits, `_` or `-`, unique ignoring case). The public value remains a string and native `tags()`, `hasTag()`, `addTag()` and `removeTag()` remain available. Each replaced standard input is suppressed independently. Removing either override retains its native value.
+
+Bare dependency names refer to the same file's metadata. `parent.` refers to the Flex root or Row containing the media property; `root.` refers to the owning Flex root. `page.` and `forpage.` retain their [native owner/editor contexts](#dependency-contexts). Uploads may remain staged while required metadata is incomplete; the containing editor save validates it. Removing a file does not require filling its metadata.
+
+`$page->save('content')` and `$image->save()` persist ordinary custom values. Selective `saveFile(..., ['values'])` saves the ordinary metadata map together; per-property partial saves are unsupported. A selective native save such as `['description']` leaves pending ordinary metadata intact. Metadata-only edits retain image variations; variations read the original's metadata, including subsequent edits, and reject metadata writes.
+
+Removing custom fields or the whole `customFields` setting preserves stored values through normal saves and copies. Reintroducing a definition recovers them. `renamedFrom` uses the existing strict conflict rules; renames to/from native description/tags are rejected. Raw maintenance addresses metadata with schema paths such as `gallery.copyright`, or `blocks.image.gallery.copyright` inside Rows; concrete reported addresses also include the asset ID. Cleanup only removes explicitly selected unknown values.
+
+Custom metadata is not available to SQL selectors, media sorting or loaded collection filters. Whole-field search retains basename, native description and tags; it does not include arbitrary custom values.
 
 ## Selectors
 
@@ -581,23 +560,64 @@ $pages->find('content.blocks.count>=3');
 $pages->find('content.blocks.text.count>0');
 ```
 
-Use **type-qualified paths** for row values: `FIELD.COLLECTION.TYPE.PROPERTY`. More deeply nested collections include each collection name and type.
+Use **type-qualified paths** for row values: `FIELD.COLLECTION.TYPE.PROPERTY`. Deeper collections include each collection name and type. SQL `COLLECTION._type` accepts `=`/`!=` with a declared type or blank; unknown types raise `PageFinderSyntaxException`.
 
 ### Operators and matching semantics
 
 - Numbers, dates and single Page references (numeric IDs): `=`, `!=`, `>`, `>=`, `<`, `<=`.
-- Text: `=`, `!=`, `*=`, `%=`, `^=`, `$=`, `%^=`, `%$=`, `~=`, `~|=`.
+- Other scalar properties (text, single-choice keys, Checkbox, Toggle, TextTags): `=`, `!=`, `*=`, `%=`, `^=`, `$=`, `%^=`, `%$=`, `~=`, `~|=`.
 - Generic arrays and multiple Page references: `=` and `!=` membership checks.
 
-A row leaf predicate means **any matching row**. Separate row predicates may match different rows. To require multiple conditions on one concrete row, use a quoted same-row expression:
+A row leaf predicate means **any matching row**. Separate row predicates may match different rows. To require multiple conditions on one concrete row, use ProcessWire's `@` prefix:
 
 ```php
-$pages->find('content.blocks.text="heading=Introduction, body*=ProcessWire"');
+$pages->find('@content.blocks.text.heading=Introduction, @content.blocks.text.body*=ProcessWire');
 ```
 
-Global `leaf!=value` means no row at that path matches `value`, rather than “some row differs”. `leaf=""` means no row has a populated leaf; `leaf!=""` means at least one does. Missing fields/ancestors therefore match global blank and negative conditions. Within a same-row expression, leaf tests apply to that concrete row; positive same-row matching requires an actual row. Negating the entire expression means no row satisfies it.
+`$pages->find()` returns **owner Pages** using the saved database projection.
+`FlexRows::find()` above returns Rows from one loaded collection. Their path
+syntax, result types, visibility context and matching engines are different.
 
-Nested same-row expressions correlate child rows with their concrete parent. Nested path counts outside such an expression total matching descendants across all qualifying parents; inside it they count only that parent’s descendants. Missing collections/parents count as zero. Numeric zero remains populated rather than blank.
+Flex groups `@` clauses by field and group name, requiring one concrete row at every shared collection/ancestor scope. Named groups such as `a@content.blocks.text.heading=Introduction, b@content.blocks.text.body*=ProcessWire` match independently; different groups can still select the same Row. Unprefixed conditions remain independent.
+
+```php
+// One parent and one child must satisfy all their respective conditions.
+$pages->find('@content.sections.section.heading=Introduction, '
+    . '@content.sections.section.blocks.text.heading=Overview, '
+    . '@content.sections.section.blocks.text.body*=ProcessWire');
+
+// Counts here belong to that concrete parent; zero children is valid.
+$pages->find('@content.sections.section.heading=Introduction, '
+    . '@content.sections.section.blocks.count=0');
+
+// Media count belongs to the same image Row as its caption.
+$pages->find('@content.blocks.image.caption=Gallery, '
+    . '@content.blocks.image.photo.count>=3');
+```
+
+Within one `@` group, use explicit type-qualified property paths, media counts,
+or child collection blank/count predicates. Each collection has one required Row
+type per group. Conflicting types, collection `_type` predicates, counts of the grouped Row
+itself, OR field names, sub-selectors and alternate operators fail explicitly
+with `PageFinderSyntaxException`. Ordinary collection/type count selectors remain
+available without `@`. Prefix negation, negative operators and OR values are
+evaluated within the concrete Row. To require that **no Row** satisfies an entire
+condition group, use the Core's native ID exclusion:
+
+```php
+$excluded = $pages->findIDs('@content.blocks.text.heading=Introduction, '
+    . '@content.blocks.text.body*=ProcessWire');
+$excluded = implode('|', $excluded) ?: '0';
+$matches = $pages->find("id!=$excluded");
+```
+
+This takes two queries and materializes owner IDs; `0` keeps empty exclusions valid. On the tested ProcessWire 3.0.274 core, `id!=[sub-selector]` fails for empty results. Native Repeater `@` matching also has correlation gaps; Flex enforces same-row correlation at every shared scope.
+
+Collection/type scopes accept only blank checks. The former Flex-specific quoted condition syntax is unsupported; replace it with type-qualified `@` conditions, or ID exclusion for a negated group.
+
+Global `leaf!=value` means no row at that path matches `value`, rather than “some row differs”. `leaf=""` means no row has a populated leaf; `leaf!=""` means at least one does. Missing fields/ancestors therefore match global blank and negative conditions. Within an `@` group, leaf tests apply to that concrete row; positive same-row matching requires an actual row. Native ID exclusion negates the whole group.
+
+Nested `@` conditions correlate child rows with their concrete parent. Nested path counts outside a group total matching descendants across all qualifying parents; inside a group they count only that parent’s descendants. Missing collections/parents count as zero. Numeric zero remains populated rather than blank.
 
 Date range comparisons exclude blank or missing dates. For scalar properties,
 nonblank `!=value` includes missing values; native Fieldtypes can differ in their
@@ -630,7 +650,7 @@ Target IDs are materialized without the editor's 500-option cap and matched agai
 
 ## Inputfield settings
 
-Definitions reuse settings from the selected **native Inputfield**. The `textformatters` setting additionally uses the native Fieldtype output pipeline; Fieldtype database storage is never copied. Refer to the installed Inputfield's PHPDoc and the [ProcessWire Inputfield API](https://processwire.com/api/ref/inputfield/) for shared options.
+Definitions reuse settings from the selected **native Inputfield**. The `textformatters` setting additionally uses the native Fieldtype output pipeline; Fieldtype database storage is never copied. Refer to the installed Inputfield's PHPDoc and [[Inputfield]] for shared options.
 
 | Setting | Example or values | Meaning |
 | --- | --- | --- |
@@ -661,16 +681,9 @@ dependencies and `InputfieldForm` processing. Flex resolves these field referenc
 | `page.feature_enabled=1` | Native field on the Page owning the Flex field |
 | `forpage.feature_enabled=1` | Native field on the main Page being edited |
 
-For a nested Row, `parent` means the containing Row. For a Row directly in the
-root value, `parent` means that root value. `parent` at the Flex root is a
-configuration error. Ordinary fieldsets do not introduce a scope. `root` always
-means the current Flex field, including when that field is inside a native
-Repeater; it does not refer to another Flex field on the main Page.
+For a nested row, `parent` is its containing row; for a direct root row, the root Flex value. `parent` at the root is invalid. Ordinary fieldsets add no scope. `root` always identifies this Flex field.
 
-Inside native Repeaters/RepeaterMatrix, `page` refers to the owning item Page,
-while `forpage` refers to the main editor Page, following ProcessWire's established
-`forpage` convention. Outside Repeaters they refer to the same Page. These are
-editor input references, not PHP variables or PageFinder selectors.
+Inside native Repeaters, `page` is the item Page and `forpage` the main editor Page; elsewhere they identify the same Page. These are editor inputs, not PHP variables or PageFinder paths.
 
 ```php
 // Inside a nested Row; both conditions must match.
@@ -682,25 +695,11 @@ editor input references, not PHP variables or PageFinder selectors.
 ],
 ```
 
-Define `show_details` in the containing Flex scope and `details_required` at the
-Flex root; `feature_enabled` is a native Checkbox field in the main editor.
-Conditions use current submitted values, including unchecked checkboxes, rather
-than only saved values. This applies to normal saves and AJAX Row duplication.
-Array/JSON and native wrapper definitions share the same resolution.
+The example needs `show_details` in the containing scope, `details_required` at the Flex root and a native `feature_enabled` Checkbox on the main Page. Conditions use submitted values, including unchecked checkboxes, on Save and AJAX duplication. Array/JSON and wrapper definitions behave alike.
 
-References accept one property/field name and the native `.count` suffix where
-the source input supports it (for example `root.tags.count>1`). Native operators,
-comma-separated AND conditions and field/value OR expressions remain available.
-The dotted prefixes `parent`, `root`, `page` and `forpage` identify contexts;
-bare properties with those names still refer to local properties.
+References accept one name plus native `.count` where supported. Native operators, comma-separated AND and field/value OR expressions remain available. Bare properties named `parent`, `root`, `page` or `forpage` remain local properties.
 
-External dependency sources must be available native value inputs in the rendered editor.
-Rows, fieldsets, File/Image inputs and another compound Flex field cannot be
-sources. Missing/unsupported sources block processing with a definition error.
-The usual core limitations on dependency input types still apply. Arbitrary
-traversal such as `page.parent.template.name` and repeated `parent.parent` paths
-are not supported; evaluate stored Page metadata in a PHP definition instead.
-Conditional visibility does not replace application permissions or validation.
+External sources must be rendered native value inputs. Rows, fieldsets, File/Image and compound Flex fields cannot supply values; missing/unsupported sources cause a definition error. Arbitrary traversal (`page.parent.template.name`, `parent.parent`) is unsupported; use PHP definitions for stored Page metadata. Conditions do not replace permissions or validation.
 
 ### Reusing native input configuration
 
@@ -712,13 +711,13 @@ Conditional visibility does not replace application permissions or validation.
 ],
 ```
 
-For native datepicker, TinyMCE and `inheritField` definitions, see [numbers/dates](examples/04-numbers-dates.php), [text inputs](examples/03-text.php) and [advanced settings](examples/07-advanced.php), including their prerequisites.
+The source Field must use the same Inputfield type (here, Textarea configured for TinyMCE). Flex copies Inputfield settings and compatible FieldtypeText/FieldtypeFile `textformatters`, never source values or storage. Local settings override inherited ones; an explicit formatter list replaces the inherited list, including `[]`.
 
-The source Field must use the same Inputfield type (for this example, a Textarea field configured for TinyMCE). Flex copies its Inputfield settings and, for a source using `FieldtypeText`, `FieldtypeFile` or their subclasses, its actual Fieldtype `textformatters` list. Local settings override inherited settings; an explicit list replaces the inherited list completely, including `[]`. A source without formatters supplies an empty list. Custom scalar text inputs can use Textformatters without extending InputfieldText. Source values and database storage are never copied. TinyMCE's own `settingsField` is a separate native setting, not an alias of `inheritField`. See [advanced settings](examples/07-advanced.php).
+TinyMCE's native `settingsField` is separate from `inheritField`. See [text inputs](examples/03-text.php), [numbers/dates](examples/04-numbers-dates.php) and [advanced settings](examples/07-advanced.php) for prerequisites and examples.
 
 ### Textformatters
 
-Text-valued inputs (including custom scalar inputs), Textarea/TinyMCE, Email, URL, Hidden and Icon support native `Textformatter` modules. File/Image properties apply them to descriptions. Formatter settings on numbers, Toggle, choices, Page references, rows and fieldsets are ignored. This allows shared configuration without errors for irrelevant settings. Effective lists must contain installed ProcessWire `Textformatter` module names; invalid effective lists/modules still raise a definition error with field, source and property context.
+Text-valued inputs, including custom scalar inputs, TinyMCE, Email/URL, Hidden and Icon support native Textformatters. File/Image applies them to descriptions. Settings on numbers, Toggle, choices, Page references, Rows and fieldsets are ignored. Effective lists must name installed Textformatter modules or a definition error is raised.
 
 PHP definitions use `'textformatters' => ['TextformatterMarkdownExtra']`. JSON uses the same ordered list:
 
@@ -731,13 +730,11 @@ PHP definitions use `'textformatters' => ['TextformatterMarkdownExtra']`. JSON u
 }
 ```
 
-Formatter order is significant. Flex delegates to native Text/Textarea/Email/URL `formatValue()` with the actual owning Page and a transient Field containing property settings. This Field has no database ID; its name is `<flex_field>_<property>`, including inside rows. It is not the inherited source Field. Formatters that require a real stored Field or fetch the property via `$page->{$field->name}` need their own Flex-aware integration. No source values or Fieldtype persistence hooks are invoked.
+Formatters run in configured order on formatted reads, after native language resolution/fallback (`langBlankInherit`, template `noLang`). An absent list or `[]` leaves text/descriptions unescaped. Use `TextformatterEntities` for HTML text/attributes; Markdown formatter output retains its HTML. Repeated reads start from raw values and do not alter canonical data or change tracking.
 
-Formatters run only on formatted reads. Multilingual values first resolve to the current language using native fallback/`langBlankInherit` and template `noLang` behavior. Every read starts from the unformatted value, including nested rows; `rawArray()`, canonical JSON and change tracking remain unchanged. Saving requires output formatting off as usual.
+The formatter receives the owning Page and a transient Field named `<flex_field>_<property>`, with no database ID, including inside Rows. Formatters requiring a stored Field or `$page->{$field->name}` need Flex-aware integration.
 
-For text properties, an absent formatter list and an explicit `[]` both mean **no Textformatter transformation**. File/Image descriptions follow the same rule: absent or empty lists leave them unescaped. Explicit or inherited formatters control formatted text output in their configured order. Flex uses native formatter modules for encoding: select `TextformatterEntities` for HTML text and description output; Markdown-generated HTML remains HTML when using a Markdown formatter.
-
-Selection keys remain raw; `label()`, `optionLabel()` and `getOptions()` entity-encode display labels when formatted. Native URL `addRoot` and Textarea output options (such as lazy image loading) apply even without a formatter list. Flex does not implement native Textarea storage-time markup QA or link abstraction. See [text and rich text](examples/03-text.php) and [field inheritance](examples/07-advanced.php).
+Native URL `addRoot` and Textarea output options apply even without formatters. Storage-time markup QA/link abstraction remains unsupported. Choice keys stay raw; [label helpers](#property-and-option-labels) encode display labels separately.
 
 ### Language modes
 
@@ -747,7 +744,9 @@ Selection keys remain raw; `label()`, `optionLabel()` and `getOptions()` entity-
 | `true` | Multilingual value | Definition error |
 | `'auto'` | Multilingual value | Plain text |
 
-`'auto'` is available on Text/Textarea subclasses, including TinyMCE. An unformatted multilingual value uses `LanguagesPageFieldValue`; formatted reads return the current-language string. JSON retains a language-ID map. Direct scalar property assignment updates the current user language while preserving other translations (a template with `noLang` uses the default). When a multilingual property switches to plain mode, Flex reads its default-language text; **saving the field replaces the language map with that plain value and discards other translations**. Reads alone do not discard stored translations. A previously stored scalar becomes the default-language value when multilingual mode is enabled. String conversion uses the current user language; `hasValue()` checks all languages. Flex remembers the default-language ID during field saves while the Languages API exists; save a Flex field before uninstalling LanguageSupport so this ID is available afterward. The live Languages API takes precedence over the remembered ID. A blank or missing default remains blank regardless of the current user. Without the API and a remembered ID, old language maps cannot be read as plain text. No bulk conversion or module installation runs. See [text and language modes](examples/03-text.php).
+`'auto'` supports Text/Textarea subclasses, including TinyMCE. Unformatted values are `LanguagesPageFieldValue`; formatted reads use the current language. JSON stores language-ID maps. Scalar assignment updates the current user's language and retains others; template `noLang` uses the default. A stored scalar becomes the default-language value when multilingual mode is enabled.
+
+Switching to plain mode reads the default-language text, even when blank/missing. **Saving then replaces the language map and discards other translations**; reads alone preserve them. Before uninstalling LanguageSupport, save a Flex field so the module remembers the default-language ID. The live Languages API takes precedence; without it or a remembered ID, old maps cannot be read as plain text. See [language examples](examples/03-text.php).
 
 ### Tested Inputfields
 
@@ -762,7 +761,7 @@ The integration fixture covers construction and native rendering for the followi
 | Rich text | TinyMCE |
 | Media | Flex File and Image integration |
 
-Native ProcessWire Repeater is supported as a **container for a Flex field**, not as a property type. CKEditor has no Flex-specific browser-save verification. Inputfields relying on their own Fieldtype persistence are not automatically supported.
+Native Repeater can contain a Flex field but cannot be a Flex property. Flex, Repeater/RepeaterMatrix, PageTable and Password inputs are rejected as properties. Inputfields requiring their own Fieldtype persistence are not automatically supported; CKEditor has no Flex-specific browser-save verification.
 
 ## Field settings
 
@@ -832,31 +831,18 @@ Continue successful incomplete batches with `lastPageId`; after errors repair an
 
 ### Native CLI
 
-Run from the ProcessWire root; refresh module metadata after updating an existing
-installation. Native CLI remains optional, with unchanged ProcessWire/PHP requirements:
-`cli => 'flex'`, `executeCli()` and `getCliCommands()` without a direct
-`implements CliModule` declaration, following the [official compatibility approach](https://processwire.com/api/ref/cli-module/).
-There is no replacement dispatcher or extra CLI module. The pinned 3.0.274 fixture
-has the native dispatcher; the pinned 3.0.259 snapshot has neither dispatcher nor
-interface. Its `index.php flex` does not run Flex, and a zero process status there
-is not evidence of success. Shared adapter and maintenance logic still works there.
+Run from the ProcessWire root on a core with native CLI dispatch. Refresh module metadata after updating. The development fixture's 3.0.274 supports it; the pinned 3.0.259 does not. PHP and Admin maintenance remain available without native CLI.
 
 ```sh
 php index.php flex --help
-php index.php flex schema content
 php index.php flex schema content --page=1234 --json
 php index.php flex status --json
-php index.php flex check content --page=1234 --json
 php index.php flex check content --all --limit=100 --json
-php index.php flex rename content --dry-run --limit=100 --after=0
-php index.php flex rename content --page=1234 --apply
-php index.php flex rename content --all --apply --limit=100
-php index.php flex orphans content --details --limit=50 --after=0
-php index.php flex orphans content --page=1234 --details
-php index.php flex orphans content --all --json
-php index.php flex cleanup content --path=old_summary --path=blocks.text.old_caption --dry-run
-php index.php flex cleanup content --page=1234 --path=old_summary --apply
-php index.php flex cleanup content --all --path=old_summary --apply
+php index.php flex rename content --dry-run
+php index.php flex rename content --all --apply
+php index.php flex orphans content --details
+php index.php flex cleanup content --path=old_summary --dry-run
+php index.php flex cleanup content --path=old_summary --apply
 ```
 
 | Command | Accepted options |
@@ -868,93 +854,29 @@ php index.php flex cleanup content --all --path=old_summary --apply
 | `orphans FIELD` | Same selection/output options as check; `--details` |
 | `cleanup FIELD` | Same selection/output options as rename; one or more `--path=PATH` |
 
-No content writes occur without `--apply`. `--dry-run` is explicit documentation of
-the default preview mode and cannot accompany `--apply`. Apply creates a fresh
-preview in this invocation and rechecks its revisions, schema and locks through
-the shared maintenance service. It does not reuse a previous terminal dry-run.
-Cleanup requires unique, explicitly selected typed schema paths, never concrete row
-IDs. `--details` adds bounded owner IDs and concrete addresses to orphan batches.
-Unknown, duplicated, inapplicable or contradictory arguments fail; repeated distinct
-`--path` options are allowed. Numeric options require decimal integers without
-leading zeros, signs, overflow or truncation. `--limit` is 1..1000 (default 100),
-`--after` is nonnegative (default zero), and `--page` is positive.
+`rename` and `cleanup` preview by default; only `--apply` writes content. Apply creates and revalidates a fresh preview, not a prior terminal dry-run. `--dry-run` cannot accompany `--apply`. Cleanup paths must be unique type-qualified schema paths, never row IDs. `--details` adds owner IDs and concrete addresses to orphan batches.
+
+Unknown, repeated, inapplicable or contradictory options fail; distinct `--path` options may repeat. Numeric options require decimal integers without leading zeros or signs: `--limit=1..1000` (default 100), `--after>=0` (default 0), `--page>0`.
 
 #### Exact owners and batches
 
-`--page` resolves exactly one owner by ID, including hidden/unpublished Pages and
-native Repeater items. An absent Page or missing template field assignment is a
-request error (exit 2). An assigned field without a stored field-table row is a
-regular empty result (`stored=false`, `checked=0`); existing empty JSON remains a
-stored value and is checked normally. `pageId` identifies the requested owner.
-Schema inspection evaluates the selected Page even when it has no stored value.
-`--page` cannot accompany `--all`, `--after` or `--limit`.
+`--page` selects one exact owner, including hidden/unpublished Pages and Repeater items. A missing Page or field assignment is an error (exit 2). An assigned field without stored data returns `stored=false`, `checked=0`; stored empty JSON is checked normally. Schema inspection evaluates the Page even without storage. `--page` excludes `--all`, `--after` and `--limit`.
 
-Without `--all`, maintenance/check scans one bounded batch. Use `lastPageId` for
-the next batch while `complete=false`. `--all` automatically advances through
-ID-ordered batches; **limit bounds each batch, not the entire run**. It may be
-combined with `--after` to scan a suffix. `finished=true` certifies only that selected
-range, never earlier skipped owners. No global transaction or snapshot spans a run.
-Each write retains the existing per-owner transaction/savepoint and concurrency
-checks. Successful writes survive a later failure.
+Without `--all`, check/maintenance scans one bounded batch. Continue with `lastPageId` while `complete=false`. `--all` advances automatically; `--limit` bounds each batch, not the run. `--after` starts a suffix. Each owner commits independently; no global snapshot/transaction spans the run.
 
-An all-run stops **after the first batch with errors or incomplete checks**. Valid
-owners in that batch may already have succeeded. It emits the failed owners and
-`resumeAfterPageId`, the cursor before the earliest failed/incompletely checked
-owner. Repair the problem, then rerun with `--all --after=RESUME_ID` and the same
-operation/selection. Previously applied transforms are idempotent. The forward
-`lastPageId` is examination progress, never proof of success. There is no automatic
-retry loop. Global property totals sum distinct owner counts from disjoint batches;
-multiple occurrences on one owner count once for that property. Summaries retain
-counts per path, not all preview tokens, IDs or detail locations.
+An all-run stops after its first batch with errors or skipped checks; successful owners in that batch remain applied. Repair failures and resume with `--all --after=RESUME_ID`, using `resumeAfterPageId` and the same operation/selection. `retryPageIds` identifies failed owners. `lastPageId` records examination progress, not success; `finished` covers only the selected range.
 
-Before removing `renamedFrom`, complete every batch from zero successfully, then
-run a new full preview from zero that finds no pending old keys. Concurrent changes
-can require another scan even after completion.
+Before removing `renamedFrom`, complete migration from zero, then repeat a full preview from zero until no pending renames remain. Concurrent edits can require another scan.
 
 #### Schema inspection
 
-`schema` shows active source kind/origin and the relative file name when available,
-property kinds/native Inputfield types, multiplicity/language mode, recursive
-collections/types and declared `renamedFrom` names. Without `--page`, it evaluates
-the existing discovery/NullPage context. With `--page`, it evaluates that exact
-Page. `context` and `pageId` expose the distinction. Dynamic schemas must still
-expose queryable properties in ordinary pageless discovery.
-
-Selector descriptors come from the actual query discovery logic, including operators,
-row counts/types, media counts and supported root Page-reference terminal fields.
-Property names alone do not imply additional paths. Existing selector restrictions
-still apply: no arbitrary JSON paths, repeated-value sorting, Page traversal from
-rows, further Page hops or unsupported grouping/negation. Schema inspection neither
-saves definitions nor migrates values. Missing/invalid definitions fail explicitly;
-trusted PHP exception details and source text are omitted from terminal reports.
+`schema` reports source, native input types, language/multiplicity settings, recursive collections/types, renames and supported selector paths/operators. Without `--page`, it uses discovery/NullPage; with it, that exact Page's schema. Dynamic definitions must still expose queryable paths in discovery. Missing/invalid definitions fail. Inspection never saves or migrates data.
 
 #### Consistency checks
 
-`check` reads canonical data without FlexValue hydration, defaults, normalization,
-repair or persistence. It checks stored owner resolution/assignment, JSON object
-shape, internal row/media envelopes and configured tree budgets, valid per-Page
-definitions, unknown row types and rename conflicts. It compares whole-field search
-and row projections against the **same raw derivation used by writes**. JSON map
-key order does not produce a false projection error. Pending renames are warnings;
-projections and ownership are compared against current stored addresses until a
-rename is applied. Unknown properties alone are not errors (`orphans` inventories
-them); retained recognized envelopes remain subject to structural checks.
+`check` reads stored data without hydration, defaults, normalization or repair. It checks owner/field assignment, canonical JSON/envelopes, resource budgets, per-Page definitions, unknown row types, rename conflicts, row/search projections and media ownership/metadata. Pending renames are warnings; unknown properties alone are allowed. Media originals are checked for existence; optional variations are not required. Unreferenced live ownership is a warning.
 
-Media checks compare canonical references to current journal records: owner field/Page,
-address, state, basename, kind and metadata, including duplicate references. Unreferenced
-live ownership is a warning because protected/version references may exist elsewhere.
-Registered referenced originals are checked on disk without initializing native file
-objects. Optional image variations are not required. These are bounded checks of
-selected stored owners, **not** a global filesystem, cross-field reference, page-version,
-staging or journal-only-owner inventory. `status` reports journal state counts.
-Custom native file-path hooks or unavailable filesystem roots leave original-path
-checks explicitly skipped. Native hook detection is conservative for the lifetime
-of that PHP process, including hooks registered and later removed. SQL/query
-failures also appear as skipped checks.
-Malformed data/definitions or conflicts/unknown types can prevent remaining structural
-checks; the report records that boundary. Reads are not a global snapshot, so concurrent
-writes can require rechecking findings. No checksum/byte validation or full index-definition
-audit is performed.
+Checks cover selected stored owners, not a global filesystem, cross-field, version or staging inventory. They do not verify file bytes or complete index definitions. Custom file-path hooks/unavailable roots can skip original-path checks; query failures or invalid data can prevent further checks. Reports expose these boundaries, and concurrent writes may require rechecking.
 
 `findings` entries have stable `category`, `severity` (`error`/`warning`), `field`,
 `fieldId`, `pageId`, `path`, `address` and a value-free `message`. Empty paths indicate
@@ -968,30 +890,13 @@ requires no errors and no skipped checks. Warnings alone do not fail a complete 
 
 #### Operating status
 
-`status` reports module, ProcessWire, PHP and database versions, native CLI interface
-availability, required shared-table columns/InnoDB engines, journal counts grouped by
-state, expired temporary records and the automatic collector's stored cursor when
-available. `mediaStates.pending_delete` (zero when absent from the map) describes
-waiting deletions. Pending/expired counts are normal work, including delayed or
-protected entries, and do not alone imply failure. Missing tables/columns or a wrong
-engine fail. Index definitions are not audited. Missing cursor information is unknown;
-no last-run success/time is inferred (`lastCleanup=unknown`). The cursor can wrap or
-restart and is not a percentage or completion certificate. No full inventory or
-collector run is triggered by the handler.
+`status` reports versions, native CLI availability, required shared-table columns/InnoDB engines, media journal counts, expired temporary records and the stored cleanup cursor when available. Missing storage or wrong engines fail; pending/expired counts alone are normal work. It does not run cleanup or audit index definitions. The cursor is not completion progress, and `lastCleanup=unknown` does not assert a last-run time or success.
 
 #### Output and exit codes
 
-Existing `rename`, `orphans` and `cleanup` keep JSON as their default output, with
-additional diagnostic keys. New commands default to indented readable text.
-`--json` without `--all` produces one JSON object. With `--all --json`, stdout is
-**JSON-Lines**: compact objects with `record="batch"`, then one
-`record="summary"` object. Each batch contains its bounded diagnostics; the summary
-contains totals, error/warning/skipped-check counts, selection cursors, retry IDs
-and completion state. Without `--json`,
-all-runs emit batches and a summary in their command's default format. Progress is
-written only to stderr. Adapter failures write a safe diagnostic to stderr and may
-terminate a stream before its summary; always check the process status. Core may
-append a trailing blank line; ignore blank lines when consuming JSON-Lines.
+`rename`, `orphans` and `cleanup` default to JSON; `schema`, `status` and `check` default to readable text. `--json` produces one JSON object. With `--all --json`, output is JSON-Lines: bounded `record="batch"` objects, then a `record="summary"` with totals, diagnostics, cursors and completion state. Without `--json`, all-runs use their command's default format for batches and summary.
+
+Progress and adapter diagnostics go to stderr. Failures can terminate a stream before its summary; check the exit status and ignore blank lines.
 
 | Exit | Meaning |
 | --- | --- |
@@ -1000,14 +905,7 @@ append a trailing blank line; ignore blank lines when consuming JSON-Lines.
 | 2 | Invalid request, exact owner selection error, or adapter-level failure |
 | 3 | Check incomplete without a known error (explicit skipped checks) |
 
-Known errors take precedence over incompleteness. The module explicitly propagates
-nonzero statuses because core CLI handlers catch module exceptions without turning
-them into failure exit codes. No command introduces a regular rebuild/collect duty:
-projections and media remain automatically maintained by normal writes and the
-existing lifecycle. The `check`, `schema`, `status` and `orphans` **handlers** are
-read-only; the independent automatic module lifecycle may process eligible media
-at request/process completion, including after read-only CLI commands. Handler
-read-only guarantees do not disable that ordinary lifecycle.
+Known errors take precedence over incompleteness. The `check`, `schema`, `status` and `orphans` handlers are read-only. The independent automatic media lifecycle may still collect eligible files at process completion.
 
 ### Field configuration
 
@@ -1015,14 +913,12 @@ Superusers have **Field → Details → Data maintenance** for batched previews,
 
 ## Notes and limitations
 
-- Flex uses MySQL 8.0+ or MariaDB 10.11+ with InnoDB. SQLite and PostgreSQL are not supported.
-- Native ProcessWire Page-version save/restore does not currently include Flex values.
-- The `rows` structure is independent of native FieldtypeRepeater/RepeaterMatrix. Rows are not pages, and mutations are saved with their owning Flex field.
-- File and Image values use Flex-managed storage exposed through compatible ProcessWire classes, not native FieldtypeFile/FieldtypeImage persistence.
-- PHP definitions are trusted code. Use direct API assignments only with appropriate validation and authorization for your application.
-- API methods and examples here document the supported public contract, not all inherited ProcessWire methods or implementation internals.
+- Requires ProcessWire 3.0.259+, PHP 8.1+, MySQL 8.0+ or MariaDB 10.11+ with InnoDB. SQLite/PostgreSQL are unsupported.
+- Native Page-version save/restore does not include Flex values.
+- Public runtime methods are documented above; services such as `storage()`, `media()`, owner/address helpers and editor hooks remain internal even where PHP visibility is public.
+- Retrieve this reference through native `php index.php docs get FieldtypeFlex` or WireApiDocs; runtime signatures are also available through PHPDoc.
 
-The supported entry points are this module reference and `FlexField::defs()`. Services such as `storage()`, `media()`, owner/address helpers and editor hooks are implementation APIs, even where PHP visibility is public. Native WireApiDocs can retrieve this reference as `FieldtypeFlex`; runtime methods are also discoverable through class PHPDoc. Shared classes: [[WireData]], [[WireArray]], [[Inputfield]], [[Pagefile]], [[Pageimage]].
+Shared APIs: [[WireData]], [[WireArray]], [[Inputfield]], [[InputfieldForm]], [[Pagefiles]], [Pagefile](https://processwire.com/api/ref/pagefile/), [[Pageimage]].
 
 Related: [README.md](README.md) · [Configuration examples](examples/README.md) · [Architecture](docs/architecture.md) · [ProcessWire API reference](https://processwire.com/api/ref/).
 
