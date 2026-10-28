@@ -1,9 +1,10 @@
 <?php namespace ProcessWire;
 
 /**
- * Optional native integrations and schema evolution.
- * Requires a native TinyMCE Textarea named rich_text_source and a Datetime field
- * named date_input_source. Copy all fields into the target ProcessWire site first.
+ * Conditional inputs, fieldsets, language support, renames and field inheritance.
+ * Create a Textarea Field named rich_text_source using InputfieldTinyMCE and a
+ * Datetime Field named date_input_source, or adapt the inheritField names below.
+ * Local settings override settings inherited from those Fields.
  */
 return [
     'advanced_enabled' => [

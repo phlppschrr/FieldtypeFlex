@@ -294,6 +294,7 @@ class FlexValue extends WireData implements \JsonSerializable {
 	 */
 	public function getUnformatted(string $name) {
 		$value = parent::get($name);
+		if($this->formatted && $value instanceof Pagefiles) return $value->unformattedCollection();
 		return ($this->definitions->property($name)['kind'] ?? '') === 'date' && $value !== '' ? strtotime($value) : $value;
 	}
 
@@ -484,11 +485,7 @@ class FlexValue extends WireData implements \JsonSerializable {
 			$format = $language && !$language->isDefault() ? $def['input']->get('dateOutputFormat' . $language->id) : '';
 			return $this->wire()->datetime->formatDate($timestamp, $format ?: $def['input']->dateOutputFormat);
 		}
-		if($this->formatted && $def && $def['kind'] === 'text' && (
-			$def['input'] instanceof InputfieldText
-			|| $def['input'] instanceof InputfieldHidden
-			|| $def['input'] instanceof InputfieldIcon
-		)) {
+		if($this->formatted && $def && $def['kind'] === 'text' && !$def['input'] instanceof InputfieldToggle) {
 			$field = $this->textformatterField((string) $key, $def);
 			return $field->type->formatValue($this->flexPage, $field, (string) $value);
 		}

@@ -364,7 +364,7 @@ class FlexFieldDefs extends Wire {
 					throw new WireException(sprintf($this->_('inheritField must use %s'), $class));
 				}
 				// Textformatters belong to the Fieldtype, not the source Inputfield.
-				if($inherit->type instanceof FieldtypeText && !array_key_exists('textformatters', $settings)) {
+				if(($inherit->type instanceof FieldtypeText || $inherit->type instanceof FieldtypeFile) && !array_key_exists('textformatters', $settings)) {
 					$settings['textformatters'] = $inherit->get('textformatters') ?? [];
 				}
 			}
@@ -386,7 +386,6 @@ class FlexFieldDefs extends Wire {
 			$input->hasFieldtype = false;
 			$input->_flex_property = $name;
 			$this->resolveLanguages($input);
-			$this->validateTextformatters($input, $settings);
 			if($isRows) {
 				$this->registerRows($name, $input, $settings);
 			} else if($input instanceof InputfieldWrapper) {
@@ -414,7 +413,6 @@ class FlexFieldDefs extends Wire {
 			$input->hasPage = $this->flexPage;
 			$input->_flex_property = $name;
 			$this->resolveLanguages($input);
-			$this->validateTextformatters($input, $input->getArray());
 			$this->validateStructureSettings($input->getArray(), $input instanceof InputfieldFlexRows);
 			if($input instanceof InputfieldFlexRows) {
 				$this->registerRows($name, $input, $input->getArray());
@@ -466,8 +464,15 @@ class FlexFieldDefs extends Wire {
 		if(isset($settings['addRowLabel']) && !is_string($settings['addRowLabel'])) {
 			unset($settings['addRowLabel']);
 		}
-		$collapse = $settings['rowCollapse'] ?? 0;
-		$settings['rowCollapse'] = in_array($collapse, [0, 1, 3, '0', '1', '3'], true) ? (int) $collapse : 0;
+		$collapseModes = [
+			FieldtypeFlex::ROW_COLLAPSE_EXISTING,
+			FieldtypeFlex::ROW_COLLAPSE_ALL,
+			FieldtypeFlex::ROW_EXPAND_ALL,
+		];
+		$collapse = $settings['rowCollapse'] ?? FieldtypeFlex::ROW_COLLAPSE_EXISTING;
+		$settings['rowCollapse'] = in_array($collapse, array_merge($collapseModes, array_map('strval', $collapseModes)), true)
+			? (int) $collapse
+			: FieldtypeFlex::ROW_COLLAPSE_EXISTING;
 		$types = $settings['types'] ?? null;
 		if(!is_array($types) || !$types || array_is_list($types)) {
 			throw new WireException($this->_('Rows types must be a non-empty map'));
@@ -507,12 +512,9 @@ class FlexFieldDefs extends Wire {
 		}
 	}
 
-	/** Validate the native ordered module list before exposing a schema or editor. */
-	private function validateTextformatters(Inputfield $input, array $settings): void {
+	/** Validate effective formatter lists; irrelevant settings never reach this method. */
+	private function normalizeTextformatters(Inputfield $input, array &$settings): void {
 		if(!array_key_exists('textformatters', $settings)) return;
-		if(!($input instanceof InputfieldText || $input instanceof InputfieldHidden || $input instanceof InputfieldIcon)) {
-			throw new WireException(sprintf($this->_('textformatters on "%s" requires a text-valued input'), $input->name));
-		}
 		$names = $settings['textformatters'];
 		if(!is_array($names) || !array_is_list($names)) {
 			throw new WireException(sprintf($this->_('textformatters on "%s" must be a list of module names'), $input->name));
@@ -524,6 +526,8 @@ class FlexFieldDefs extends Wire {
 				throw new WireException(sprintf($this->_('Invalid Textformatter module on "%s": %s'), $input->name, is_scalar($name) ? (string) $name : get_debug_type($name)));
 			}
 		}
+		$settings['textformatters'] = $names;
+		$input->textformatters = $names;
 	}
 
 	private function register(string $name, Inputfield $input, array $settings): void {
@@ -561,6 +565,9 @@ class FlexFieldDefs extends Wire {
 			$kind = 'array';
 		} else if($input instanceof InputfieldSelect) {
 			$kind = 'select';
+		}
+		if(in_array($kind, ['text', 'file', 'image'], true) && !$input instanceof InputfieldToggle) {
+			$this->normalizeTextformatters($input, $settings);
 		}
 		$multiple = $kind === 'array' || ($kind === 'page' && !(int) $input->derefAsPage);
 		if(in_array($kind, ['file', 'image'], true)) {
@@ -722,23 +729,7 @@ class FlexFieldDefs extends Wire {
 	}
 
 	private function copyInput(Inputfield $source): Inputfield {
-		// Some core inputs (Datetime, TinyMCE) own helpers pointing at themselves.
-		// A shallow clone retains the original owner and renders/processes stale attributes.
-		$input = $source->className() === 'InputfieldWrapper'
-			? $this->wire(new InputfieldWrapper())
-			: $this->wire()->modules->getModule($source->className(), ['noCache' => true]);
-		foreach($source->getArray() as $key => $v) {
-			$input->set($key, $v);
-		}
-		foreach($source->getAttributes() as $key => $v) {
-			$input->attr($key, $v);
-		}
-		if(method_exists($source, 'getOptions') && method_exists($input, 'addOptions')) {
-			$input->addOptions($source->getOptions());
-		}
-		$input->label = $source->label;
-		$input->editable($source->editable());
-		return $input;
+		return FlexDependencies::copyInput($source);
 	}
 
 	/**
@@ -750,11 +741,15 @@ class FlexFieldDefs extends Wire {
 	 * @param FlexValue|null $root Detached root overlay used to resolve descendants.
 	 * @param FlexValue|null $base Canonical root, before draft media overlays, for POST processing.
 	 * @param string $inputName Outer rendered name including native Repeater context.
+	 * @param array $ancestors Native Flex scopes, nearest first (internal).
 	 * @return InputfieldWrapper
 	 */
-	public function getInputfields(?FlexValue $value = null, string $prefix = '', string $draft = '', ?FlexValue $root = null, ?FlexValue $base = null, string $inputName = ''): InputfieldWrapper {
+	public function getInputfields(?FlexValue $value = null, string $prefix = '', string $draft = '', ?FlexValue $root = null, ?FlexValue $base = null, string $inputName = '', array $ancestors = []): InputfieldWrapper {
 		if($inputName === '') {
 			$inputName = $draft !== '' ? $this->flexField->type->admin()->draft($draft)['input'] : substr($prefix, 0, -2);
+		}
+		if(!$ancestors && $value instanceof FlexRow && $root) {
+			$ancestors = FlexDependencies::ancestors($value, $root, $inputName, $draft);
 		}
 		$copy = function(InputfieldWrapper $source) use (&$copy, $value, $prefix, $draft, $root, $base, $inputName): InputfieldWrapper {
 			$target = $this->wire(new InputfieldWrapper());
@@ -811,8 +806,7 @@ class FlexFieldDefs extends Wire {
 							$fields = [];
 							$not = $selector->not;
 							foreach($selector->fields() as $fieldName) {
-								$dependencyRoot = explode('.', $fieldName, 2)[0];
-								$fields[] = isset($this->names[$dependencyRoot]) ? $prefix . $fieldName : $fieldName;
+								$fields[] = FlexDependencies::fieldName($fieldName, $value, $inputName, $prefix, $this->names, $this->flexPage, $this->flexField);
 							}
 							$selector->setField($fields);
 							$selector->not = $not;
@@ -840,7 +834,14 @@ class FlexFieldDefs extends Wire {
 			}
 			return $target;
 		};
-		return $copy($this->tree);
+		$inputs = $copy($this->tree);
+		$inputs->flexDependencyAncestors = $ancestors;
+		$inputs->flexDependencyField = $this->flexField;
+		$inputs->flexDependencyPrefix = $prefix;
+		foreach($inputs->getAll() as $child) {
+			if($child instanceof InputfieldFlexRows) $child->flexDependencyAncestors = array_merge([$inputs], $ancestors);
+		}
+		return $inputs;
 	}
 
 	/**

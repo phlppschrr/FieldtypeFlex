@@ -39,15 +39,82 @@
     function rows($set) {
         return $set.children('.flex-rows-items').children('.flex-row[data-flex-row]');
     }
+    function titleParts(format, values, number, type, path, cleanup) {
+        var parts = [];
+        format.split(/(\[[^\[\]]*\]|_\{[^{}]+\}_|\{[^{}]+\}|#n)/gi).filter(Boolean).forEach(function(part) {
+            if(part[0] === '[' && part.slice(-1) === ']') {
+                var details = titleParts(part.slice(1, -1), values, number, type, path, false);
+                if(!details.length) details.push({text: '', badge: false, literal: false});
+                details.forEach(function(detail) {
+                    detail.muted = true;
+                    parts.push(detail);
+                });
+                return;
+            }
+            var badge = part.slice(0, 2) === '_{' && part.slice(-2) === '}_';
+            var token = badge ? part.slice(1, -1) : part, value = part, literal = false;
+            if(token.toLowerCase() === '#n') value = '#' + number;
+            else if(token[0] === '{' && token.slice(-1) === '}') {
+                value = '';
+                token.slice(1, -1).split('|').some(function(name) {
+                    var candidate = name === '@type' ? type : (name === '@path' ? path : (Object.prototype.hasOwnProperty.call(values, name) ? values[name] : ''));
+                    if(String(candidate).trim() === '') return false;
+                    value = String(candidate);
+                    return true;
+                });
+            } else literal = true;
+            parts.push({text: value, badge: badge, literal: literal});
+        });
+        if(cleanup === false) return parts;
+        parts.forEach(function(part, i) {
+            if(!part.literal || !/^[\s›|/:;,–—-]+$/.test(part.text)) return;
+            var before = parts.some(function(other, j) { return j < i && other.text.trim() !== '' && (!other.literal || !/^[\s›|/:;,–—-]+$/.test(other.text)); });
+            var after = parts.some(function(other, j) { return j > i && other.text.trim() !== '' && (!other.literal || !/^[\s›|/:;,–—-]+$/.test(other.text)); });
+            if(!before || !after) part.text = '';
+        });
+        var separator = null, omitted = false;
+        parts.forEach(function(part, i) {
+            if(part.text === '') {
+                if(!part.literal) omitted = true;
+                return;
+            }
+            if(part.literal && /^[\s›|/:;,–—-]+$/.test(part.text)) {
+                if(separator !== null && omitted) parts[separator].text = '';
+                separator = i;
+            } else separator = null;
+            omitted = false;
+        });
+        return parts;
+    }
+    function rowTitle($row, index, path) {
+        var format = $row.attr('data-flex-label-format') || '';
+        var type = $row.attr('data-flex-type-label') || '';
+        var parts = titleParts(format, $row.data('flexLabelValues') || {}, index + 1, type, path);
+        if(!parts.some(function(part) { return part.text.trim() !== ''; })) {
+            parts = [{text: (format ? '' : type + ' ') + '#' + (index + 1), badge: false}];
+        }
+        if(!format) parts.unshift({text: type, badge: true}, {text: ' ', badge: false});
+        return parts;
+    }
+    function contextPath($row) {
+        return $row.parents('.flex-row').get().reverse().map(function(ancestor) {
+            return $(ancestor).attr('data-flex-type-label') || '';
+        }).join(' › ');
+    }
     function updateLabels($set) {
         rows($set).each(function(index) {
-            var $row = $(this), values = $row.data('flexLabelValues') || {};
-            var format = $row.attr('data-flex-label-format') || '';
-            var label = format.replace(/#n/gi, '#' + (index + 1)).replace(/\{([a-zA-Z_][a-zA-Z0-9_]*)\}/g, function(match, name) {
-                return Object.prototype.hasOwnProperty.call(values, name) ? values[name] : '';
-            }).trim();
-            if(!label) label = ($row.attr('data-flex-label-fallback') || '').replace(/#n/gi, '#' + (index + 1));
-            $row.children('.flex-row-header').find('.flex-row-title').text(label);
+            var $row = $(this), $title = $row.children('.flex-row-header').find('.flex-row-title').empty();
+            rowTitle($row, index, contextPath($row)).forEach(function(part) {
+                if(!part.text) return;
+                if(part.badge || part.muted) {
+                    $('<span>').toggleClass('flex-row-type-badge', !!part.badge)
+                        .toggleClass('flex-row-deemphasized', !!part.muted).text(part.text).appendTo($title);
+                } else $title.append(document.createTextNode(part.text));
+            });
+            // Parent edits and reordering also update every descendant breadcrumb.
+            $row.children('.flex-row-content').find('.flex-rows').filter(function() {
+                return $(this).closest('.flex-row')[0] === $row[0];
+            }).each(function() { updateLabels($(this)); });
         });
     }
     function treeBusy($set) {
@@ -222,6 +289,16 @@
         $row.data('flexLabelValues', values);
         updateLabels($set);
     });
+    $(document).on('change', '.InputfieldTinyMCE[data-flex-label-property]', function(event) {
+        if(event.target !== this || !window.tinymce) return;
+        $(this).find('textarea').each(function() {
+            var editor = window.tinymce.get(this.id);
+            if(editor) {
+                editor.save();
+                $(this).trigger('input');
+            }
+        });
+    });
     document.addEventListener('invalid', function(event) {
         $(event.target).parents('.flex-row').each(function() { openRow($(this), true); });
     }, true);
@@ -259,7 +336,9 @@
                 data.set('flex_type', type);
             } else if(action === 'duplicate') {
                 data.set('flex_source', $row.attr('data-flex-row'));
-                $row.find(':input').serializeArray().forEach(function(item) { data.append(item.name, item.value); });
+                // Ancestor/Page dependencies need the same live values as a full save.
+                // Only the requested source row is applied by the duplicate handler.
+                $row.closest('form').serializeArray().forEach(function(item) { data.append(item.name, item.value); });
             }
             var token = csrf();
             if(token) data.set(token.name, token.value);

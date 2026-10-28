@@ -1,8 +1,12 @@
 <?php namespace ProcessWire;
 
 /**
- * Typed and nested Rows, media, default values, conditional visibility and
- * row titles. The root slide/fact/block collection is also used by DDEV demos.
+ * Slides, facts, mixed content blocks and three levels of nested Rows.
+ * rowTitle supports {heading|title}, {@type}, ancestor {@path} and _{heading}_
+ * badges; […] de-emphasizes text/tokens, and #n inserts the row number.
+ * Dependencies use local names or parent./root. for containing/root Flex scopes.
+ * page.field targets an owning Page input; forpage.field targets the main editor
+ * Page, including outside native Repeaters. See API.md#dependency-contexts.
  */
 return [
 	'heading'   => [
@@ -11,11 +15,13 @@ return [
 	],
 	'hero'      => [
 		'type'     => 'image',
+		'textformatters' => ['TextformatterEntities'],
 		'label'    => __('Hero image'),
 		'maxFiles' => 1,
 	],
 	'downloads' => [
 		'type'       => 'file',
+		'textformatters' => ['TextformatterEntities'],
 		'label'      => __('Downloads'),
 		'extensions' => 'pdf txt zip',
 		'maxFiles'   => 5,
@@ -24,7 +30,7 @@ return [
 		'type'        => 'rows',
 		'label'       => __('Slides'),
 		'maxItems'    => 20,
-		'rowCollapse' => 0,
+		'rowCollapse' => FieldtypeFlex::ROW_COLLAPSE_EXISTING,
 		'addRowLabel' => __('Add slide'),
 		'types'       => [
 			'item' => [
@@ -38,6 +44,7 @@ return [
 					],
 					'image'   => [
 						'type'     => 'image',
+						'textformatters' => ['TextformatterEntities'],
 						'label'    => __('Slide image'),
 						'maxFiles' => 1,
 					],
@@ -71,12 +78,12 @@ return [
 	'facts'     => [
 		'type'        => 'rows',
 		'label'       => __('Facts'),
-		'rowCollapse' => 0,
+		'rowCollapse' => FieldtypeFlex::ROW_COLLAPSE_EXISTING,
 		'addRowLabel' => __('Add fact'),
 		'types'       => [
 			'item' => [
 				'label'    => __('Fact'),
-				'rowTitle' => '{heading}',
+				'rowTitle' => '_{@type}_ {heading}',
 				'children' => [
 					'heading' => [
 						'type'  => 'text',
@@ -94,7 +101,7 @@ return [
 		'type'        => 'rows',
 		'label'       => __('Content blocks'),
 		'maxItems'    => 20,
-		'rowCollapse' => 0,
+		'rowCollapse' => FieldtypeFlex::ROW_COLLAPSE_EXISTING,
 		'addRowLabel' => __('Add block'),
 		'types'       => [
 			'text'  => [
@@ -119,6 +126,7 @@ return [
 				'children' => [
 					'image'   => [
 						'type'     => 'image',
+						'textformatters' => ['TextformatterEntities'],
 						'label'    => __('Image'),
 						'maxFiles' => 1,
 					],
@@ -149,11 +157,11 @@ return [
 		'type'        => 'rows',
 		'label'       => __('Sections'),
 		'addRowLabel' => __('Add section'),
-		'rowCollapse' => 3,
+		'rowCollapse' => FieldtypeFlex::ROW_EXPAND_ALL,
 		'types'       => [
 			'section' => [
 				'label'    => __('Section'),
-				'rowTitle' => '{heading}',
+				'rowTitle' => '[{@path}] / _{heading}_',
 				'children' => [
 					'heading' => [
 						'type'     => 'text',
@@ -164,11 +172,11 @@ return [
 						'type'        => 'rows',
 						'label'       => __('Blocks'),
 						'addRowLabel' => __('Add block'),
-						'rowCollapse' => 3,
+						'rowCollapse' => FieldtypeFlex::ROW_EXPAND_ALL,
 						'types'       => [
 							'text'  => [
 								'label'    => __('Text'),
-								'rowTitle' => '{heading}',
+								'rowTitle' => '[{@path}] / _{heading}_',
 								'children' => [
 									'heading' => [
 										'type'  => 'text',
@@ -182,7 +190,7 @@ return [
 										'type'        => 'rows',
 										'label'       => __('Notes'),
 										'addRowLabel' => __('Add note'),
-										'rowCollapse' => 3,
+										'rowCollapse' => FieldtypeFlex::ROW_EXPAND_ALL,
 										'types'       => [
 											'note' => [
 												'label'    => __('Note'),
@@ -208,6 +216,7 @@ return [
 									],
 									'image'   => [
 										'type'     => 'image',
+										'textformatters' => ['TextformatterEntities'],
 										'label'    => __('Image'),
 										'maxFiles' => 1,
 									],

@@ -1,12 +1,9 @@
 <?php namespace ProcessWire;
 
 /**
- * Complete configuration, composed from tested independent examples.
- * PHP array spread works with string keys on PHP 8.1+. Every root property
- * name is distinct; the Row types reuse smaller schemas in their own scopes.
- * Copy this file alongside the referenced numbered PHP examples.
- *
- * A native declarative "add file" schema directive is not currently supported.
+ * Combine examples 03–08 at the root and reuse choice/number schemas inside Rows.
+ * Keep the included PHP files beside this file and meet the prerequisites in
+ * 07-advanced.php. The included schemas use distinct root property names.
  */
 return [
     ...require __DIR__ . '/03-text.php',

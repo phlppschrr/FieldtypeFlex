@@ -1,10 +1,83 @@
 # Changelog
 
+## Unreleased — dependency contexts
+
+- Extend native `showIf` and `requiredIf` with `parent.`, `root.`, `page.` and
+  ProcessWire's `forpage.` references. Distinguish owning Repeater items from
+  the main editor Page and resolve containing Flex scopes recursively.
+- Process external sources through native Inputfields for current submit values,
+  unchecked checkboxes and chained conditions. Include current ancestor/Page
+  inputs when duplicating Rows through AJAX.
+
+## Unreleased — de-emphasized Row title text
+
+- Support `[…]` groups around literal text, tokens and badges in `rowTitle`.
+  Strip the grouping brackets and dim only the enclosed text on initial render
+  and live updates; field values cannot introduce formatting.
+- Restore full header text color for ordinary badges and white titles in the
+  Original UIKit admin theme. Preserve the active theme palette elsewhere.
+
+## Unreleased — configurable Row titles
+
+- Add field fallbacks, explicit type/context tokens and optional badges to string
+  `rowTitle` formats. Custom titles control type visibility; missing templates keep
+  the existing default header.
+- Use only ancestor type labels for compact breadcrumbs, independent of edited
+  titles and row numbers. Omit empty badges and separators, retain zero and render
+  values as safe text.
+
+## Unreleased — named Rows collapse modes
+
+- Expose `FieldtypeFlex::ROW_COLLAPSE_EXISTING`, `ROW_COLLAPSE_ALL` and
+  `ROW_EXPAND_ALL`; document and use them in the Rows example.
+
+## Unreleased — media description formatters
+
+- Format File/Image descriptions with native Textformatters on formatted reads,
+  including languages, nested Rows and image variations. Only configured or
+  inherited lists run; absent or empty lists leave descriptions unchanged.
+- Preserve raw metadata, revisions and change tracking during description reads,
+  serialization and cloning. Public unformatted reads retain raw descriptions.
+- Allow custom scalar text inputs to use inherited/explicit formatters without
+  requiring an InputfieldText subclass. Ignore irrelevant formatter settings on
+  non-text inputs; continue validating effective lists and modules.
+- Demonstrate Entities configuration and direct image-description output in the
+  media examples and README.
+
+## Unreleased — integration corrections
+
+- Refresh editor definitions for the current Page context while retaining raw
+  edits, expected revisions and draft overlays; rebuild preloaded native inputs.
+- Traverse native FieldsetPage values as single Pages and respect the concrete
+  owner's fields when checking full-page Flex resource budgets.
+- Inherit Textformatters only for supported Inputfields; keep explicit unsupported
+  configurations invalid, including empty lists.
+- Clarify that media descriptions require application output escaping and do not
+  run native File/Image description Textformatters.
+
+## Unreleased — review corrections
+
+- Preserve JSON object/list differences as rename conflicts, including unknown
+  nested Row values; equal values remain mergeable.
+- Allow a revised cleanup selection to be previewed without repeating the orphan scan.
+- Link all ten configuration examples, repair stale API links and clarify example
+  comments and prerequisites.
+
+## Unreleased — CLI inspection and batch selection
+
+- Add native `schema`, `check` and `status` diagnostics with readable/JSON output.
+- Support exact `--page` owners and bounded `--all` continuation, JSON-Lines streams,
+  distinct owner aggregation and explicit stop/resume on failures.
+- Reuse raw maintenance, definition/query discovery and projection derivation;
+  inspect media without hydration, repair or file-manager initialization.
+- Document diagnostic boundaries, lifecycle cleanup and exit codes 0/1/2/3.
+  Optional native CLI, automatic maintenance and dependency pins stay unchanged.
+
 ## Unreleased — curated examples
 
 - Replace overlapping examples with ten focused, verified configuration definitions: identical JSON, PHP-array and InputfieldWrapper basics; typed core Inputfields; advanced settings; typed/nested Rows; and a composable Kitchen Sink.
-- Demonstrate native `columnWidth`, explicit `TextformatterEntities` and schema reuse within typed Rows. The Kitchen Sink uses ordinary PHP array spread and `require`; a declarative import directive is only a future proposal.
-- Keep InputfieldWrapper as a public definition format pending a separate decision. Update the example catalog, translations, fixture tests and DDEV seed references.
+- Demonstrate native `columnWidth`, explicit `TextformatterEntities` and schema reuse within typed Rows. The Kitchen Sink uses ordinary PHP array spread and `require`.
+- Include equivalent InputfieldWrapper definitions alongside PHP arrays and JSON. Update the example catalog, translations, fixture tests and DDEV seed references.
 
 ## Unreleased — automatic projections and media cleanup
 

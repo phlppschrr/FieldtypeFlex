@@ -1,8 +1,8 @@
 <?php namespace ProcessWire;
 
 /**
- * Choice values are raw keys; use optionLabel() for formatted display labels.
- * The same stable keys work in PHP, translated labels and nested Rows.
+ * Single and multiple choice controls. Values contain option keys; optionLabel()
+ * returns a display label. Translate labels while keeping stored option keys stable.
  */
 return [
     'choice_country' => [

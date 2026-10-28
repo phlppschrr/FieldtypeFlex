@@ -1,50 +1,55 @@
 # FieldtypeFlex configuration examples
 
-These files are intentionally small, copyable reference definitions for developers
-and coding agents. The same native ProcessWire inputs work within normal Flex
-fields and inside typed Rows. **PHP arrays are recommended**: they support
-translations, composition, conditional logic and native PHP constants. Plain
-JSON is also supported for static definitions (no comments or PHP expressions).
+Copy one of these definitions to `site/templates/flex-fields/FIELDNAME.php`
+(or `.json`), replacing `FIELDNAME` with your Flex field's name. You can also set
+an explicit definition path relative to `site/templates` in the field settings.
 
-| File | Purpose | Requirements |
+PHP arrays support translations, composition, conditional logic and native PHP
+constants. JSON works for static definitions. An InputfieldWrapper lets you build
+the same schema with native ProcessWire Inputfield objects. Leaf definitions can
+also be used inside a typed Row's `children` array.
+
+| File | Demonstrates | Requirements |
 | --- | --- | --- |
-| `01-basic.json` | Minimal, valid JSON | None |
-| `02-basic.php` | Same properties using a recommended PHP array | None |
-| `02-basic-objects.php` | Same properties using an InputfieldWrapper | None |
-| `03-text.php` | Text, Textarea, TinyMCE, URL, Email, Hidden, Icon; formatters | TinyMCE |
-| `04-numbers-dates.php` | Integer, Float, Checkbox, Toggle, Datetime | Core inputs |
-| `05-choices.php` | Select, Radios, Checkboxes, multi-select, AsmSelect, TextTags | Core inputs |
-| `06-references-media.php` | Page/PageArray, Image, File; file limits | Core inputs |
-| `07-advanced.php` | Dependencies, multilingual auto mode, fieldset, renames and native field inheritance | TinyMCE; existing Datetime `date_input_source` and TinyMCE `rich_text_source` Fields |
-| `08-rows.php` | Mixed typed Rows, nested Rows, media and row headings | TinyMCE |
-| `09-kitchen-sink.php` | Composes 03–08, including reuse of choices/numbers inside Rows | Requirements of all included files |
+| [01-basic.json](01-basic.json) | A required title and an email input in two columns | Core inputs |
+| [02-basic.php](02-basic.php) | The same two inputs as a PHP array | Core inputs |
+| [02-basic-objects.php](02-basic-objects.php) | The same two inputs as an InputfieldWrapper | Core inputs |
+| [03-text.php](03-text.php) | Text, Textarea, TinyMCE, URL, Email, Hidden, Icon, formatters and optional languages | InputfieldTinyMCE |
+| [04-numbers-dates.php](04-numbers-dates.php) | Integer, Float, Checkbox, Toggle and Datetime | Core inputs |
+| [05-choices.php](05-choices.php) | Select, Radios, Checkboxes, SelectMultiple, AsmSelect and TextTags | Core inputs |
+| [06-references-media.php](06-references-media.php) | Single/multiple Page references, images and downloads | Adjust Page selectors to your site |
+| [07-advanced.php](07-advanced.php) | Dependencies, fieldsets, language support, renames and inherited input settings | A Textarea Field named `rich_text_source` using TinyMCE and a Datetime Field named `date_input_source`, or adapt `inheritField` |
+| [08-rows.php](08-rows.php) | Typed content blocks, nested Rows, media and row titles | InputfieldTinyMCE |
+| [09-kitchen-sink.php](09-kitchen-sink.php) | Composition of examples 03–08, with choice/number schemas reused inside Rows | The included files and their prerequisites |
 
-Use the automatic location `site/templates/flex-fields/FIELDNAME.php` or
-`.json`, or configure an explicit path relative to `site/templates`.
-Copy dependencies beside `09-kitchen-sink.php`. Do not copy the manifest as
-a definition; it is only metadata for the read-only example catalog.
+## Settings to adapt
 
-## Conventions
+- `columnWidth` demonstrates native editor layouts using 33/34, 50 and 100 percent.
+- `showIf` and `requiredIf` reference local properties by bare name. Use `parent.`
+  for the containing Flex scope, `root.` for this Flex field's root, `page.` for
+  the owning Page's native inputs and ProcessWire's `forpage.` for the main
+  editor Page. See [dependency contexts](../API.md#dependency-contexts).
+- `textformatters => ['TextformatterEntities']` escapes text for HTML text content.
+  An absent or empty formatter list leaves text unescaped. Apply escaping for the
+  actual output context; TinyMCE values contain HTML markup. File/Image descriptions
+  use only configured or inherited formatters; examples 06 and 08 explicitly select Entities, including nested media.
+- `useLanguages => 'auto'` enables multilingual text when LanguageSupport and
+  LanguageSupportFields are available, and plain text otherwise.
+- `findPagesSelector` limits selectable Page references. Adjust it to your site's
+  Page tree. Create the source Fields required by `inheritField` or use existing
+  Fields with the matching Inputfield type.
 
-- Unique root property keys are intentional: `text_*`, `number_*`,
-  `choice_*`, `ref_*`, `media_*` and `advanced_*` can be composed without
-  silent overwrites. Row children have their own scope.
-- `columnWidth` illustrates 33/34, 50 and 100 percent native editor layouts.
-  `showIf` and `requiredIf` refer to siblings in the same property scope.
-- Without `TextformatterEntities` text output is **not** HTML-escaped.
-  Escape for the actual HTML context. Rich HTML is intentionally different.
-- Page reference selectors and inherited editor settings depend on the site's
-  actual installed Fields and Pages. Adjust those examples to your project.
-- `InputfieldWrapper` definitions are currently supported. There is no
-  decision to remove them; this third basic example deliberately retains coverage.
+## Combine definitions
 
-## Composition and a possible future import directive
+[09-kitchen-sink.php](09-kitchen-sink.php) loads the PHP arrays from examples 03–08
+using `require` and array unpacking. Copy all included files into the same directory.
+Their root property names are distinct, so combining them does not overwrite keys.
+The `variants` collection also loads the choice and number definitions as separate
+Row types; each Row type has its own property scope.
 
-`09-kitchen-sink.php` uses standard PHP array unpacking and `require`.
-This works today without adding a new Flex-specific configuration syntax. A
-future `add` or include directive could simplify imports in both the root
-schema and Row `children`; this is **only a proposal**, not a supported setting.
-Do not generate `add: filename` definitions until it has an explicit, tested
-contract for file resolution, duplicate keys, nesting and cycle prevention.
+[manifest.php](manifest.php) supplies metadata to the read-only example catalog in
+field settings. It is not a field definition and does not need to be copied.
 
-For the runtime API and exact supported settings, see [API.md](../API.md).
+For runtime values, selectors and the complete settings contract, see
+[API.md](../API.md). For a complete definition and template output, see the
+[README quick start](../README.md#quick-start).

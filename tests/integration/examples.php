@@ -27,6 +27,20 @@ $examplesRoot = dirname(__DIR__, 2) . '/examples/';
 $exampleManifest = require $examplesRoot . 'manifest.php';
 $same(2, $exampleManifest['version'], 'catalog manifest has the new reference version');
 $same(10, count($exampleManifest['entries']), 'curated catalog has ten definitions');
+$exampleIndex = file_get_contents($examplesRoot . 'README.md');
+foreach($exampleManifest['entries'] as $entry) {
+	$assert(str_contains($exampleIndex, '](' . $entry['file'] . ')'), 'example index links directly to ' . $entry['file']);
+}
+foreach(['README.md', 'API.md', 'examples/README.md'] as $documentPath) {
+	$absolutePath = dirname(__DIR__, 2) . '/' . $documentPath;
+	preg_match_all('/\]\(([^\s)]+)\)/', file_get_contents($absolutePath), $links);
+	foreach(array_unique($links[1]) as $link) {
+		if(preg_match('/^[a-z][a-z0-9+.-]*:/i', $link)) continue;
+		$target = explode('#', $link, 2)[0];
+		if($target === '') continue;
+		$assert(file_exists(dirname($absolutePath) . '/' . $target), "$documentPath links to an existing local target: $target");
+	}
+}
 $exampleFixture = 'flex-example-test-' . bin2hex(random_bytes(4));
 $exampleFixturePath = $wire->config->paths->templates . $exampleFixture . '/';
 if(!mkdir($exampleFixturePath, 0755, true)) throw new \RuntimeException('Unable to create the example fixture');
@@ -84,6 +98,9 @@ try {
     $same('d.m.Y', $loaded['numbers-dates']->getPropertyInputfield('number_date')->dateInputFormat, 'dates reference uses a native localized date format');
     $same('InputfieldAsmSelect', $loaded['choices']->getPropertyInputfield('choice_ordered')->className(), 'choices reference includes ordered multi-choice input');
     $same(0, (int) $loaded['references-media']->property('ref_related')['settings']['derefAsPage'], 'reference example has a multiple-Page mode');
+    foreach(['media_cover', 'media_gallery', 'media_downloads'] as $name) {
+        $same(['TextformatterEntities'], $loaded['references-media']->property($name)['settings']['textformatters'], 'media example explicitly encodes descriptions: ' . $name);
+    }
     $same('Y-m-d H:i', $loaded['advanced']->getPropertyInputfield('advanced_date')->dateInputFormat, 'advanced source field inherits native Datetime configuration');
     $same(12, (int) $loaded['advanced']->getPropertyInputfield('advanced_body')->rows, 'advanced TinyMCE inherits native settings with a local override');
     $assert($loaded['rows']->property('sections.section.blocks.text.notes.note.text') !== null, 'rows example provides three nested levels');

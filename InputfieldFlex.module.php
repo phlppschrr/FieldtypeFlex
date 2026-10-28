@@ -4,6 +4,7 @@
 class InputfieldFlex extends Inputfield {
 	private ?InputfieldWrapper $flexInputs = null;
 	private string $flexDraft = '';
+	private bool $flexProcessed = false;
 
 	/**
 	 * Return module metadata and installation requirements.
@@ -43,6 +44,12 @@ class InputfieldFlex extends Inputfield {
 		if($value instanceof FlexInvalidValue) {
 			throw $value->definitionError();
 		}
+		// Ready Repeater items can receive their concrete type after value hydration.
+		// Bind the editor to current definitions, retaining the detached raw edits
+		// and optimistic revision rather than replacing the Page's cached value.
+		$current = new FlexValue($page, $field, $field->type->getDefinitions($field, $page), $value->rawArray());
+		$current->expectedRevision($value->expectedRevision());
+		$this->value = $value = $current;
 		if($this->flexDraft === '') {
 			$this->flexDraft = $field->type->admin()->open($value, $this->name, $this->wire()->input->post($this->name . '__0draft'));
 		}
@@ -118,6 +125,9 @@ class InputfieldFlex extends Inputfield {
 	 * @return bool
 	 */
 	public function renderReady(?Inputfield $parent = null, $renderValueMode = false) {
+		// A preloaded editor may be reused after a ready item's type is assigned.
+		// Once processed, retain native input errors and submitted values.
+		if(!$this->flexProcessed) $this->flexInputs = null;
 		$loaded = parent::renderReady($parent, $renderValueMode);
 		$base = dirname($this->wire()->modules->getModuleFile('FieldtypeFlex', ['getURL' => true])) . '/';
 		$this->wire()->config->scripts->add($base . 'FieldtypeFlex.js');
@@ -180,6 +190,8 @@ class InputfieldFlex extends Inputfield {
 	 * @return $this
 	 */
 	public function ___processInput(WireInputData $input) {
+		if(!$this->flexProcessed) $this->flexInputs = null;
+		$this->flexProcessed = true;
 		if($this->value instanceof FlexInvalidValue) {
 			$this->reportDefinitionError($this->value->definitionError());
 			return $this;
@@ -221,15 +233,8 @@ class InputfieldFlex extends Inputfield {
 			$this->reportDefinitionError($error);
 			return $this;
 		}
-		// InputfieldForm supplies core server-side showIf/requiredIf evaluation.
-		// It is only used for processing; rendering uses a wrapper, so there is no nested HTML form.
-		$form = $this->wire()->modules->get('InputfieldForm');
-		$form->protectCSRF = false; // The containing ProcessPageEdit form validates CSRF.
 		try {
-			foreach($inputs->children() as $child) {
-				$form->add($child);
-			}
-			$form->processInput($input);
+			$form = FlexDependencies::processInput($inputs, $this->hasPage, $input);
 		} catch(\Throwable $error) {
 			$this->reportDefinitionError($error);
 			return $this;

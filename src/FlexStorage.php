@@ -166,21 +166,22 @@ class FlexStorage extends Wire {
 		$delete = $db->prepare("DELETE FROM fieldtype_flex_rows WHERE fields_id=:field AND pages_id=:page");
 		$delete->execute(['field' => $field->id, 'page' => $page->id]);
 		$insert = $db->prepare("INSERT INTO fieldtype_flex_rows (fields_id,pages_id,set_key,set_name,schema_key,schema_path,row_key,parent_row_key,row_id,row_type,ordinal,data) VALUES (:field,:page,:key,:name,:schema_key,:schema,:row_key,:parent,:id,:type,:sort,:data)");
+		foreach(self::projection($raw) as $row) {
+			$insert->execute(['field' => $field->id, 'page' => $page->id] + $row);
+		}
+	}
+
+	/** The single derivation used by writes and read-only consistency checks. @internal */
+	public static function projection(array $raw): \Generator {
 		foreach(FlexPath::rows($raw) as $entry) {
-			$insert->execute([
-				'field'      => $field->id,
-				'page'       => $page->id,
-				'key'        => hash('sha256', $entry['set']),
-				'name'       => $entry['set'],
-				'schema_key' => hash('sha256', $entry['schema']),
-				'schema'     => $entry['schema'],
-				'row_key'    => hash('sha256', $entry['address']),
-				'parent'     => $entry['parent'] === '' ? '' : hash('sha256', $entry['parent']),
-				'id'         => $entry['row']['id'],
-				'type'       => $entry['row']['type'],
-				'sort'       => $entry['ordinal'],
-				'data'       => self::encode($entry['data']),
-			]);
+			yield [
+				'key' => hash('sha256', $entry['set']), 'name' => $entry['set'],
+				'schema_key' => hash('sha256', $entry['schema']), 'schema' => $entry['schema'],
+				'row_key' => hash('sha256', $entry['address']),
+				'parent' => $entry['parent'] === '' ? '' : hash('sha256', $entry['parent']),
+				'id' => $entry['row']['id'], 'type' => $entry['row']['type'],
+				'sort' => $entry['ordinal'], 'data' => self::encode($entry['data']),
+			];
 		}
 	}
 

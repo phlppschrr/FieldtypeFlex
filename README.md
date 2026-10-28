@@ -19,6 +19,10 @@ Define your field structure in PHP or JSON, edit everything together in Page Edi
 
 Flex uses native ProcessWire Inputfields for editing, including validation, conditional dependencies, Page references, TinyMCE and multilingual text. Flex fields can also be used inside native ProcessWire Repeater items.
 
+Native `showIf`/`requiredIf` conditions can reference local properties, `parent.`
+and `root.` Flex properties, the owning `page.` inputs and the main editor's
+`forpage.` inputs. See [dependency contexts](API.md#dependency-contexts).
+
 ## Installation
 
 Requires **ProcessWire 3.0.259+**, **PHP 8.1+**, **MySQL 8.0+ or MariaDB 10.11+**, and **InnoDB**.
@@ -43,15 +47,17 @@ return [
         'textformatters' => ['TextformatterEntities'],
     ],
     'hero' => [
-        'type'     => 'image',
-        'label'    => __('Hero image'),
-        'maxFiles' => 1,
+        'type'           => 'image',
+        'textformatters' => ['TextformatterEntities'],
+        'label'          => __('Hero image'),
+        'maxFiles'       => 1,
     ],
     'downloads' => [
-        'type'       => 'file',
-        'label'      => __('Downloads'),
-        'extensions' => 'pdf txt zip',
-        'maxFiles'   => 5,
+        'type'           => 'file',
+        'textformatters' => ['TextformatterEntities'],
+        'label'          => __('Downloads'),
+        'extensions'     => 'pdf txt zip',
+        'maxFiles'       => 5,
     ],
     'blocks' => [
         'type'        => 'rows',
@@ -79,8 +85,9 @@ return [
                 'rowTitle' => '{caption}',
                 'children' => [
                     'photo' => [
-                        'type'     => 'image',
-                        'maxFiles' => 1,
+                        'type'           => 'image',
+                        'textformatters' => ['TextformatterEntities'],
+                        'maxFiles'       => 1,
                     ],
                     'caption' => [
                         'type'           => 'text',
@@ -110,7 +117,7 @@ Access Flex properties directly in a ProcessWire template:
     <?php if($image = $page->content->hero): ?>
         <img
             src="<?= $image->size(1200, 700)->url ?>"
-            alt=""
+            alt="<?= $image->description ?>"
         >
     <?php endif; ?>
 
@@ -125,7 +132,7 @@ Access Flex properties directly in a ProcessWire template:
         <?php elseif($block->rowType() === 'image'): ?>
             <?php if($image = $block->photo): ?>
                 <figure>
-                    <img src="<?= $image->url ?>" alt="">
+                    <img src="<?= $image->url ?>" alt="<?= $image->description ?>">
 
                     <?php if($block->caption): ?>
                         <figcaption>
@@ -153,7 +160,7 @@ Access Flex properties directly in a ProcessWire template:
 </article>
 ```
 
-Flex follows the Page's output-formatting state. Plain text is **not HTML-encoded automatically**; configure `TextformatterEntities` for text rendered in HTML or escape it in the template. Explicit or inherited [native Textformatters](API.md#textformatters) control text output, while TinyMCE content retains its HTML markup. Choice values are raw keys; label helpers encode display labels when formatted.
+Flex follows the Page's output-formatting state. Plain text is **not HTML-encoded automatically**; configure `TextformatterEntities` for text rendered in HTML or escape it in the template. Explicit or inherited [native Textformatters](API.md#textformatters) control text output, while TinyMCE content retains its HTML markup. File/Image descriptions use their explicitly configured or inherited formatter list; without one they remain unescaped. The examples select `TextformatterEntities` explicitly. Choice values are raw keys; label helpers encode display labels when formatted.
 
 ### Query with ProcessWire selectors
 
@@ -204,11 +211,11 @@ JSON, PHP-array and InputfieldWrapper definitions, followed by focused native
 Inputfield examples, typed/nested Rows and a composable Kitchen Sink.
 
 - [Basic JSON](examples/01-basic.json) and [basic PHP](examples/02-basic.php)
-- [Basic InputfieldWrapper](examples/02-basic-objects.php) — optional object syntax
+- [Basic InputfieldWrapper](examples/02-basic-objects.php) — native Inputfield objects
 - [Text and formatting](examples/03-text.php), [numbers and dates](examples/04-numbers-dates.php), [choices](examples/05-choices.php)
 - [Page references and media](examples/06-references-media.php)
 - [Advanced settings](examples/07-advanced.php) and [typed/nested Rows](examples/08-rows.php)
-- [Kitchen Sink](examples/09-kitchen-sink.php) — combines tested configurations
+- [Kitchen Sink](examples/09-kitchen-sink.php) — composes schemas at the root and inside Rows
 
 For the complete definition syntax, value types, settings and runtime methods, see **[API.md](API.md)**.
 

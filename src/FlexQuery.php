@@ -547,7 +547,7 @@ class FlexQuery extends Wire {
 	 * @param array $data
 	 * @return array
 	 */
-	public function info(Field $field, array $data = []): array {
+	public function info(Field $field, array $data = [], ?FlexFieldDefs $definitions = null): array {
 		$info = [
 			'name'      => $field->name,
 			'label'     => $field->label ?: $field->name,
@@ -558,7 +558,8 @@ class FlexQuery extends Wire {
 		];
 		$page = isset($data['page']) && $data['page'] instanceof Page ? $data['page'] : null;
 		$targetInfo = [];
-		$discover = function(FlexFieldDefs $defs, bool $root = true) use (&$discover, $page, &$targetInfo): array {
+		$inspection = !empty($data['inspection']);
+		$discover = function(FlexFieldDefs $defs, bool $root = true) use (&$discover, $page, &$targetInfo, $inspection): array {
 			$subfields = [];
 			foreach($defs->properties() as $name => $def) {
 				if($def['kind'] === 'rows') {
@@ -638,7 +639,7 @@ class FlexQuery extends Wire {
 					// InputfieldSelector assumes page subfields are real Field objects
 					// unless selector metadata supplies its own selectable options.
 					$options = [0 => $this->_('None')];
-					foreach($def['input']->getSelectablePages($page ?: $this->wire()->pages->newNullPage(), 'limit=500') as $item) {
+					foreach($inspection ? [] : $def['input']->getSelectablePages($page ?: $this->wire()->pages->newNullPage(), 'limit=500') as $item) {
 						$options[$item->id] = $def['input']->getPageLabel($item);
 					}
 				} else if($options) {
@@ -656,7 +657,7 @@ class FlexQuery extends Wire {
 			}
 			return $subfields;
 		};
-		$tree = $discover($this->type->getDefinitions($field, $page));
+		$tree = $discover($definitions ?? $this->type->getDefinitions($field, $page));
 		$flat = [];
 		$flatten = function(array $branch, string $prefix = '', string $labelPrefix = '') use (&$flatten, &$flat): void {
 			foreach($branch as $name => $descriptor) {

@@ -36,3 +36,9 @@ foreach($itemIds as $n => $itemId) {
 	$raw = $type->storage()->persisted($wire->pages->getFresh($itemId), $stored);
 	$same(['heading' => ['First', 'Second'][$n]], $raw, 'native Repeater maintenance readback retains the renamed value only');
 }
+$cli = new FlexMaintenanceCli($type);
+foreach($itemIds as $itemId) {
+	ob_start(); $status = $cli->run(['check', $stored->name, '--page=' . $itemId, '--json']); $json = ob_get_clean();
+	$same(0, $status, 'CLI exact selection supports a native Repeater item');
+	$same($itemId, json_decode($json, true, 512, JSON_THROW_ON_ERROR)['pageId'], 'CLI retains exact Repeater owner identity');
+}

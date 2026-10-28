@@ -13,11 +13,37 @@ The implementation has four responsibilities:
 - FlexRows represents typed row collections with stable IDs and immutable row types.
 - Storage, query and media services persist canonical values, derive selector projections and manage owned files.
 
-Keep native Inputfield processing as the input pipeline. A property Inputfield supplies UI, validation and dependencies; it does not supply an independent storage layer. For text-valued inputs, `inheritField` also copies the source Text Fieldtype’s formatter list; explicit lists override it completely.
+Keep native Inputfield processing as the input pipeline. A property Inputfield supplies UI, validation and dependencies; it does not supply an independent storage layer. For text-valued inputs and media descriptions, `inheritField` also copies the source Text/File/Image Fieldtype’s formatter list; explicit lists override it completely.
 
 ## Definition and schema model
 
 Definitions are evaluated for the owning Page context. Dynamic PHP definitions are not globally cached. Query discovery has no individual Page, so a dynamic definition still needs to expose queryable properties there. Metadata Inputfields and returned input trees are fresh instances.
+
+An existing FlexValue retains the definitions used to hydrate it. The editor
+rebinds raw data to current definitions before building native inputs and applying
+draft overlays, retaining the expected storage revision. Native renderReady and
+the first processInput rebuild prepared input trees; after processing, inputs
+retain submitted values and native validation errors. This handles ready Repeater
+items whose concrete type is assigned after initial value hydration without
+replacing the Page's cached value or coupling Flex to RepeaterMatrix internals.
+Full-page validation uses each owner's getFields() and traverses single
+FieldsetPages as well as Repeater collections, skipping empty values.
+
+Dependency references resolve bare names within the current scope, `parent.` to
+the containing Flex scope, `root.` to the current Flex root, `page.` to native
+owner inputs (including Repeater item suffixes), and `forpage.` to main editor
+inputs. FlexDependencies translates selector fields, preserving native operators
+and values. Browser evaluation remains entirely in core inputfields.js.
+Processing-only native forms include fresh copies of external dependency sources
+and their dependency/visibility context. Private processing names isolate native
+source validation errors; original browser references are restored even on
+exceptions. Core Inputfield processing supplies
+submitted values, unchecked-checkbox handling and chained conditions, avoiding
+raw POST comparisons or stale saved ancestor values. Copies never render or
+persist; only the owning schema's inputs are applied to canonical data. AJAX
+duplication submits current form values as dependency context and applies only
+the requested source Row. Standalone AJAX trees reconstruct ancestor scopes
+through authenticated draft row identities. No schema/storage format changes.
 
 `useLanguages` accepts false (single-language), true (required multilingual
 support), or `'auto'` (optional multilingual text). Definition loading resolves
@@ -62,7 +88,7 @@ the current boundary. Template reference hydration is independent.
 
 ## Values and output formatting
 
-Persisted values are never entity encoded or converted to display-date strings. Output formatting follows the owning Page and is a cloned view. Text, choice labels and dates are formatted when read; date runtime reads are Unix timestamps while canonical JSON remains ISO strings. Raw multilingual values are language objects; formatted values are current-language strings. Rich HTML follows the native TinyMCE/Inputfield pipeline. All formatted text-valued property reads delegate to native FieldtypeText/Textarea/Email/URL with a transient property Field and the real owning Page. Missing or empty `textformatters` lists apply no text transformation; explicit/inherited lists apply native formatters in order. Flex adds no entity encoding; developers opt into `TextformatterEntities` for HTML text output. Choice keys remain raw data, while formatted property and option display labels are HTML entity encoded. Formatter output is never cached into canonical values. Native URL and Textarea output options apply, but storage-time markup QA/link abstraction is not introduced. Page-reference access follows native derefAsPage, allowUnpub hydration and formatting. Native FieldtypePage validates canonical reference IDs during serialization; a transient Field carries each property’s native settings without creating a second database field. Direct multi-reference assignments append unless a PageArray replaces the collection; editor submissions replace the selection. Nested language and PageArray objects participate in change tracking and are rebound to the owning Page after cloning or assignment.
+Persisted values are never entity encoded or converted to display-date strings. Output formatting follows the owning Page and is a cloned view. Text, choice labels and dates are formatted when read; date runtime reads are Unix timestamps while canonical JSON remains ISO strings. Raw multilingual values are language objects; formatted values are current-language strings. Rich HTML follows the native TinyMCE/Inputfield pipeline. All formatted text-valued property reads, including custom scalar inputs, delegate to native FieldtypeText/Textarea/Email/URL with a transient property Field and the real owning Page. Missing or empty `textformatters` lists apply no text transformation; explicit/inherited lists apply native formatters in order. Flex adds no entity encoding; developers opt into `TextformatterEntities` for HTML text output. Choice keys remain raw data, while formatted property and option display labels are HTML entity encoded. Formatter output is never cached into canonical values. File/Image descriptions apply the configured native formatter modules lazily after language resolution, with a transient native File/Image Field. Only explicitly configured or inherited lists run; absent and empty lists leave descriptions unchanged. Description reads never replace native metadata; canonical export and collection cloning read raw descriptions explicitly. Irrelevant formatter settings on non-text/non-media properties are tolerated, while effective formatter lists remain validated. Native URL and Textarea output options apply, but storage-time markup QA/link abstraction is not introduced. Page-reference access follows native derefAsPage, allowUnpub hydration and formatting. Native FieldtypePage validates canonical reference IDs during serialization; a transient Field carries each property’s native settings without creating a second database field. Direct multi-reference assignments append unless a PageArray replaces the collection; editor submissions replace the selection. Nested language and PageArray objects participate in change tracking and are rebound to the owning Page after cloning or assignment.
 
 Unknown stored properties are always retained on saves, serialization and copies,
 including nested rows and owned media. `flexPrune` no longer exists as a setting or
@@ -156,3 +182,23 @@ Flex does not make that native filesystem operation rollback-safe. Whole-Page
 permanent deletion and explicit native image-variation deletion retain core's
 immediate filesystem semantics and must not be confused with removing Flex
 properties, rows or originals through a field save.
+
+## CLI diagnostics and selection
+
+Exact owner selection delegates to the same maintenance batch transformer, after
+resolving the Page/field assignment. A missing field-table row is empty storage,
+not a missing owner. `--all` advances ID-keyset batches and stops on the first
+failed or incomplete batch. Output streams bounded batch details; summaries keep
+only path counters and the last batch's retry information. No global transaction
+or retained terminal approval is introduced.
+
+`FlexInspection` reads schemas through FlexFieldDefs and selector descriptors through
+FlexQuery, using the same evaluated definitions. Writes and consistency checks share
+FlexStorage's raw projection generator. Check uses the raw maintenance validator and
+walker; unknown properties do not become errors, pending renames retain raw addresses.
+Media inspection queries the current journal, avoiding hydration/cache and native
+file objects whose initialization could create/rename directories. Original probes
+use guarded normal/secure/extended and journal paths; custom native path hooks leave
+the check explicitly incomplete. No diagnostics handler repairs or collects. Native
+completion cleanup remains independent and may still run when the PHP process ends.
+API.md defines categories, skipped work, output framing and exit precedence.

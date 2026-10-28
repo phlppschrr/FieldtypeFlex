@@ -235,7 +235,7 @@ file_put_contents($textPath, 'Native and Flex comparison');
 foreach(['file', 'image'] as $kind) {
 	foreach([0, 1, 2] as $format) {
 		foreach([0, 1, 2] as $limit) {
-			$settings = ['extensions' => $kind === 'file' ? 'txt' : 'png', 'maxFiles' => $limit, 'outputFormat' => $format, 'noLang' => 1, 'useTags' => 1];
+			$settings = ['extensions' => $kind === 'file' ? 'txt' : 'png', 'maxFiles' => $limit, 'outputFormat' => $format, 'noLang' => 1, 'useTags' => 1, 'textformatters' => ['TextformatterEntities']];
 			$n = $native($kind === 'file' ? 'FieldtypeFile' : 'FieldtypeImage', $settings);
 			$f = $createField('flex_native_media', ['asset' => ['type' => $kind] + $settings]);
 			$p = $wire->pages->getFresh($id);

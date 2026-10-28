@@ -1,6 +1,9 @@
 <?php namespace ProcessWire;
 
-/** Native Page references and owned File/Image properties. */
+/**
+ * Single/multiple Page references and File/Image collections.
+ * Adjust findPagesSelector to the Pages that editors should be able to select.
+ */
 return [
     'ref_primary' => [
         'type' => 'page',
@@ -22,21 +25,24 @@ return [
     ],
     'media_cover' => [
         'type' => 'image',
+        'textformatters' => ['TextformatterEntities'],
         'label' => __('Cover image'),
-        'extensions' => 'jpg jpeg png webp',
+        'extensions' => 'jpg jpeg gif png',
         'maxFiles' => 1,
         'columnWidth' => 50,
     ],
     'media_gallery' => [
         'type' => 'image',
+        'textformatters' => ['TextformatterEntities'],
         'label' => __('Image gallery'),
-        'extensions' => 'jpg jpeg png webp',
+        'extensions' => 'jpg jpeg gif png',
         'maxFiles' => 10,
         'outputFormat' => 1,
         'columnWidth' => 50,
     ],
     'media_downloads' => [
         'type' => 'file',
+        'textformatters' => ['TextformatterEntities'],
         'label' => __('Downloads'),
         'extensions' => 'pdf txt zip',
         'maxFiles' => 5,

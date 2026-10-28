@@ -94,8 +94,41 @@ $assert(str_contains($renderRowSetting(['rowTitle' => '{mode}']), '>Beta</span>'
 $rowUiChoiceHtml = $renderRowSetting(['rowTitle' => '{mode}']);
 preg_match('/data-flex-label-options=([\'"])(.*?)\1/', $rowUiChoiceHtml, $rowUiChoiceOptions);
 $same(['a' => 'Alpha', 'b' => 'Beta'], json_decode(html_entity_decode($rowUiChoiceOptions[2], ENT_QUOTES, 'UTF-8'), true, 512, JSON_THROW_ON_ERROR), 'live choice labels receive escaped native option names');
-$assert(str_contains($renderRowSetting(['rowTitle' => '{unknown}']), '>Item #1</span>'), 'an empty label falls back to the row type label and index');
+$assert(str_contains($renderRowSetting(['rowTitle' => '{unknown}']), '>#1</span>'), 'an empty custom label falls back to the index without adding an unrequested type');
 $assert(str_contains($renderRowSetting(['rowTitle' => '{summary}']), '>Default label</span>'), 'row labels resolve native language values');
+// Custom formats control all badges; zero is nonempty, including in fallback lists.
+$assert(!str_contains($renderRowSetting(['rowTitle' => '{heading}']), 'class="flex-row-type-badge"'), 'custom field-only titles omit the type badge');
+$assert(str_contains($renderRowSetting(['rowTitle' => '_{@type}_ {heading}']), 'class="flex-row-type-badge">Item</span>'), 'the explicit type token renders a badge');
+$assert(str_contains($renderRowSetting(['rowTitle' => '_{unknown|heading}_']), 'class="flex-row-type-badge">Fish &amp; Chips</span>'), 'fallback uses the first nonempty field inside a badge');
+$assert(str_contains($renderRowSetting(['rowTitle' => '_{price|heading}_']), 'class="flex-row-type-badge">0</span>'), 'fallback retains numeric zero');
+$rowUiFirst->heading = '   ';
+$assert(str_contains($renderRowSetting(['rowTitle' => '_{heading|price}_']), 'class="flex-row-type-badge">0</span>'), 'an existing blank first field falls back to a zero value');
+$assert(str_contains($renderRowSetting(['rowTitle' => '_{heading}_']), '>#1</span>'), 'a wholly empty badge-only template falls back to the index');
+$rowUiFirst->heading = 'Fish & Chips';
+$assert(str_contains($renderRowSetting(['rowTitle' => '{@type}: {heading}']), '>Item: Fish &amp; Chips</span>'), 'type tokens can render as plain text without a badge');
+$mutedTitleHtml = $renderRowSetting(['rowTitle' => '[Info] {heading} [{@type} #n:] _{price}_']);
+$assert(str_contains($mutedTitleHtml, 'class="flex-row-deemphasized">Info</span>'), 'square-bracket text is de-emphasized without showing the brackets');
+$assert(str_contains($mutedTitleHtml, 'class="flex-row-deemphasized">Item</span>') && str_contains($mutedTitleHtml, 'class="flex-row-deemphasized">#1</span>'), 'one de-emphasized group can contain several tokens');
+$assert(str_contains($mutedTitleHtml, 'class="flex-row-deemphasized">:</span>'), 'group punctuation retains its relation to following content');
+$assert(str_contains($renderRowSetting(['rowTitle' => '[_{price}_] {heading}']), 'class="flex-row-type-badge flex-row-deemphasized">0</span>'), 'de-emphasis combines with a badge and retains zero');
+$assert(str_contains($renderRowSetting(['rowTitle' => '[{unknown}] / {heading}']), '>Fish &amp; Chips</span>'), 'empty de-emphasized content and its edge separator disappear');
+$assert(str_contains($renderRowSetting(['rowTitle' => '{heading} / [] / {price}']), 'Fish &amp; Chips / 0</span>'), 'an empty literal group leaves only one separator');
+$assert(str_contains($renderRowSetting(['rowTitle' => '[Info] / {heading}']), 'Info</span> / Fish &amp; Chips'), 'static de-emphasized text retains a separating slash');
+$assert(str_contains($renderRowSetting(['rowTitle' => '[Unclosed {heading}']), '>[Unclosed Fish &amp; Chips</span>'), 'unmatched square brackets remain literal');
+$rowUiFirst->heading = '[Literal] <b>Safe</b> #n';
+$assert(str_contains($renderRowSetting(['rowTitle' => '[{heading}]']), 'class="flex-row-deemphasized">[Literal] Safe #n</span>'), 'field values cannot inject bracket groups, markup or numbering');
+$rowUiFirst->heading = 'Fish & Chips';
+$emptyBadgeHtml = $renderRowSetting(['rowTitle' => '{@path} / _{unknown}_ / #n: _{missing}_']);
+$assert(!str_contains($emptyBadgeHtml, 'class="flex-row-type-badge"'), 'empty values omit their complete badge wrappers');
+$assert(str_contains($emptyBadgeHtml, '>#1</span>'), 'empty leading path and badges leave no edge separators');
+$assert(str_contains($renderRowSetting(['rowTitle' => '{heading} / _{unknown}_ / {price}']), 'Fish &amp; Chips / 0</span>'), 'an empty middle badge leaves a single separator');
+$defaultTitleInput = clone $rowUiInput;
+$defaultTitleDefinition = $defaultTitleInput->definition;
+unset($defaultTitleDefinition['types']['item']['settings']['rowTitle']);
+$defaultTitleInput->definition = $defaultTitleDefinition;
+$defaultTitleHtml = $defaultTitleInput->renderRow($rowUiFirst);
+$assert(str_contains($defaultTitleHtml, 'class="flex-row-type-badge">Item</span> Item #1'), 'absent rowTitle preserves the established default header');
+
 $wire->user->language = $wire->languages->get('de');
 $assert(str_contains($renderRowSetting(['rowTitle' => '{summary}']), '>Deutsches Label</span>'), 'row labels follow the current editor language');
 $wire->user->language = $wire->languages->getDefault();
@@ -105,6 +138,31 @@ $safeRow = $rowUiInput->renderRow($rowUiFirst, 3, true);
 $assert(str_contains($safeRow, '#3: Safe #n {price} (0)'), 'row values cannot inject new label tokens or row numbering');
 $assert(!str_contains($safeRow, '<img src=x'), 'rich text and markup are excluded from the header label');
 $rowUiFirst->heading = 'Fish & Chips';
+
+// Three levels prove breadcrumbs use only ancestor types, independent of titles.
+$nestedTitleSchema = ['heading' => ['type' => 'text']];
+foreach([3, 2, 1] as $level) {
+	$nestedTitleSchema = ['items' => ['type' => 'rows', 'types' => ['item' => [
+		'label' => 'Level ' . $level,
+		'rowTitle' => '{@path} / _{heading}_',
+		'children' => ['heading' => ['type' => 'text']] + $nestedTitleSchema,
+	]]]];
+}
+$nestedTitleField = $createField('flex_nested_titles', $nestedTitleSchema);
+$nestedTitleValue = $type->getBlankValue($page, $nestedTitleField);
+$nestedTitleParent = $nestedTitleValue->items->addRow('item', ['heading' => 'Parent']);
+$nestedTitleChild = $nestedTitleParent->items->addRow('item', ['heading' => 'Child']);
+$nestedTitleChild->items->addRow('item', ['heading' => 'Leaf']);
+$nestedTitleEditor = $nestedTitleField->getInputfield($page);
+$nestedTitleEditor->value = $nestedTitleValue;
+$nestedTitleHtml = $nestedTitleEditor->render();
+$assert(str_contains(html_entity_decode($nestedTitleHtml, ENT_QUOTES, 'UTF-8'), 'Level 1 › Level 2 / <span class="flex-row-type-badge">Leaf</span>'), 'nested breadcrumb contains each ancestor type label once and excludes the current type');
+$assert(!str_contains($nestedTitleHtml, 'Parent › Child'), 'breadcrumb excludes ancestor field values');
+$nestedTitleParent->heading = 'Changed parent title';
+$nestedTitleChild->heading = '';
+$nestedTitleEditor = $nestedTitleField->getInputfield($page);
+$nestedTitleEditor->value = $nestedTitleValue;
+$assert(str_contains(html_entity_decode($nestedTitleEditor->render(), ENT_QUOTES, 'UTF-8'), 'Level 1 › Level 2 / <span class="flex-row-type-badge">Leaf</span>'), 'changed and empty ancestor titles leave the type breadcrumb unchanged');
 
 // Presentation mistakes must not make existing content uneditable.
 foreach(['0' => 0, '1' => 1, '3' => 3, '2' => 0, 'invalid' => 0] as $collapse => $expectedCollapse) {

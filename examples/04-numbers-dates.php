@@ -1,6 +1,6 @@
 <?php namespace ProcessWire;
 
-/** Native numeric, state and date controls; use the same property schema in Rows. */
+/** Number/state controls and localized date/time editors, also usable as Row children. */
 return [
     'number_quantity' => [
         'type' => 'integer',

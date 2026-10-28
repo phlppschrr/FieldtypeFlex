@@ -29,7 +29,18 @@ compares actual saved native Fields with Flex properties, including Page derefer
 access/unpublished states, languages, scalar values, option objects and media output modes.
 `ddev flex-test formatting` also compares native text formatter chains with Flex, including
 explicit/inherited/empty lists, HTML output, multilingual values and nested rows.
+Its media formatter suite covers absent/explicit/empty and inherited description chains,
+single/collection output, language changes and fallback, raw exports, read-only
+unformatted views, nested images, variations and unchanged canonical metadata.
 Run suites sequentially against one fixture; their owned baseline field name is shared.
+
+The admin context regression loads a Flex value before assigning its owner's
+concrete type, then exercises preload, rendering and authenticated processing.
+It checks revisions, unsaved rows/unknown data, owned media and draft overlays.
+The Repeater suite includes a real native FieldsetPage full save and nested
+budget rejection. A Page subclass mirrors RepeaterMatrix's getFields()/null-value
+contract so CI does not require proprietary ProFields. This does not replace a
+browser check of the complete RepeaterMatrix AJAX dialog in a local integration.
 
 AgentTools is optional. Set `FLEX_INSTALL_AGENTTOOLS=1` when running setup to install
 the pinned inspection module. It is not required by the test runner.
@@ -99,6 +110,9 @@ properties, select just one, preview and apply cleanup. Save through ProcessPage
 with a native `collapsedHidden` property; verify hidden/unknown values, row/asset IDs,
 media addresses and bytes independently from the database. Check console errors.
 Opening and normally saving field configuration must not scan or migrate data.
+After previewing a cleanup, change the selected paths: Apply must become disabled,
+and Preview selected cleanup must become available without another orphan scan.
+Preview and apply the revised selection, then verify only those paths were removed.
 
 Native CLI checks run from `.dev/pw`: `ddev exec php .dev/pw/index.php flex --help`.
 Refresh module metadata after adding CLI support. Test both pinned cores through
@@ -131,3 +145,21 @@ outer transactions open in PHP tests, never force a commit in the lifecycle hook
 When a subprocess changes files, clear the parent process's stat cache before
 filesystem readback. Verify journal ownership independently too: a cached positive
 `is_file()` result can otherwise misreport successful child-process cleanup.
+
+## CLI inspection regressions
+
+`ddev flex-test maintenance` includes `maintenance-cli.php` through the shared raw
+maintenance fixture. It verifies discovery/Page schemas, recursive query paths,
+exact hidden/unpublished and Repeater owners, batch streaming and stop/resume,
+unique owner aggregation, deliberate JSON/projection/media corruption, original
+file checks, status expiry counts and strict option/exit handling. MariaDB-only
+syntactically invalid JSON is injected with its session constraint check temporarily
+disabled; MySQL native JSON otherwise prevents that storage state.
+
+Snapshot canonical/search, row projections and media journal before/after diagnostic
+**handlers**. Do not mistake independent native process-end collection for a handler
+write. Test absent assigned storage separately from missing owners/field assignment.
+New commands have text and JSON modes; all JSON output is JSON-Lines and progress
+is stderr-only. Validate native dispatcher exits where available; the older pinned
+core runs shared adapter cases but has no native CLI dispatcher. No admin input
+behavior changes are involved in these CLI diagnostics.

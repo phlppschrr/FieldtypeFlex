@@ -1,6 +1,6 @@
 <?php namespace ProcessWire;
 
-/** Same two fields as 01-basic.json. PHP definitions are recommended. */
+/** A required title and an email input, each occupying half the editor width. */
 return [
     'title' => [
         'type' => 'text',

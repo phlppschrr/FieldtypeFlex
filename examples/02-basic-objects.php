@@ -1,6 +1,6 @@
 <?php namespace ProcessWire;
 
-/** Alternative representation of 02-basic.php; InputfieldWrapper remains supported. */
+/** Build the same title/email schema as 02-basic.php with native Inputfield objects. */
 $inputs = $wire->wire(new InputfieldWrapper());
 
 $title = $wire->modules->get('InputfieldText');

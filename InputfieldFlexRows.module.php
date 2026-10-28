@@ -25,7 +25,7 @@ class InputfieldFlexRows extends Inputfield {
 	private function inputsFor(FlexRow $row): InputfieldWrapper {
 		$id = $row->rowId();
 		if(!isset($this->rowInputs[$id])) {
-			$this->rowInputs[$id] = $row->definitions()->getInputfields($row, FlexPath::inputPrefix($this->flexInputName ?: $this->name, $row->address()), $this->flexDraft, $this->flexRoot, $this->flexBaseRoot, $this->flexInputName ?: $this->name);
+			$this->rowInputs[$id] = $row->definitions()->getInputfields($row, FlexPath::inputPrefix($this->flexInputName ?: $this->name, $row->address()), $this->flexDraft, $this->flexRoot, $this->flexBaseRoot, $this->flexInputName ?: $this->name, $this->flexDependencyAncestors ?: []);
 			if($this->parent instanceof InputfieldWrapper) {
 				$this->rowInputs[$id]->setParent($this->parent);
 			}
@@ -68,7 +68,7 @@ class InputfieldFlexRows extends Inputfield {
 				(string) $type,
 				[]
 			);
-			$sampleInputs = $sample->definitions()->getInputfields($sample, FlexPath::inputPrefix($this->flexInputName ?: $this->name, $sample->address()), '', $this->flexRoot, $this->flexBaseRoot, $this->flexInputName ?: $this->name);
+			$sampleInputs = $sample->definitions()->getInputfields($sample, FlexPath::inputPrefix($this->flexInputName ?: $this->name, $sample->address()), '', $this->flexRoot, $this->flexBaseRoot, $this->flexInputName ?: $this->name, $this->flexDependencyAncestors ?: []);
 			foreach($sampleInputs->getAll(['withWrappers' => true]) as $child) {
 				if($child->renderReady($child->parent, $renderValueMode)) {
 					$loaded = true;
@@ -94,7 +94,8 @@ class InputfieldFlexRows extends Inputfield {
 
 	/** Return plain display values for the known, flat properties used by the label. */
 	private function labelValues(FlexRow $row): array {
-		preg_match_all('/\{([a-zA-Z_][a-zA-Z0-9_]*)\}/', $this->labelFormat($row), $matches);
+		preg_match_all('/\{([a-zA-Z_][a-zA-Z0-9_]*(?:\|[a-zA-Z_][a-zA-Z0-9_]*)*)\}/', $this->labelFormat($row), $matches);
+		$matches[1] = explode('|', implode('|', $matches[1]));
 		$values = [];
 		foreach(array_unique($matches[1]) as $name) {
 			$property = $row->definitions()->property($name);
@@ -123,6 +124,91 @@ class InputfieldFlexRows extends Inputfield {
 		return $values;
 	}
 
+	/** Render a text-only format, with optional badges and no dangling edge separators. */
+	private function titleParts(string $format, array $values, int $number, string $type, string $path, bool $cleanup = true): array {
+		$parts = preg_split('/(\[[^\[\]]*\]|_\{[^{}]+\}_|\{[^{}]+\}|#n)/i', $format, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY);
+		$result = [];
+		foreach($parts as $part) {
+			if(str_starts_with($part, '[') && str_ends_with($part, ']')) {
+				$details = $this->titleParts(substr($part, 1, -1), $values, $number, $type, $path, false);
+				if(!$details) $details[] = ['text' => '', 'badge' => false, 'literal' => false];
+				foreach($details as $detail) {
+					$detail['muted'] = true;
+					$result[] = $detail;
+				}
+				continue;
+			}
+			$badge = str_starts_with($part, '_{') && str_ends_with($part, '}_');
+			$token = $badge ? substr($part, 1, -1) : $part;
+			$value = $part;
+			$literal = false;
+			if(strcasecmp($token, '#n') === 0) {
+				$value = '#' . $number;
+			} else if(str_starts_with($token, '{') && str_ends_with($token, '}')) {
+				$value = '';
+				foreach(explode('|', substr($token, 1, -1)) as $name) {
+					$candidate = $name === '@type' ? $type : ($name === '@path' ? $path : ($values[$name] ?? ''));
+					if(trim($candidate) !== '') {
+						$value = $candidate;
+						break;
+					}
+				}
+			} else {
+				$literal = true;
+			}
+			$result[] = ['text' => $value, 'badge' => $badge, 'literal' => $literal];
+		}
+		if(!$cleanup) return $result;
+		// Separator-only literals need visible content on both sides. Field values
+		// themselves are never cleaned as punctuation or interpreted as new tokens.
+		foreach($result as $i => &$part) {
+			if(!$part['literal'] || !preg_match('/^[\s›|\/:;,–—-]+$/u', $part['text'])) continue;
+			$before = $after = false;
+			foreach($result as $j => $other) {
+				if(trim($other['text']) !== '' && (!$other['literal'] || !preg_match('/^[\s›|\/:;,–—-]+$/u', $other['text']))) {
+					if($j < $i) $before = true;
+					if($j > $i) $after = true;
+				}
+			}
+			if(!$before || !$after) $part['text'] = '';
+		}
+		unset($part);
+		$separator = null;
+		$omitted = false;
+		foreach($result as $i => $part) {
+			if($part['text'] === '') {
+				if(!$part['literal']) $omitted = true;
+				continue;
+			}
+			if($part['literal'] && preg_match('/^[\s›|\/:;,–—-]+$/u', $part['text'])) {
+				if($separator !== null && $omitted) $result[$separator]['text'] = '';
+				$separator = $i;
+			} else {
+				$separator = null;
+			}
+			$omitted = false;
+		}
+		return $result;
+	}
+
+	/** Use only ancestor type labels, independent of their titles and values. */
+	private function contextPath(): string {
+		$parts = explode('.', $this->setName);
+		$owner = $this->flexRoot;
+		$labels = [];
+		while(count($parts) > 1) {
+			$set = array_shift($parts);
+			$id = array_shift($parts);
+			$rows = $owner->getUnformatted($set);
+			if(!$rows instanceof FlexRows) break;
+			$ancestor = $rows->getById($id);
+			if(!$ancestor) break;
+			$labels[] = $ancestor->rowTypeLabel();
+			$owner = $ancestor;
+		}
+		return implode(' › ', $labels);
+	}
+
 	/**
 	 * Render one row’s scoped native inputs and accessible action buttons.
 	 *
@@ -139,12 +225,22 @@ class InputfieldFlexRows extends Inputfield {
 		$typeLabel = (string) ($typeDefinition['label'] ?? $type);
 		$values = $this->labelValues($row);
 		$format = $this->labelFormat($row);
-		$fallback = $typeLabel . ' #n';
-		$label = str_ireplace('#n', '#' . $number, $format);
-		$label = trim(preg_replace_callback('/\{([a-zA-Z_][a-zA-Z0-9_]*)\}/', fn($match) => $values[$match[1]] ?? '', $label));
-		if($label === '') {
-			$label = str_ireplace('#n', '#' . $number, $fallback);
+		$parts = $this->titleParts($format, $values, $number, $typeLabel, str_contains($format, '@path') ? $this->contextPath() : '');
+		if(trim(implode('', array_column($parts, 'text'))) === '') {
+			$parts = [['text' => ($format === '' ? $typeLabel . ' ' : '') . '#' . $number, 'badge' => false]];
 		}
+		$entities = fn($value) => $this->wire()->sanitizer->entities((string) $value);
+		$label = '';
+		foreach($parts as $part) {
+			if($part['text'] === '') continue;
+			$classes = [];
+			if($part['badge']) $classes[] = 'flex-row-type-badge';
+			if(!empty($part['muted'])) $classes[] = 'flex-row-deemphasized';
+			$text = $entities($part['text']);
+			$label .= $classes ? '<span class="' . implode(' ', $classes) . '">' . $text . '</span>' : $text;
+		}
+		// Preserve the established default header, including its type badge.
+		if($format === '') $label = '<span class="flex-row-type-badge">' . $entities($typeLabel) . '</span> ' . $label;
 		foreach($inputs->getAll() as $input) {
 			$name = (string) $input->_flex_property;
 			if(array_key_exists($name, $values)) {
@@ -168,10 +264,10 @@ class InputfieldFlexRows extends Inputfield {
 			$buttons .= '<button type="button" class="flex-row-action" data-flex-row-action="' . $action . '" title="' . $entities($actionLabel) . '" aria-label="' . $entities($actionLabel) . '"><i class="fa fa-fw fa-' . $icon . '" aria-hidden="true"></i></button>';
 		}
 		$sortLabel = $entities($this->_('Drag to reorder; use Up and Down arrow keys when focused'));
-		return '<li class="Inputfield InputfieldFieldset InputfieldNoFocus flex-row' . ($collapsed ? ' InputfieldStateCollapsed' : '') . '" id="wrap_' . $entities($bodyId) . '" data-flex-row="' . $entities($id) . '" data-flex-type="' . $entities($type) . '" data-flex-label-format="' . $entities($format) . '" data-flex-label-fallback="' . $entities($fallback) . '" data-flex-label-values="' . $entities(json_encode((object) $values, JSON_THROW_ON_ERROR)) . '">' .
+		return '<li class="Inputfield InputfieldFieldset InputfieldNoFocus flex-row' . ($collapsed ? ' InputfieldStateCollapsed' : '') . '" id="wrap_' . $entities($bodyId) . '" data-flex-row="' . $entities($id) . '" data-flex-type="' . $entities($type) . '" data-flex-type-label="' . $entities($typeLabel) . '" data-flex-label-format="' . $entities($format) . '" data-flex-label-values="' . $entities(json_encode((object) $values, JSON_THROW_ON_ERROR)) . '">' .
 			'<div class="InputfieldHeader flex-row-header"><div class="flex-row-bar uk-background-primary uk-light">' .
 			'<button type="button" class="flex-row-sort" title="' . $sortLabel . '" aria-label="' . $sortLabel . '"><i class="fa fa-fw fa-arrows" aria-hidden="true"></i></button>' .
-			'<button type="button" class="flex-row-toggle" aria-controls="' . $entities($bodyId) . '" aria-expanded="' . ($collapsed ? 'false' : 'true') . '"><span class="flex-row-label"><span class="flex-row-type-badge">' . $entities($typeLabel) . '</span><span class="flex-row-title">' . $entities($label) . '</span></span><i class="fa fa-fw fa-angle-down flex-row-chevron" aria-hidden="true"></i></button>' .
+			'<button type="button" class="flex-row-toggle" aria-controls="' . $entities($bodyId) . '" aria-expanded="' . ($collapsed ? 'false' : 'true') . '"><span class="flex-row-label"><span class="flex-row-title">' . $label . '</span></span><i class="fa fa-fw fa-angle-down flex-row-chevron" aria-hidden="true"></i></button>' .
 			'<span class="flex-row-controls">' . $buttons . '</span></div></div>' .
 			'<div class="InputfieldContent flex-row-content" id="' . $entities($bodyId) . '">' . $inputs->render() . '</div></li>';
 	}
@@ -257,12 +353,7 @@ class InputfieldFlexRows extends Inputfield {
 					$view = $this->admin()->row($this->flexDraft, $this->setName, $id, $this->flexRoot);
 					$this->inputsFor($view);
 				}
-				$form = $this->wire()->modules->get('InputfieldForm');
-				$form->protectCSRF = false;
-				foreach($this->inputsFor($row)->children() as $child) {
-					$form->add($child);
-				}
-				$form->processInput($input);
+				$form = FlexDependencies::processInput($this->inputsFor($row), $this->flexRoot->ownerPage(), $input);
 				InputfieldFlex::applyInputs($row, $form, FlexPath::inputPrefix($this->flexInputName ?: $this->name, $row->address()));
 				foreach($form->getErrors() as $error) {
 					$this->error($error);

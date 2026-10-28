@@ -617,12 +617,8 @@ class FlexAdmin extends Wire {
 						throw new WirePermissionException($this->_('An existing Flex row cannot change type'));
 					}
 					$prefix = FlexPath::inputPrefix($draft['input'], $source->address());
-					$form = $this->wire()->modules->get('InputfieldForm');
-					$form->protectCSRF = false;
-					foreach($source->definitions()->getInputfields($source, $prefix, $token, $value)->children() as $child) {
-						$form->add($child);
-					}
-					$form->processInput($this->wire()->input->post);
+					$inputs = $source->definitions()->getInputfields($source, $prefix, $token, $value);
+					$form = FlexDependencies::processInput($inputs, $page, $this->wire()->input->post);
 					InputfieldFlex::applyInputs($source, $form, $prefix);
 					if($form->getErrors()) {
 						throw new WireException(implode('; ', $form->getErrors()));

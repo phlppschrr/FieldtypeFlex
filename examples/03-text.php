@@ -1,9 +1,9 @@
 <?php namespace ProcessWire;
 
 /**
- * Text-like native Inputfields. Choose TextformatterEntities for text placed in
- * HTML; a missing/empty textformatters list never implies HTML escaping.
- * TinyMCE is an optional native input module and preserves rich HTML.
+ * Text controls, HTML escaping and optional language support.
+ * Install InputfieldTinyMCE before using the text_body property.
+ * TextformatterEntities escapes HTML text; an empty formatter list leaves text raw.
  */
 return [
     'text_heading' => [

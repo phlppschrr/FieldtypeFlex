@@ -8,8 +8,12 @@ if(PHP_SAPI !== 'cli' || !isset($same, $createField)) {
 // Execute the actual reference snippets in the existing disposable suite fixture.
 $api = file_get_contents(dirname(__DIR__, 2) . '/API.md');
 preg_match_all('/```php\n(.*?)```/s', $api, $matches);
-$same(22, count($matches[1]), 'all API PHP examples have an execution context');
+$same(24, count($matches[1]), 'all API PHP examples have an execution context');
 $blocks = array_combine(range(1, count($matches[1])), $matches[1]);
+$rowTitleFragment = $blocks[9];
+$dependencyFragment = $blocks[21];
+unset($blocks[9], $blocks[21]);
+$blocks = array_combine(range(1, count($blocks)), array_values($blocks));
 $modules = $wire->modules;
 $fields = $wire->fields;
 $snippet = static function(string $code, array $vars = []) use ($trackFile): array {
@@ -30,6 +34,11 @@ $snippet = static function(string $code, array $vars = []) use ($trackFile): arr
 	return $run($path, $vars);
 };
 $fragment = static fn(string $code): string => "return [\n" . $code . "\n];";
+$rowTitleSettings = $snippet($fragment($rowTitleFragment))['result'];
+$same('[{@path} › {@type}] #n: _{heading|title}_', $rowTitleSettings['rowTitle'], 'API rowTitle fragment executes as native Rows settings');
+$dependencySettings = $snippet($fragment($dependencyFragment))['result'];
+$same('parent.show_details=1, forpage.feature_enabled=1', $dependencySettings['details']['showIf'], 'API dependency fragment declares containing and main Page contexts');
+$same('root.details_required=1', $dependencySettings['details']['requiredIf'], 'API dependency fragment declares root requiredIf');
 $base = $snippet($blocks[5])['result'];
 $same(['heading', 'hero'], array_keys($base), 'API complete definition executes');
 $rowSchema = $snippet($fragment($blocks[8]))['result'];

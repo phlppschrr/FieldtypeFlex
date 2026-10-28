@@ -73,10 +73,13 @@ foreach(['file', 'image'] as $kind) {
 			if($limit !== 1) {
 				$value->asset->add($kind === 'image' ? $imageFixture : $fixtureFile);
 			}
+			$value->asset->first()->description = 'A "quote" & B';
 			$before = $value->rawArray();
 			$value->of(true);
 			$output = $value->asset;
 			$assert($single ? $output instanceof Pagefile : $output instanceof Pagefiles, "$kind format/limit $format/$limit output type");
+			$description = ($single ? $output : $output->first())->description;
+			$same('A "quote" & B', $description, 'unconfigured media descriptions stay raw');
 			if(!$single) {
 				$same($limit === 1 ? 1 : 2, count($output), 'formatted collection respects maxFiles');
 			}

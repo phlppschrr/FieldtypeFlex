@@ -264,7 +264,6 @@ inheritField requires a native Inputfield type,inheritField nécessite un type I
 "%s belongs to a row type, not the collection","%s appartient à un type de ligne, pas à la collection",,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,17795d5594850ab0f20cec5fb1d2ca5e
 Rows types must be a non-empty map,Les types Rows doivent être une table associative non vide,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,4d8a070f99222a89b6fc38f038c10c51
 Row type children must be definitions or a wrapper,Les enfants du type de ligne doivent être des définitions ou un wrapper,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,c7f305aaac06be3e3db4530c0a9c73d4
-"textformatters on ""%s"" requires a text-valued input","textformatters pour ""%s"" nécessite un champ de saisie textuel",,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,b6d8d7c0f70393cdeff506e9a9c191b8
 "textformatters on ""%s"" must be a list of module names","textformatters pour ""%s"" doit être une liste de noms de modules",,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,75525c9e291581e109c5301bbe6ab12d
 "Invalid Textformatter module on ""%s"": %s","Module Textformatter invalide pour ""%s"" : %s",,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,08ebbc5c5c0b5b714b58769305f53b30
 Unsupported Flex Page-reference target field,Champ cible de référence de page Flex non pris en charge,,site/modules/FieldtypeFlex/src/FlexQuery.php,77799ded8d22a3401149fcec83eb7dd2
@@ -407,3 +406,7 @@ Typed and nested Rows,Lignes typées et imbriquées,,site/modules/FieldtypeFlex/
 Kitchen Sink,Exemple complet,,site/modules/FieldtypeFlex/examples/manifest.php,77901897bcfd593f45a4788aa4eb5a26
 Combines the Core Inputfield references and reuses choice/number definitions inside typed Rows.,Combines the Core Inputfield references and reuses choice/number definitions inside typed Rows.,,site/modules/FieldtypeFlex/examples/manifest.php,d713019e8cd40192d4c1ef9151081696
 Editor guidance,Aide de l'éditeur,,site/modules/FieldtypeFlex/examples/07-advanced.php,25f5051ba4696eee08e6386c488ae673
+Unsupported Flex dependency path: %s,Chemin de dépendance Flex non pris en charge : %s,,site/modules/FieldtypeFlex/src/FlexDependencies.php,7797985ff60af9c91249675209ccbedf
+A parent dependency requires a Flex row,Une dépendance parent nécessite une ligne Flex,,site/modules/FieldtypeFlex/src/FlexDependencies.php,c0406d34785b042d533d89f0fabe5d35
+Flex dependency graph exceeds its safety limit,Le graphe des dépendances Flex dépasse sa limite de sécurité,,site/modules/FieldtypeFlex/src/FlexDependencies.php,a2944e613b00b513dcc6fd5aef51c118
+Flex dependency field is unavailable or unsupported: %s,Le champ de dépendance Flex est indisponible ou non pris en charge : %s,,site/modules/FieldtypeFlex/src/FlexDependencies.php,d3173c2c6a62a5aa47658dfa2e97d211

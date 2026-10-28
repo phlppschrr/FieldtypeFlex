@@ -69,6 +69,22 @@ try {
 		}
 	}
 
+	// Custom scalar inputs can inherit text formatters without subclass restrictions.
+	$customSource = $native('FieldtypeText', ['inputfieldClass' => 'InputfieldButton', 'textformatters' => ['TextformatterEntities']]);
+	$customDefs = new FlexFieldDefs($field, $page, ['custom' => ['type' => 'Button', 'inheritField' => $customSource->name]]);
+	$same(['TextformatterEntities'], $customDefs->property('custom')['settings']['textformatters'], 'custom scalar input inherits the native formatter list');
+	$customValue = new FlexValue($page, $field, $customDefs, ['custom' => '<b>A & B</b>']);
+	$customValue->of(true);
+	$same('&lt;b&gt;A &amp; B&lt;/b&gt;', $customValue->custom, 'custom scalar input applies native text output formatters');
+	$customSource->textformatters = [];
+	$wire->fields->save($customSource);
+	$emptyInherited = new FlexFieldDefs($field, $page, ['custom' => ['type' => 'Button', 'inheritField' => $customSource->name]]);
+	$same([], $emptyInherited->property('custom')['settings']['textformatters'], 'custom scalar input inherits an empty native list');
+	foreach([[], ['TextformatterEntities']] as $explicit) {
+		$defs = new FlexFieldDefs($field, $page, ['custom' => ['type' => 'Button', 'inheritField' => $customSource->name, 'textformatters' => $explicit]]);
+		$same($explicit, $defs->property('custom')['settings']['textformatters'], 'custom input accepts explicit formatter lists');
+	}
+
 	$n = $native('FieldtypeTextarea', ['textformatters' => ['TextformatterMarkdownExtra']]);
 	$f = $createField('flex_format_inherit', [
 		'body' => ['type' => 'textarea', 'inheritField' => $n->name],
@@ -191,11 +207,22 @@ try {
 	$wrapper->add($input);
 	$defs = new FlexFieldDefs($f, $page, $wrapper);
 	$same(['TextformatterEntities'], $defs->property('body')['settings']['textformatters'], 'native wrapper retains formatter list');
-	foreach(['integer', 'float', 'page', 'TextTags', 'select', 'file', 'rows', 'fieldset'] as $inputType) {
-		$throws(fn() => new FlexFieldDefs($f, $page, ['bad' => ['type' => $inputType, 'textformatters' => []]]), "$inputType rejects textformatters", FlexDefinitionException::class, 'bad');
+	foreach(['integer', 'float', 'Toggle', 'page', 'TextTags', 'select', 'file', 'rows', 'fieldset'] as $inputType) {
+		$settings = ['type' => $inputType, 'textformatters' => []];
+		if($inputType === 'file') $settings['extensions'] = 'txt';
+		if($inputType === 'rows') $settings['types'] = ['text' => ['children' => []]];
+		new FlexFieldDefs($f, $page, ['optional' => $settings]);
+		$assert(true, "$inputType tolerates irrelevant empty formatter metadata");
+	}
+	foreach(['integer', 'Toggle', 'select', 'page'] as $inputType) {
+		$defs = new FlexFieldDefs($f, $page, ['optional' => ['type' => $inputType, 'textformatters' => ['TextformatterDoesNotExist']]]);
+		$v = new FlexValue($page, $f, $defs, []);
+		$v->of(true);
+		$v->optional;
+		$assert(true, "$inputType ignores ineffective formatter module metadata on output");
 	}
 	foreach([null, '', 'TextformatterEntities', ['wrong' => 'TextformatterEntities'], [null], [42], ['TextformatterDoesNotExist'], ['InputfieldText']] as $invalid) {
-		$throws(fn() => new FlexFieldDefs($f, $page, ['bad' => ['type' => 'text', 'textformatters' => $invalid]]), 'invalid formatter definition reports field/source/property', FlexDefinitionException::class, 'bad');
+		$throws(fn() => new FlexFieldDefs($f, $page, ['bad' => ['type' => 'text', 'textformatters' => $invalid]]), 'invalid effective formatter definition still reports field/source/property', FlexDefinitionException::class, 'bad');
 	}
 } finally {
 	$wire->user->language = $defaultLanguage;

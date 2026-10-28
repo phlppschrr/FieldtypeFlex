@@ -38,3 +38,5 @@ $same([], $input->getErrors(), 'requiredIf false is not required');
 $page->flex_test = $input->value;
 $page->save('flex_test');
 $same('New name', $page->flex_test->name, 'processed value saves');
+
+require __DIR__ . '/dependencies.php';

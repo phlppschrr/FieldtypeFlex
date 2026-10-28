@@ -3,7 +3,7 @@
 	'use strict';
 	document.addEventListener('DOMContentLoaded', function() {
 		document.querySelectorAll('.FlexMaintenance').forEach(function(root) {
-			let batches = [], operation = '', selection = [], running = false;
+			let batches = [], orphanBatches = [], operation = '', selection = [], running = false;
 			const messages = JSON.parse(root.dataset.messages);
 			const report = root.querySelector('.FlexMaintenanceReport');
 			const progress = root.querySelector('.FlexMaintenanceProgress');
@@ -67,7 +67,7 @@
 				let valid = false;
 				try {
 					if(action === 'rename' || action === 'orphans') {
-						batches = []; operation = action; paths.replaceChildren();
+						batches = []; orphanBatches = []; operation = action; paths.replaceChildren();
 						let after = 0;
 						while(true) {
 							const batch = await request(action, {after: after});
@@ -78,6 +78,7 @@
 						const summary = display(batches);
 						progress.textContent += ' ' + (action === 'rename' && !summary.renames.length && batches.every(batch => batch.success) ? messages.noRenames : messages.previewed);
 						if(action === 'orphans') {
+							orphanBatches = batches;
 							const total = summary;
 							Object.keys(total.properties).forEach(function(path) {
 								const label = document.createElement('label'), check = document.createElement('input');
@@ -100,12 +101,12 @@
 						}
 						const total = display(results);
 						progress.textContent += total.errors.length || total.conflicts.length ? ' ' + messages.retry : operation === 'rename' ? ' ' + messages.renamed : ' ' + messages.cleaned;
-						batches = []; operation = '';
+						batches = []; orphanBatches = []; operation = '';
 					}
 					valid = true;
 				} catch(error) {
 					progress.textContent = error.message + ' ' + messages.retry;
-					batches = []; operation = '';
+					batches = []; orphanBatches = []; operation = '';
 				} finally {
 					running = false;
 					buttons.forEach(item => item.disabled = false);
@@ -115,7 +116,11 @@
 				}
 			});
 			paths.addEventListener('change', function() {
-				if(operation === 'cleanup') { apply.disabled = true; operation = ''; batches = []; }
+				if(operation === 'cleanup') {
+					apply.disabled = true;
+					batches = orphanBatches; operation = 'orphans'; selection = [];
+					cleanup.disabled = false;
+				}
 			});
 		});
 	});

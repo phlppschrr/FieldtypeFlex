@@ -5,9 +5,11 @@ require_once __DIR__ . '/src/FlexFieldDefs.php';
 require_once __DIR__ . '/src/FlexValue.php';
 require_once __DIR__ . '/src/FlexRows.php';
 require_once __DIR__ . '/src/FlexPath.php';
+require_once __DIR__ . '/src/FlexDependencies.php';
 require_once __DIR__ . '/src/FlexStorage.php';
 require_once __DIR__ . '/src/FlexMaintenance.php';
 require_once __DIR__ . '/src/FlexMaintenanceCli.php';
+require_once __DIR__ . '/src/FlexInspection.php';
 require_once __DIR__ . '/src/FlexMaintenanceAdmin.php';
 require_once __DIR__ . '/src/FlexQuery.php';
 require_once __DIR__ . '/src/FlexAdmin.php';
@@ -18,6 +20,13 @@ require_once __DIR__ . '/src/FlexMedia.php';
 // This is the upstream-recommended compatibility path for cores without CliModule.
 /** Structured ProcessWire values with native inputs, typed rows and owned media. */
 class FieldtypeFlex extends Fieldtype implements FieldtypeHasFiles, FieldtypeHasPagefiles, FieldtypeHasPageimages {
+	/** Existing rows start collapsed; newly added rows start open. */
+	public const ROW_COLLAPSE_EXISTING = 0;
+	/** Existing and newly added rows start collapsed. */
+	public const ROW_COLLAPSE_ALL = 1;
+	/** Existing and newly added rows start open. */
+	public const ROW_EXPAND_ALL = 3;
+
 	private ?FlexMedia $mediaService = null;
 	private array $adminDefinitionErrors = [];
 	private array $adminInputErrors = [];
@@ -217,7 +226,7 @@ class FieldtypeFlex extends Fieldtype implements FieldtypeHasFiles, FieldtypeHas
 	public function validatePageTree(HookEvent $event): void {
 		$page = $event->arguments(0);
 		$walk = function(Page $owner) use (&$walk): void {
-			foreach($owner->fieldgroup as $field) {
+			foreach($owner->getFields() as $field) {
 				if($field->type instanceof self && $owner->isChanged($field->name)) {
 					try {
 						$this->getDefinitions($field, $owner);
@@ -232,8 +241,13 @@ class FieldtypeFlex extends Fieldtype implements FieldtypeHasFiles, FieldtypeHas
 						$value->validateTree();
 					}
 				} else if($field->type instanceof FieldtypeRepeater) {
-					foreach($owner->getUnformatted($field->name) as $item) {
-						$walk($item);
+					$items = $owner->getUnformatted($field->name);
+					if($items instanceof Page) {
+						$walk($items);
+					} else if(is_iterable($items)) {
+						foreach($items as $item) {
+							if($item instanceof Page) $walk($item);
+						}
 					}
 				}
 			}

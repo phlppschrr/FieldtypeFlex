@@ -27,6 +27,9 @@
     gap: .25rem;
     padding: 0 .5rem;
 }
+.AdminThemeUikitOriginal .flex-row-bar {
+    color: #fff;
+}
 .AdminThemeUikit:not(.AdminThemeUikitOriginal) .flex-row-bar {
     background: var(--pw-inputs-background);
     color: var(--pw-text-color);
@@ -74,9 +77,15 @@
     border-radius: 2px;
     font-size: .8em;
     font-weight: 600;
-    opacity: .8;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+.flex-row-deemphasized {
+    opacity: .7;
+}
+.flex-row-title > .flex-row-type-badge {
+    display: inline-block;
+    vertical-align: middle;
 }
 .flex-row-title {
     flex: 1;

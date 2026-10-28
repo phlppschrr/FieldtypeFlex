@@ -241,6 +241,59 @@ $db->prepare("UPDATE `$table` SET data=:data WHERE pages_id=:id")->execute(['id'
 $stale = $type->cleanupProperties($maintenance, ['opaque'], $scan);
 $assert(!$stale['success'] && str_contains($stale['errors'][0]['message'], 'Stale'), 'object-to-list concurrent change invalidates preview');
 
+// Rename conflicts must distinguish JSON objects from lists, including retained row values.
+$shapeField = $createField('flex_maintenance_shapes', [
+	'blocks' => ['type' => 'rows', 'renamedFrom' => ['old_blocks', 'older_blocks'], 'types' => [
+		'text' => ['children' => [
+			'title' => ['type' => 'text'],
+			'children' => ['type' => 'rows', 'renamedFrom' => ['old_children', 'older_children'], 'types' => [
+				'item' => ['children' => ['title' => ['type' => 'text']]],
+			]],
+		]],
+	]],
+]);
+$shapeTable = $db->escapeTable($shapeField->table);
+$shapeRowId = bin2hex(random_bytes(16));
+$shapeEnvelope = static fn($opaque) => (object) ['_flex' => 'rows:1', 'items' => [(object) [
+	'id' => $shapeRowId, 'type' => 'item', 'values' => (object) ['title' => 'Keep', 'opaque' => $opaque],
+]]];
+foreach(['root', 'nested', 'root-aliases', 'nested-aliases'] as $scope) {
+	$rootScope = str_starts_with($scope, 'root');
+	$aliases = str_ends_with($scope, 'aliases');
+	foreach([
+		[(object) [], [], true],
+		[(object) ['0' => 'Keep'], ['Keep'], true],
+		[(object) ['nested' => (object) []], (object) ['nested' => []], true],
+		[(object) [], (object) [], false],
+		[[], [], false],
+	] as [$oldShape, $newShape, $different]) {
+		$oldSet = $shapeEnvelope($oldShape); $newSet = $shapeEnvelope($newShape);
+		if($rootScope) {
+			$oldSet->items[0]->type = $newSet->items[0]->type = 'text';
+			$document = (object) ['old_blocks' => $oldSet, ($aliases ? 'older_blocks' : 'blocks') => $newSet];
+		} else {
+			$document = (object) ['blocks' => (object) ['_flex' => 'rows:1', 'items' => [(object) [
+				'id' => $shapeRowId, 'type' => 'text', 'values' => (object) ['old_children' => $oldSet, ($aliases ? 'older_children' : 'children') => $newSet],
+			]]]];
+		}
+		$beforeJson = json_encode($document, JSON_THROW_ON_ERROR);
+		$db->prepare("INSERT INTO `$shapeTable` (pages_id,data,search) VALUES (:id,:data,'') ON DUPLICATE KEY UPDATE data=VALUES(data)")
+			->execute(['id' => $page->id, 'data' => $beforeJson]);
+		$preview = $type->checkRenames($shapeField);
+		if($different) {
+			$same(1, count($preview['conflicts']), "$scope rename reports different JSON object/list shapes as a conflict");
+			$same(0, $type->applyRenames($shapeField, $preview)['changed'], "$scope JSON shape conflict blocks apply");
+			$same($beforeJson, json_encode($store->document($page, $shapeField)), "$scope JSON shape conflict preserves both stored values");
+		} else {
+			$same([], $preview['conflicts'], "$scope equal JSON shapes remain mergeable");
+			$same(1, $type->applyRenames($shapeField, $preview)['changed'], "$scope equal JSON shapes merge");
+			if($rootScope) $document = (object) ['blocks' => $newSet];
+			else $document->blocks->items[0]->values = (object) ['children' => $newSet];
+			$same(json_encode($document), json_encode($store->document($page, $shapeField)), "$scope merged JSON retains the original object/list shape");
+		}
+	}
+}
+
 // Per-page definitions can intentionally omit properties. Never promote these to a global schema conclusion.
 $definitionPath = $trackFile($wire->config->paths->templates . 'flex-maintenance-' . bin2hex(random_bytes(4)) . '.php');
 file_put_contents($definitionPath, '<?php namespace ProcessWire; return ["heading" => ["type" => "text"]] + ($page && $page->id === ' . (int) $page->id . ' ? [] : ["contextual" => ["type" => "text"]]);');
@@ -329,3 +382,5 @@ try {
 } finally {
 	$db->prepare("UPDATE `$table` SET data=:data WHERE pages_id=:id")->execute(['id' => $page->id, 'data' => json_encode($original)]);
 }
+
+require __DIR__ . '/maintenance-cli.php';

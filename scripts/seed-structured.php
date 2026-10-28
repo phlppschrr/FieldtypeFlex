@@ -96,7 +96,7 @@ if(!$extra) {
 		'facts' => [
 			'type'        => 'rows',
 			'label'       => 'Facts',
-			'rowCollapse' => 0,
+			'rowCollapse' => FieldtypeFlex::ROW_COLLAPSE_EXISTING,
 			'addRowLabel' => 'Add fact',
 			'types'       => [
 				'item' => [

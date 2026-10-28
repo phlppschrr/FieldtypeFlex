@@ -5,6 +5,28 @@ trait FlexOwnedFile {
 	private string $flexAssetId = '';
 	private array $flexBaseline = [];
 
+	/** Read canonical descriptions for cloning, revision checks and persistence. @internal */
+	public function rawDescription($language = null) {
+		return parent::description($language);
+	}
+
+	/** Format description reads without changing native multilingual metadata. */
+	public function description($language = null, $value = null) {
+		if(is_array($language) || ($value !== null && !($language === true && $value === true))) {
+			$this->pagefiles->assertWritable();
+		}
+		$description = parent::description($language, $value);
+		if($value !== null || is_array($language) || $language === true) return $description;
+		return $this->pagefiles->formatDescription($description);
+	}
+
+	/** Apply the same output rules to native language-specific property reads. */
+	public function get($key) {
+		$value = parent::get($key);
+		return is_string($key) && preg_match('/^description\d+$/D', $key)
+			? $this->pagefiles->formatDescription((string) $value) : $value;
+	}
+
 	/**
 	 * Get or replace the last committed metadata used for conflict detection.
 	 *
@@ -115,6 +137,25 @@ trait FlexMediaCollection {
 	private bool $flexHydrating = true;
 	private array $pendingCopies = [];
 	private string $flexDraft = '';
+	private bool $rawDescriptions = false;
+
+	/** Run native description formatters against a transient property Field. @internal */
+	public function formatDescription(string $description): string {
+		if(!$this->formatted() || $this->rawDescriptions) return $description;
+		$field = $this->wire(new Field());
+		$field->type = $this->wire()->modules->get($this instanceof Pageimages ? 'FieldtypeImage' : 'FieldtypeFile');
+		$leaf = substr(strrchr('.' . $this->flexAddress, '.'), 1);
+		$field->name = $this->field->name . '_' . $leaf;
+		foreach($this->flexDefinition['settings'] ?? [] as $key => $value) {
+			if(!in_array($key, ['id', 'name', 'type', 'value', 'inheritField'], true)) $field->set($key, $value);
+		}
+		$names = $field->textformatters ?? [];
+		foreach($names as $name) {
+			$formatter = $this->wire()->modules->get($name);
+			if($formatter instanceof Textformatter) $formatter->formatValue($this->page, $field, $description);
+		}
+		return $description;
+	}
 
 	/**
 	 * Bind the collection to its owning page without native temp-file handling.
@@ -174,13 +215,7 @@ trait FlexMediaCollection {
 				'items' => [],
 			];
 		}
-		if(
-			!is_array($raw)
-			|| ($raw['_flex'] ?? '') !== $this->marker()
-			|| !isset($raw['items'])
-			|| !is_array($raw['items'])
-			|| !array_is_list($raw['items'])
-		) {
+		if(!FlexMedia::validEnvelope($raw, $this->marker())) {
 			throw new WireException(sprintf($this->_('Invalid Flex media value: %s'), $address));
 		}
 		$ids = [];
@@ -649,10 +684,18 @@ trait FlexMediaCollection {
 	 */
 	public function outputCollection(int $limit = 0) {
 		$view = clone $this;
+		$view->rawDescriptions = false;
 		if($limit > 0) {
 			$view->data = array_slice($view->data, 0, $limit, true);
 		}
 		$view->formatted(true);
+		return $view;
+	}
+
+	/** Bypass description formatting while retaining the view's mutation guards. @internal */
+	public function unformattedCollection() {
+		$view = clone $this;
+		$view->rawDescriptions = true;
 		return $view;
 	}
 
@@ -761,6 +804,12 @@ class FlexMedia extends Wire {
 		$this->type = $type;
 	}
 
+	/** Shared envelope shape used before hydration and by raw diagnostics. @internal */
+	public static function validEnvelope($raw, string $marker): bool {
+		return is_array($raw) && ($raw['_flex'] ?? '') === $marker
+			&& isset($raw['items']) && is_array($raw['items']) && array_is_list($raw['items']);
+	}
+
 	/**
 	 * Validate the persisted media identity and safe original basename.
 	 *
@@ -795,10 +844,12 @@ class FlexMedia extends Wire {
 		$languages = $file->wire()->languages;
 		if($languages) {
 			foreach($languages as $language) {
-				$descriptions[$language->isDefault() ? '0' : (string) $language->id] = $file->description($language);
+				$descriptions[$language->isDefault() ? '0' : (string) $language->id] = $file instanceof FlexPagefile || $file instanceof FlexPageimage
+					? $file->rawDescription($language) : $file->description($language);
 			}
 		} else {
-			$descriptions['0'] = $file->description();
+			$descriptions['0'] = $file instanceof FlexPagefile || $file instanceof FlexPageimage
+				? $file->rawDescription() : $file->description();
 		}
 		$meta = [
 			'id'                => $id,
@@ -852,6 +903,35 @@ class FlexMedia extends Wire {
 			$this->manifest[$id] = $record;
 		}
 		return $record;
+	}
+
+	/** Probe original paths without constructing PagefilesManager (which can mkdir/rename). @internal */
+	public function originalExists(Page $page, array $owner): ?bool {
+		if($this->wire()->hooks->isHooked('PagefilesManager::path()')) return null;
+		self::validateMeta(['id' => $owner['asset_id'], 'basename' => $owner['basename']]);
+		$config = $this->wire()->config;
+		$root = realpath($config->paths->files);
+		if(!$root) return null;
+		$prefixes = array_unique(['', PagefilesManager::defaultSecurePathPrefix, (string) $config->pagefileSecurePathPrefix]);
+		$directories = [];
+		foreach($prefixes as $prefix) {
+			$directories[] = $prefix . $page->id . '/';
+			$directories[] = PagefilesManager::_dirExtended($page->id, $prefix);
+		}
+		$data = json_decode($owner['data'], true, 64, JSON_THROW_ON_ERROR);
+		if(isset($data['directory'])) {
+			if(!is_string($data['directory'])) throw new WireException('Invalid registered assets directory');
+			$directories[] = $data['directory'];
+		}
+		foreach(array_unique($directories) as $directory) {
+			if(!is_string($directory) || str_contains($directory, '..') || str_starts_with($directory, '/') || PagefilesManager::dirToPageID($directory) !== (int) $page->id) continue;
+			$folder = realpath($root . '/' . $directory);
+			if(!$folder || !str_starts_with($folder . '/', $root . '/')) continue;
+			$path = $folder . '/' . $owner['basename'];
+			clearstatcache(true, $path);
+			if(is_file($path)) return true;
+		}
+		return false;
 	}
 
 	/**
