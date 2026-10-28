@@ -24,6 +24,13 @@ Search results retain their selected membership when read without formatting.
 
 ## Definition and schema model
 
+The module's `definitionsPath` selects the automatic PHP/JSON directory relative
+to the configured templates directory, defaulting to `flex-fields/`. The existing
+source resolver validates it without executing PHP, including existing symlink
+ancestors of missing paths. Explicit field file paths retain their templates base;
+inline JSON is independent. Path changes do not move files or rewrite data. All
+callers share this resolver and the existing missing-source write guards.
+
 Definitions are evaluated for the owning Page context. Dynamic PHP definitions are not globally cached. Query discovery has no individual Page, so a dynamic definition still needs to expose queryable properties there. Metadata Inputfields and returned input trees are fresh instances.
 
 An existing FlexValue retains the definitions used to hydrate it. The editor

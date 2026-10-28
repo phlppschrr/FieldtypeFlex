@@ -53,14 +53,16 @@ $configErrorField = clone $field;
 $configErrorField->name = 'flex_config_error_overview';
 $configErrorField->flexDefinition = '{';
 $configInputs = $type->getConfigInputfields($configErrorField);
-$configPreview = null;
-foreach($configInputs->children() as $child) {
-	if($child->label === 'Definition source and structure') {
-		$configPreview = $child;
-	}
-}
+$configPreview = $configInputs->getChildByName('flexDefinitionStatus');
 $assert($configPreview instanceof InputfieldMarkup && str_contains($configPreview->value, 'Technical cause') &&
 	str_contains($configPreview->value, 'JsonException'), 'field configuration shows the technical cause behind a definition error');
+
+$validConfig = $type->getConfigInputfields($field);
+$assert($validConfig->getChildByName('flexSource') instanceof InputfieldFieldset, 'definition settings use a native fieldset');
+$same(Inputfield::collapsedBlank, $validConfig->getChildByName('flexDefinition')->collapsed, 'inline JSON uses native blank collapse behavior');
+$same(Inputfield::collapsedYes, $validConfig->getChildByName('flexStructure')->collapsed, 'structure is optional and collapsed');
+$assert(!str_contains($validConfig->render(), 'FieldtypeFlex-example'), 'field settings render without embedded example source');
+$assert(!str_contains($validConfig->getChildByName('flexDefinitionStatus')->value, 'flex-fields/flex_test.php'), 'inline definitions do not list unused automatic search paths');
 
 $pageSelectorSchema = [
 	'items' => [

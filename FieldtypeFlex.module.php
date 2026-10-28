@@ -21,7 +21,7 @@ require_once __DIR__ . '/src/FlexMedia.php';
 // Native CLI also discovers metadata/methods without an implements declaration.
 // This is the upstream-recommended compatibility path for cores without CliModule.
 /** Structured ProcessWire values with native inputs, typed rows and owned media. */
-class FieldtypeFlex extends Fieldtype implements FieldtypeHasFiles, FieldtypeHasPagefiles, FieldtypeHasPageimages {
+class FieldtypeFlex extends Fieldtype implements ConfigurableModule, FieldtypeHasFiles, FieldtypeHasPagefiles, FieldtypeHasPageimages {
 	/** Existing rows start collapsed; newly added rows start open. */
 	public const ROW_COLLAPSE_EXISTING = 0;
 	/** Existing and newly added rows start collapsed. */
@@ -33,6 +33,43 @@ class FieldtypeFlex extends Fieldtype implements FieldtypeHasFiles, FieldtypeHas
 	private array $adminDefinitionErrors = [];
 	private array $adminInputErrors = [];
 	private array $adminFormErrors = [];
+
+	/**
+	 * Build native module settings; field-specific file paths retain their base.
+	 * @return InputfieldWrapper
+	 */
+	public function getModuleConfigInputfields() {
+		$wrapper = $this->wire(new InputfieldWrapper());
+		$input = $this->wire()->modules->get('InputfieldText');
+		$input->name = 'definitionsPath';
+		$input->label = $this->_('Definitions directory');
+		$input->description = $this->_('Relative to site/templates. Automatic definitions use FIELD.php or FIELD.json in this directory.');
+		$input->notes = $this->_('Make definitions available at the new location before changing this setting. Explicit field paths and inline JSON are unaffected.');
+		$previous = $this->wire()->modules->getConfig($this, 'definitionsPath') ?? '';
+		$input->value = $previous;
+		try {
+			$directory = FlexFieldDefs::definitionDirectory($this->wire());
+			$input->value = $directory;
+			$input->notes .= "\n" . sprintf($this->_('Current directory: %s'), $this->wire()->config->urls->templates . $directory);
+			if(!is_dir($this->wire()->config->paths->templates . $directory)) {
+				$input->notes .= "\n" . $this->_('This directory does not exist yet. No directory or files will be created.');
+			}
+		} catch(WireException $error) {
+			$input->error($error->getMessage());
+		}
+		$input->notes .= "\n[" . $this->_('Documentation and examples') . '](https://github.com/phlppschrr/FieldtypeFlex/blob/main/README.md)';
+		$input->addHookAfter('processInput', function(HookEvent $event) use ($previous): void {
+			try {
+				$event->object->value = FlexFieldDefs::definitionDirectory($this->wire(), $event->object->value);
+			} catch(WireException $error) {
+				// ProcessModule saves even when an Inputfield reports errors.
+				$event->object->value = $previous;
+				$event->object->error($error->getMessage());
+			}
+		});
+		$wrapper->add($input);
+		return $wrapper;
+	}
 
 	/** Preview declared renames in an ID-ordered batch. See API.md for the result contract. */
 	public function checkRenames(Field $field, int $afterPageId = 0, int $limit = 100): array {
@@ -1219,194 +1256,110 @@ class FieldtypeFlex extends Fieldtype implements FieldtypeHasFiles, FieldtypeHas
 	}
 
 	/**
-	 * Build field settings, definition diagnostics and the source example catalog.
-	 *
+	 * Build native field settings with a compact source summary and optional structure.
 	 * @param Field $field Owning Flex field.
 	 * @return InputfieldWrapper
 	 */
 	public function ___getConfigInputfields(Field $field) {
 		$wrapper = parent::___getConfigInputfields($field);
-		$settings = [
-			[
-				'InputfieldText',
-				'flexDefinitionFile',
-				$this->_('Definition file'),
-				$this->_('Relative to site/templates. Automatic: flex-fields/NAME.php or .json. Configure exactly one source.'),
-			],
-			[
-				'InputfieldTextarea',
-				'flexDefinition',
-				$this->_('Inline JSON definition'),
-				$this->_('Optional alternative to a definition file. PHP is only loaded from trusted template files.'),
-			],
-			[
-				'InputfieldCheckbox',
-				'flexHideWrap',
-				$this->_('Hide outer field label'),
-				$this->_('Display the child inputs without the Flex heading.'),
-			],
-		];
-		foreach($settings as [$class, $name, $label, $description]) {
-			$input = $this->wire()->modules->get($class);
-			$input->name = $name;
-			$input->label = $label;
-			$input->description = $description;
-			if($input instanceof InputfieldCheckbox) {
-				$default = 0;
-				$input->checked($field->get($name) === null ? (bool) $default : (bool) $field->get($name));
-				$input->uncheckedValue = 0;
-			} else {
-				$input->value = $field->get($name) ?? '';
-			}
-			$wrapper->add($input);
-		}
-		$preview = $this->wire()->modules->get('InputfieldMarkup');
-		$preview->label = $this->_('Definition source and structure');
-		$source = FlexFieldDefs::inspectSource($field, $this->wire());
+		$modules = $this->wire()->modules;
 		$escape = fn($text) => $this->wire()->sanitizer->entities((string) $text);
+		$this->wire()->config->styles->add($this->wire()->config->urls->get('FieldtypeFlex') . 'FieldtypeFlex.css');
+		$source = FlexFieldDefs::inspectSource($field, $this->wire());
+		$group = $modules->get('InputfieldFieldset');
+		$group->name = 'flexSource';
+		$group->label = $this->_('Definition');
+		$status = $modules->get('InputfieldMarkup');
+		$status->name = 'flexDefinitionStatus';
+		$status->label = $this->_('Active source');
+		$status->description = $this->_('Source and structure reflect saved settings, evaluated without a specific page. Page-dependent definitions may differ.');
 		$sourceOrigin = $source['origin'] === 'automatic'
 			? $this->_('Automatic')
 			: $this->_('Configured');
 		$sourceText = match($source['kind']) {
-			'inline-json' => $this->_('Inline JSON is active.'),
-			'file'        => sprintf($this->_('%1$s file: %2$s'), $sourceOrigin, $source['relativePath']),
-			default       => $this->_('No definition file is active; automatic lookup is allowed.'),
+			'inline-json' => $this->_('Inline JSON'),
+			'file' => $sourceOrigin . ': ' . ($source['relativePath'] ?? ''),
+			default => $this->_('No definition yet.'),
 		};
-		$previewHtml = '<p><strong>' . $escape($this->_('Active source')) . ':</strong> ' . $escape($sourceText) . '</p>';
-		if($source['error']) {
-			$previewHtml .= '<p class="notice-error">' . $escape($source['error']) . '</p>';
-		}
-		$previewHtml .= '<p><strong>' . $escape($this->_('Automatic search paths')) . ':</strong></p><pre>' . $escape(implode("\n", $source['searchPaths'])) . '</pre>';
+		$html = '<p>' . $escape($sourceText) . '</p>';
+		$defs = null;
 		try {
 			$defs = $this->getDefinitions($field);
+		} catch(FlexDefinitionException $error) {
+			$this->logDefinitionError($this->wire()->pages->newNullPage(), $field, $error);
+			$html .= '<p class="notice-error">' . $escape($this->wire()->sanitizer->unentities($error->getMessage())) . '</p>';
+			$causes = [];
+			for($cause = $error->getPrevious(); $cause; $cause = $cause->getPrevious()) {
+				$causes[] = get_class($cause) . ': ' . $cause->getMessage();
+			}
+			if($causes) {
+				$html .= '<details><summary>' . $escape($this->_('Technical cause')) . '</summary><pre>' . $escape(implode("\n", $causes)) . '</pre></details>';
+			}
+		}
+		if($source['origin'] === 'automatic' && ($source['kind'] === 'missing' || $source['error'])) {
+			$html .= '<p>' . $escape($this->_('Expected definition files')) . ':</p><pre>' . $escape(implode("\n", $source['searchPaths'])) . '</pre>';
+		}
+		if($this->wire()->user->isSuperuser()) {
+			$html .= '<p><a href="' . $escape($this->wire()->config->urls->admin . 'module/edit?name=FieldtypeFlex') . '">' . $escape($this->_('Configure definitions directory')) . '</a></p>';
+		}
+		$status->value = $html;
+		$group->add($status);
+		$file = $modules->get('InputfieldText');
+		$file->name = 'flexDefinitionFile';
+		$file->label = $this->_('Override definition file');
+		$file->description = $this->_('Optional PHP/JSON path relative to site/templates. Leave blank for automatic lookup or inline JSON.');
+		$file->value = $field->flexDefinitionFile ?? '';
+		$group->add($file);
+		$json = $modules->get('InputfieldTextarea');
+		$json->name = 'flexDefinition';
+		$json->label = $this->_('Inline JSON definition');
+		$json->description = $this->_('Alternative to a definition file. Configure exactly one source.');
+		$json->value = $field->flexDefinition ?? '';
+		$json->rows = 8;
+		$json->collapsed = Inputfield::collapsedBlank;
+		$group->add($json);
+		$wrapper->add($group);
+
+		if($defs && $source['kind'] !== 'missing') {
+			$structure = $modules->get('InputfieldMarkup');
+			$structure->name = 'flexStructure';
+			$structure->label = $this->_('Structure');
+			$structure->collapsed = Inputfield::collapsedYes;
 			$lines = [];
 			$walk = function(array $nodes, int $depth = 0) use (&$walk, &$lines): void {
 				foreach($nodes as $node) {
 					$kind = match($node['kind']) {
 						'fieldset' => $this->_('Fieldset'),
-						'rows'     => $this->_('Repeatable set'),
+						'rows' => $this->_('Repeatable set'),
 						'row-type' => $this->_('Row type'),
-						default    => $node['type'],
+						default => $node['type'],
 					};
-					$line = str_repeat('  ', $depth) . sprintf('%s [%s] — %s', $node['label'] ?: $node['name'], $node['name'], $kind);
+					$line = str_repeat('  ', $depth) . $node['name'] . ' — ' . $kind;
 					if($node['required']) {
 						$line .= ' · ' . $this->_('required');
 					}
 					if($node['useLanguages']) {
 						$line .= ' · ' . $this->_('multilingual');
 					}
-					if($node['showIf'] !== '') {
-						$line .= ' · ' . sprintf($this->_('showIf: %s'), $node['showIf']);
-					}
-					if($node['requiredIf'] !== '') {
-						$line .= ' · ' . sprintf($this->_('requiredIf: %s'), $node['requiredIf']);
-					}
-					if($node['kind'] === 'rows') {
-						$line .= ' · ' . sprintf($this->_('min %1$d, max %2$d'), $node['minItems'], $node['maxItems']);
-					}
 					$lines[] = $line;
 					$walk($node['children'], $depth + 1);
 				}
 			};
 			$walk($defs->structure());
-			if(!$lines) {
-				$lines[] = $this->_('No properties yet. See the module examples directory.');
-			}
-			$previewHtml .= '<p><strong>' . $escape($this->_('Structure in the NullPage context')) . ':</strong></p><pre>' . $escape(implode("\n", $lines)) . '</pre>';
-		} catch(FlexDefinitionException $e) {
-			$this->logDefinitionError($this->wire()->pages->newNullPage(), $field, $e);
-			$previewHtml .= '<p class="notice-error">' . $escape($e->getMessage()) . '</p>';
-			$causes = [];
-			for($cause = $e->getPrevious(); $cause; $cause = $cause->getPrevious()) {
-				$causes[] = get_class($cause) . ': ' . $cause->getMessage();
-			}
-			if($causes) {
-				$previewHtml .= '<details><summary>' . $escape($this->_('Technical cause')) . '</summary><ul>';
-				foreach($causes as $cause) {
-					$previewHtml .= '<li>' . $escape($cause) . '</li>';
-				}
-				$previewHtml .= '</ul></details>';
-			}
+			$structure->value = '<pre>' . $escape(implode("\n", $lines) ?: $this->_('This definition has no properties.')) . '</pre>';
+			$wrapper->add($structure);
 		}
-		$preview->value = $previewHtml;
-		$wrapper->add($preview);
-
-		$catalog = $this->exampleCatalogHtml($escape);
-		if($catalog !== '') {
-			$examples = $this->wire()->modules->get('InputfieldMarkup');
-			$examples->label = $this->_('Example catalog');
-			$examples->description = $this->_('Browse and copy source files. Viewing examples does not execute or install them.');
-			$examples->value = $catalog;
-			$wrapper->add($examples);
-		}
+		$hide = $modules->get('InputfieldCheckbox');
+		$hide->name = 'flexHideWrap';
+		$hide->label = $this->_('Hide outer field label');
+		$hide->description = $this->_('Display the child inputs without the Flex heading.');
+		$hide->checked((bool) $field->flexHideWrap);
+		$hide->uncheckedValue = 0;
+		$wrapper->add($hide);
 		(new FlexMaintenanceAdmin($this))->addInput($wrapper, $field);
+		$help = $modules->get('InputfieldMarkup');
+		$help->value = '<p><a href="https://github.com/phlppschrr/FieldtypeFlex/blob/main/README.md">' . $escape($this->_('Documentation and examples')) . '</a></p>';
+		$wrapper->add($help);
 		return $wrapper;
-	}
-
-	/** Render source from the fixed examples manifest as escaped, non-executable text. */
-	private function exampleCatalogHtml(callable $escape): string {
-		$root = realpath(__DIR__ . '/examples');
-		if(!$root) {
-			return '';
-		}
-		$manifestPath = $root . DIRECTORY_SEPARATOR . 'manifest.php';
-		if(!is_file($manifestPath)) {
-			return '';
-		}
-		try {
-			// This trusted file contains only catalog data and translatable strings;
-			// example definitions remain display-only and are never included here.
-			$manifest = (static function(string $path) {
-				return include $path;
-			})($manifestPath);
-		} catch(\Throwable $e) {
-			$this->wire()->log->save('errors', 'FieldtypeFlex example manifest: ' . $e->getMessage());
-			return '';
-		}
-		if(!is_array($manifest['entries'] ?? null)) {
-			return '';
-		}
-		$html = '';
-		foreach($manifest['entries'] as $entry) {
-			if(!is_array($entry) || !in_array($entry['kind'] ?? '', ['definition', 'helper'], true)) {
-				continue;
-			}
-			$category = $entry['category'] ?? null;
-			$title = $entry['title'] ?? null;
-			$description = $entry['description'] ?? '';
-			if(!is_string($category) || !is_string($title) || !is_string($description)) {
-				continue;
-			}
-			$relative = $entry['file'] ?? '';
-			if(!is_string($relative) || $relative === '' || basename($relative) !== $relative) {
-				continue;
-			}
-			$path = realpath($root . DIRECTORY_SEPARATOR . $relative);
-			if(!$path || !str_starts_with($path, $root . DIRECTORY_SEPARATOR) || !is_file($path)) {
-				continue;
-			}
-			$source = file_get_contents($path);
-			if($source === false) {
-				continue;
-			}
-			$copies = array_values(array_filter($entry['copyFiles'] ?? [], fn($file) => is_string($file) && basename($file) === $file));
-			$requires = array_values(array_filter($entry['requires'] ?? [], 'is_string'));
-			$html .= '<details class="FieldtypeFlex-example"><summary>' . $escape($title) . '</summary>';
-			$html .= '<p><strong>' . $escape($this->_('Category')) . ':</strong> ' . $escape($category) . '</p>';
-			if($description !== '') {
-				$html .= '<p>' . $escape($description) . '</p>';
-			}
-			if($copies) {
-				$html .= '<p><strong>' . $escape($this->_('Copy beside this definition')) . ':</strong> <code>' . $escape(implode(', ', $copies)) . '</code></p>';
-			}
-			if($requires) {
-				$html .= '<p><strong>' . $escape($this->_('Optional modules')) . ':</strong> ' . $escape(implode(', ', $requires)) . '</p>';
-			}
-			if(($entry['kind'] ?? '') === 'helper') {
-				$html .= '<p>' . $escape($this->_('Helper file only; this is not a field definition.')) . '</p>';
-			}
-			$html .= '<pre><code>' . $escape($source) . '</code></pre></details>';
-		}
-		return $html;
 	}
 }

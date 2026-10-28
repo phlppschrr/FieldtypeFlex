@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — Admin configuration and maintenance
+
+- Add a configurable automatic definitions directory under Modules → Flex.
+- Simplify field configuration, remove the embedded example catalog and keep
+  source errors visible with an optional compact structure overview.
+- Separate rename and unknown-property maintenance actions; combine cleanup
+  selection and results while retaining checked previews and conflict protection.
+
 ## Unreleased — HTML URL and link abstraction
 
 - Sleep/wake native HTML URLs and optionally abstract internal page links across

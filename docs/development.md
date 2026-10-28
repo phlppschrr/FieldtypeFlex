@@ -156,9 +156,13 @@ conflict preview, repair the conflict, apply renames, list potentially orphaned
 properties, select just one, preview and apply cleanup. Save through ProcessPageEdit
 with a native `collapsedHidden` property; verify hidden/unknown values, row/asset IDs,
 media addresses and bytes independently from the database. Check console errors.
-Opening and normally saving field configuration must not scan or migrate data.
-After previewing a cleanup, change the selected paths: Apply must become disabled,
-and Preview selected cleanup must become available without another orphan scan.
+Opening and normally saving field/module configuration must not scan or migrate data.
+Verify the module definitions directory save/reload, path normalization, invalid
+input retaining the previous setting, and retained `defaultLanguageId` metadata.
+Use an isolated automatic definition in a custom directory for a real PageEdit
+save and independent readback; test missing-source protection and recovery too.
+After previewing a cleanup, change the selected paths: Remove selected properties must become unavailable,
+and Check selection must become available without another orphan scan.
 Preview and apply the revised selection, then verify only those paths were removed.
 
 Native CLI checks run from `.dev/pw`: `ddev exec php .dev/pw/index.php flex --help`.

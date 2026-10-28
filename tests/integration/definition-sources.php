@@ -5,6 +5,91 @@ if(PHP_SAPI !== 'cli' || !isset($same, $createField)) {
 	exit;
 }
 
+// The global directory changes automatic lookup, while explicit/inline sources keep their base.
+$directoryConfig = $wire->modules->getConfig('FieldtypeFlex');
+$customDirectory = $wire->config->paths->templates . 'flex-directory-' . bin2hex(random_bytes(4)) . '/';
+mkdir($customDirectory);
+$directoryField = clone $field;
+$directoryField->flexDefinition = '';
+$directoryField->flexDefinitionFile = '';
+$directoryFile = $customDirectory . $directoryField->name . '.php';
+file_put_contents($directoryFile, '<?php namespace ProcessWire; return ["custom_directory" => ["type" => "text"]];');
+try {
+	$wire->modules->saveConfig('FieldtypeFlex', 'definitionsPath', basename($customDirectory) . '/');
+	$assert(isset($type->getDefinitions($directoryField, $page)->properties()['custom_directory']), 'automatic definitions use the configured module directory');
+	$same(basename($customDirectory) . '/' . $directoryField->name . '.php', FlexFieldDefs::inspectSource($directoryField, $wire)['relativePath'], 'automatic source identifies the configured directory');
+	$same('flex-fields/', FlexFieldDefs::definitionDirectory($wire, ''), 'blank directory uses the documented default');
+	$same(basename($customDirectory) . '/', FlexFieldDefs::definitionDirectory($wire, '  ./' . basename($customDirectory) . '//  '), 'relative directory separators are normalized');
+	foreach(['../outside', '/tmp', 'php://filter', "bad\0path", 'C:\\definitions', '.', ['bad']] as $invalidDirectory) {
+		$throws(fn() => FlexFieldDefs::definitionDirectory($wire, $invalidDirectory), 'invalid automatic directory is rejected');
+	}
+	$same('future/definitions/', FlexFieldDefs::definitionDirectory($wire, 'future/definitions'), 'missing safe directory can be configured without creation');
+	$assert(!is_dir($wire->config->paths->templates . 'future/definitions'), 'directory validation does not create directories');
+	$wire->modules->saveConfig('FieldtypeFlex', 'definitionsPath', '../outside');
+	$throws(fn() => $type->getDefinitions($directoryField, $page), 'invalid configured directory cannot fall back to the default');
+	$directoryField->flexDefinition = '{"inline_only":{"type":"text"}}';
+	$assert(isset($type->getDefinitions($directoryField, $page)->properties()['inline_only']), 'inline definitions are independent of automatic directory errors');
+	$directoryField->flexDefinition = '';
+	$directoryField->flexDefinitionFile = basename($customDirectory) . '/' . $directoryField->name . '.php';
+	$assert(isset($type->getDefinitions($directoryField, $page)->properties()['custom_directory']), 'explicit definition paths keep their templates-relative base');
+	$directoryField->flexDefinitionFile = '';
+	$wire->modules->saveConfig('FieldtypeFlex', 'definitionsPath', basename($customDirectory));
+	$jsonDirectoryFile = $customDirectory . $directoryField->name . '.json';
+	file_put_contents($jsonDirectoryFile, '{}');
+	try {
+		$throws(fn() => $type->getDefinitions($directoryField, $page), 'configured directory preserves PHP/JSON ambiguity errors');
+	} finally {
+		unlink($jsonDirectoryFile);
+	}
+	$outsideDirectory = $wire->config->paths->site . 'assets';
+	$symlinkDirectory = $customDirectory . 'outside';
+	symlink($outsideDirectory, $symlinkDirectory);
+	try {
+		$throws(fn() => FlexFieldDefs::definitionDirectory($wire, basename($customDirectory) . '/outside'), 'outside directory symlink is rejected');
+		$throws(fn() => FlexFieldDefs::definitionDirectory($wire, basename($customDirectory) . '/outside/missing'), 'missing child cannot hide an outside directory symlink');
+	} finally {
+		unlink($symlinkDirectory);
+	}
+	chmod($directoryFile, 0000);
+	clearstatcache(true, $directoryFile);
+	try {
+		if(!is_readable($directoryFile)) {
+			$throws(fn() => $type->getDefinitions($directoryField, $page), 'unreadable definition is an explicit error', FlexDefinitionException::class, 'not readable');
+		} else {
+			echo "SKIP: runtime user bypasses unreadable-file permissions.\n";
+		}
+	} finally {
+		chmod($directoryFile, 0644);
+		clearstatcache(true, $directoryFile);
+	}
+	$otherWire = new ProcessWire($wire->config->paths->root);
+	try {
+		$otherWire->modules->getConfig('FieldtypeFlex');
+		$wire->modules->saveConfig('FieldtypeFlex', 'definitionsPath', 'other-instance-missing-directory/');
+		$same('missing', FlexFieldDefs::inspectSource($directoryField, $wire)['kind'], 'first instance uses its changed module configuration');
+		$same('file', FlexFieldDefs::inspectSource($directoryField, $otherWire)['kind'], 'second native instance retains its own module configuration');
+	} finally {
+		$wire->modules->saveConfig('FieldtypeFlex', 'definitionsPath', basename($customDirectory));
+		ProcessWire::removeInstance($otherWire);
+		ProcessWire::setCurrentInstance($wire);
+	}
+	$configuration = $type->getModuleConfigInputfields();
+	$directoryInput = $configuration->getChildByName('definitionsPath');
+	$directoryPost = ['definitionsPath' => '../invalid'];
+	$directoryInput->processInput($wire->wire(new WireInputData($directoryPost)));
+	$same(basename($customDirectory), $directoryInput->value, 'invalid module form input retains the previous configured path');
+	$assert(count($directoryInput->getErrors()) > 0, 'invalid module form input is reported');
+	$directoryInput->getErrors(true);
+	$directoryPost = ['definitionsPath' => '  ' . basename($customDirectory) . '// '];
+	$directoryInput->processInput($wire->wire(new WireInputData($directoryPost)));
+	$same(basename($customDirectory) . '/', $directoryInput->value, 'valid module form input is normalized before saving');
+
+} finally {
+	$wire->modules->saveConfig('FieldtypeFlex', $directoryConfig);
+	unlink($directoryFile);
+	rmdir($customDirectory);
+}
+
 // Definition files: JSON and PHP sources; dynamically changing PHP must never share a page cache.
 $definitionPath = $wire->config->paths->templates . 'flex-fields/definition-test.json';
 copy(dirname(__DIR__, 2) . '/examples/01-basic.json', $definitionPath);
@@ -74,12 +159,7 @@ try {
 	$assert(str_contains($helperLogText, $helperFilePath . ':2'), 'technical cause log records the helper exception throw file and line');
 
 	$helperConfig = $type->getConfigInputfields($helperErrorField);
-	$helperPreview = null;
-	foreach($helperConfig->children() as $child) {
-		if($child->label === 'Definition source and structure') {
-			$helperPreview = $child;
-		}
-	}
+	$helperPreview = $helperConfig->getChildByName('flexDefinitionStatus');
 	$assert(
 		$helperPreview instanceof InputfieldMarkup && str_contains($helperPreview->value, $helperDefinitionRelative),
 		'field configuration identifies the configured top-level definition source'

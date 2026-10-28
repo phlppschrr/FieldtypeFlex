@@ -123,6 +123,48 @@ class FlexFieldDefs extends Wire {
 	}
 
 	/**
+	 * Normalize the automatic definition directory and retain the templates boundary.
+	 * @param ProcessWire $wire Owning instance.
+	 * @param mixed $value Optional directory override; null reads module configuration.
+	 * @return string Normalized templates-relative directory with trailing slash.
+	 * #pw-internal
+	 * @internal
+	 */
+	public static function definitionDirectory(ProcessWire $wire, $value = null): string {
+		$value = $value ?? $wire->modules->getConfig('FieldtypeFlex', 'definitionsPath') ?? '';
+		if(!is_string($value)) {
+			throw new WireException(__('Use a relative definitions directory inside site/templates.'));
+		}
+		$value = str_replace('\\', '/', trim($value, " \t\r\n"));
+		if($value === '') {
+			$value = 'flex-fields/';
+		}
+		if(str_starts_with($value, '/') || str_contains($value, ':') || str_contains($value, "\0") || in_array('..', explode('/', $value), true)) {
+			throw new WireException(__('Use a relative definitions directory inside site/templates.'));
+		}
+		$segments = array_values(array_filter(explode('/', $value), static fn($part) => $part !== '' && $part !== '.'));
+		if(!$segments) {
+			throw new WireException(__('Use a relative definitions directory inside site/templates.'));
+		}
+		$relative = implode('/', $segments) . '/';
+		$base = realpath($wire->config->paths->templates);
+		if(!$base) {
+			throw new WireException(__('The site/templates directory could not be resolved.'));
+		}
+		$path = $base . '/' . rtrim($relative, '/');
+		// Validate the nearest existing ancestor too: a missing child must not hide
+		// an outside-pointing or broken symlink in its parent directory.
+		while(!file_exists($path) && !is_link($path)) {
+			$path = dirname($path);
+		}
+		$resolved = realpath($path);
+		if(!$resolved || !is_dir($resolved) || ($resolved !== $base && !str_starts_with($resolved, $base . DIRECTORY_SEPARATOR))) {
+			throw new WireException(__('The definitions directory must resolve inside site/templates.'));
+		}
+		return $relative;
+	}
+
+	/**
 	 * Resolve the active source without evaluating PHP. Paths remain relative in admin output.
 	 *
 	 * @param Field $field Owning Flex field.
@@ -135,9 +177,6 @@ class FlexFieldDefs extends Wire {
 		$wire = $wire ?: $field->wire();
 		$base = realpath($wire->config->paths->templates);
 		$searchPaths = [];
-		foreach(['php', 'json'] as $extension) {
-			$searchPaths[] = "flex-fields/{$field->name}.$extension";
-		}
 		$configured = trim((string) $field->get('flexDefinitionFile'));
 		$inline = trim((string) $field->get('flexDefinition'));
 		if($inline !== '') {
@@ -156,6 +195,23 @@ class FlexFieldDefs extends Wire {
 		$origin = 'explicit';
 		if($relative === '') {
 			$origin = 'automatic';
+			try {
+				$directory = self::definitionDirectory($wire);
+			} catch(WireException $error) {
+				return [
+					'kind' => 'missing',
+					'origin' => 'automatic',
+					'relativePath' => null,
+					'configuredPath' => '',
+					'absolutePath' => null,
+					'exists' => false,
+					'error' => $error->getMessage(),
+					'searchPaths' => [],
+				];
+			}
+			foreach(['php', 'json'] as $extension) {
+				$searchPaths[] = "$directory{$field->name}.$extension";
+			}
 			$matches = [];
 			foreach($searchPaths as $candidate) {
 				// Select the first existing candidate before applying the boundary
@@ -202,6 +258,8 @@ class FlexFieldDefs extends Wire {
 				: __('The configured definition file does not exist.');
 		} else if(!str_starts_with($path, $base . DIRECTORY_SEPARATOR)) {
 			$error = __('The definition file must resolve inside site/templates.');
+		} else if(!is_readable($path)) {
+			$error = __('The definition file is not readable.');
 		} else if(!in_array(strtolower(pathinfo($path, PATHINFO_EXTENSION)), ['php', 'json'], true)) {
 			$error = __('Definition files must use the PHP or JSON extension.');
 		}

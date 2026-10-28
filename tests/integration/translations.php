@@ -11,7 +11,7 @@ $translationLanguage = $wire->languages->get('de');
 $translator = $translationLanguage->translator();
 $previousLanguage = $wire->user->language;
 $translationDomains = [];
-$translationRoot = dirname(__DIR__, 2);
+$translationRoot = dirname((new \ReflectionClass(FieldtypeFlex::class))->getFileName());
 $translationSources = [
 	'FieldtypeFlex.module.php' => [
 		'PHP/JSON-defined compound fields with native inputs and selectors',

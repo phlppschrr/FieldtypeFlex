@@ -163,6 +163,14 @@
 }
 
 .FlexMaintenanceReport { overflow-x: auto; }
+.FlexMaintenancePaths { overflow-x: auto; }
+.FlexMaintenance button[hidden] { display: none; }
+.FlexMaintenance td { overflow-wrap: anywhere; }
+.Inputfield_flexSource pre,
+.Inputfield_flexStructure pre {
+    max-height: 24rem;
+    overflow: auto;
+}
 
 /* Native Repeater headers retain their theme palette and fade only the header.
    Hover/focus restores the controls; the open body always stays fully readable. */

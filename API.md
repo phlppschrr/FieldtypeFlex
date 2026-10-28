@@ -173,12 +173,21 @@ Flex reuses native Inputfields and selected Fieldtype behavior, with these bound
 
 ## Definitions
 
-A Flex field's properties are defined with a PHP array, JSON, or a native `InputfieldWrapper` tree. An automatic definition for a field named `content` is loaded from exactly one of:
+A Flex field's properties are defined with a PHP array, JSON, or a native `InputfieldWrapper` tree. An automatic definition for a field named `content` is loaded from exactly one of these default paths:
 
 ```text
 site/templates/flex-fields/content.php
 site/templates/flex-fields/content.json
 ```
+
+The module setting `definitionsPath` changes the automatic directory (default
+`flex-fields/`), relative to ProcessWire's configured templates directory. Configure
+it under **Modules → Flex** or with `$modules->saveConfig('FieldtypeFlex', 'definitionsPath', 'content/flex/')`.
+A blank value uses the default. Paths must resolve within the templates directory;
+absolute paths, stream wrappers and parent traversal are rejected. A missing safe
+directory may be configured without creating it. Changing the setting moves no files
+or data; provide definitions at the new location before changing it. Missing
+definitions continue to block writes to existing values.
 
 Alternatively set `flexDefinitionFile` to a PHP/JSON path relative to `site/templates`, or provide inline JSON via `flexDefinition`. Two automatic files, or an explicit path together with non-empty inline JSON, are configuration errors. Explicit paths must resolve inside `site/templates` and end in `.php` or `.json`. PHP files are trusted executable code; never make them editable by untrusted users.
 
@@ -934,7 +943,13 @@ Known errors take precedence over incompleteness. The `check`, `schema`, `status
 
 ### Field configuration
 
-Superusers have **Field → Details → Data maintenance** for batched previews, bulk renames, orphan inventory and explicitly selected cleanup. Actions require CSRF validation; cleanup has separate selection, preview and apply steps. Ordinary field-configuration saves do not migrate data. Repair conflicts and rerun affected batches.
+Superusers have **Field → Details → Data maintenance** with separate rename and
+unknown-property cleanup sections. Check renames before applying them; find
+unknown properties, select explicit paths and check that selection before removing
+them. Changing the selection invalidates its preview. Actions require CSRF
+validation and recheck stored revisions. Ordinary field/module configuration saves
+do not scan or migrate data. Repair reported errors and run a new check; earlier
+successful batches remain applied.
 
 ## Notes and limitations
 

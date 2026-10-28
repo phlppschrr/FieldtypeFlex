@@ -14,37 +14,18 @@ Unable to save canonical Flex value,No se pudo guardar el valor canónico de Fle
 An existing Flex row cannot change type,No se puede cambiar el tipo de una fila Flex existente,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,27437bd02f4b8a2813efaf63dd956f9a
 Remove saved Flex fields before uninstalling FieldtypeFlex,Elimine los campos Flex guardados antes de desinstalar FieldtypeFlex,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,44c596edf843b647e95d2596c90de641
 FieldtypeFlex currently requires MySQL or MariaDB,FieldtypeFlex requiere actualmente MySQL o MariaDB,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,195814c6577f453497902c77cb1b1366
-Definition file,Archivo de definición,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,527341b211a417892828b5a0616c635c
-Relative to site/templates. Automatic: flex-fields/NAME.php or .json. Configure exactly one source.,Ruta relativa a site/templates. Automático: flex-fields/NAME.php o .json. Configure exactamente una fuente.,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,9e7a313f703c86f26eb25291ac0e8360
 Inline JSON definition,Definición JSON integrada,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,f64d78e1f8db3cd2845b3257d66038a2
-Optional alternative to a definition file. PHP is only loaded from trusted template files.,Alternativa opcional a un archivo de definición. PHP solo se carga desde archivos de plantilla de confianza.,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,bcf8fb1487202ef87c7273faea8eb1c3
 Hide outer field label,Ocultar la etiqueta del campo contenedor,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,0a0411c4b5ea78a187bdd1a96c8d55ec
 Display the child inputs without the Flex heading.,Mostrar los campos secundarios sin el encabezado Flex.,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,cb9449da92c2d4bf85b36b07ca267aa5
-Definition source and structure,Fuente y estructura de la definición,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,5cd74143e6e66b44f22e6c4b8e382ea9
 Automatic,Automático,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,086247a9b57fde6eefee2a0c4752242d
 Configured,Configurado,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,61aa63eb3ac1c3408640463ee5fe8aa3
-Inline JSON is active.,El JSON integrado está activo.,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,c884fae2c5f398404db64af198db02d8
-%1$s file: %2$s,Archivo %1$s: %2$s,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,e1c444eee533406bbd5be80f425db947
-No definition file is active; automatic lookup is allowed.,No hay ningún archivo de definición activo; se permite la búsqueda automática.,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,6faf6e099b879f0ccbcc86f0580dbc88
 Active source,Fuente activa,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,a51bbd65445cff414616dbd04c2c34d2
-Automatic search paths,Rutas de búsqueda automática,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,7f9279ecb53150176ddf55e0512301d3
 Fieldset,Grupo de campos,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,5b3a50aadfa94048d38820473b25ec57
 Repeatable set,Colección repetible,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,6a60d9d10d4516bf9988133d12619b7f
 Row type,Tipo de fila,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,6f524ce004ca3d42571f5690b27ae756
 required,obligatorio,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,ac67ede5a84eb5a1add7ff4440e9a485
 multilingual,multilingüe,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,39b54e52b6cb2f51165f2736030781ed
-showIf: %s,showIf: %s,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,18716430bba356523c4380ee020ff7c6
-requiredIf: %s,requiredIf: %s,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,d8775f1afc79dd7ef15aa9a960eae894
-"min %1$d, max %2$d","mín. %1$d, máx. %2$d",,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,23c2031946f70e9366ca813ad3580e40
-No properties yet. See the module examples directory.,Todavía no hay propiedades. Consulte el directorio de ejemplos del módulo.,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,6c0bc51a330022b9e843b28ff0872ab2
-Structure in the NullPage context,Estructura en el contexto NullPage,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,43f3f55b2763f2040a5af2c2ccd02869
 Technical cause,Causa técnica,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,4c8af2ac03d1b81d0c74cc24a234c5c6
-Example catalog,Catálogo de ejemplos,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,9d2817bd69b5c1b30677f3b218ad7475
-Browse and copy source files. Viewing examples does not execute or install them.,Explore y copie los archivos fuente. Ver los ejemplos no los ejecuta ni los instala.,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,2c70fa0aadd8c4d494f90e7a6a2053d0
-Category,Categoría,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,3adbdb3ac060038aa0e6e6c138ef9873
-Copy beside this definition,Copiar junto a esta definición,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,e513d9fc77b3b61cca53a2aa5c405ffa
-Optional modules,Módulos opcionales,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,f90f4ac8085102bf149598c730ddb371
-Helper file only; this is not a field definition.,Solo es un archivo auxiliar; no es una definición de campo.,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,6405959982e0e7525251d65aad9ca05a
 Flex,Flex,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,09d2bd168181f1e64c2b1651a80a8aa8
 PHP/JSON-defined compound fields with native inputs and selectors,Campos compuestos definidos en PHP/JSON con entradas y selectores nativos,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,9560bda478132dee41d442a929c0db97
 FieldtypeFlex contributors,Colaboradores de FieldtypeFlex,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,e7a4050b5d397c44f13cba2eaffb47ff
@@ -268,29 +249,19 @@ Row type children must be definitions or a wrapper,Los hijos del tipo de fila de
 Unsupported Flex Page-reference target field,Campo de destino de referencia de página Flex no compatible,,site/modules/FieldtypeFlex/src/FlexQuery.php,77799ded8d22a3401149fcec83eb7dd2
 Flex Page-reference traversal does not support selector negation or grouping,El recorrido de referencias de página Flex no admite negación ni agrupación de selectores,,site/modules/FieldtypeFlex/src/FlexQuery.php,12e59af690ae1161240003aaa61371bc
 Data maintenance,Mantenimiento de datos,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,00527b2473e61f0aeb5f86275b587376
-Preview and explicitly apply data changes,Previsualizar y aplicar explícitamente los cambios,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,76ccb7046a730d78543142f6aca3fe23
 Potentially orphaned does not mean safe to delete. Dynamic definitions may intentionally omit properties.,Potencialmente huérfano no significa que sea seguro eliminarlo. Las definiciones dinámicas pueden omitir propiedades intencionadamente.,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,13e96ebd8ecdc2f8db1326245592bfcb
-Preview renames,Previsualizar los cambios de nombre,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,6cc26fabfada29af67c8b2e52f6bf43a
-List potentially orphaned properties,Listar propiedades potencialmente huérfanas,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,d3fc98d08200eaeefa17dbdeaef01ddd
-Preview selected cleanup,Previsualizar la limpieza seleccionada,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,3d15172f79c4c72f17e8192268a64095
-Apply checked changes,Aplicar los cambios comprobados,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,7ebb658086cce0c2e82591ed7380f752
 Checked pages,Páginas comprobadas,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,b61d50b9f475d78d01a11e5803d838b7
-Unchanged pages,Páginas sin cambios,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,14dfe0f0df6e3d55c72f2795175260c1
 Renames,Cambios de nombre,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,9c2485a66f064c8690e791958c4d36ae
 Conflicts and errors,Conflictos y errores,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,ee4c6264371befc21ad3f53efb44c079
 Old path,Ruta anterior,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,39cebb6e9507b2bf937ee5024fca1819
 Affected pages,Páginas afectadas,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,90ad095b30dc0896c1843ba661df070e
-Stored address,Dirección almacenada,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,92e7d7c280919f7140bce550b3edafd7
-"Inspect errors and retry page IDs, then run a new preview.",Revise los errores y los IDs de páginas que debe reintentar y ejecute otra previsualización.,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,455178e5af8118a2182f0b29c69749dc
 Checked old keys migrated. Run a new full preview before removing renamedFrom.,Se han migrado las claves anteriores comprobadas. Ejecute otra previsualización completa antes de retirar renamedFrom.,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,11a9758a50275ed9505322bb56c2149d
 Selected cleanup completed.,Limpieza seleccionada completada.,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,61f13182e9ab656430fb0dc8daa17bb9
 Select explicit property paths.,Seleccione rutas de propiedades explícitas.,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,fa59c6b20fa8a194180638d3366410d7
 Missing CSRF token.,Falta el token CSRF.,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,a56bf84c6ab4d24d59a4d2c772f1c83a
-Preview completed.,Previsualización completada.,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,9602cabbff5f580ae1b8d5d50f1a567e
 No pending renames remain in this complete scan. The checked renamedFrom attributes can now be removed.,Esta comprobación completa no encuentra cambios de nombre pendientes. Ahora puede retirar los atributos renamedFrom comprobados.,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,9fb768a845f739c150c85447624bb92b
 Changed pages,Páginas modificadas,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,62d8e3cec3cfe8c5e75e2bd1b60cb901
 Pages with proposed changes,Páginas con cambios propuestos,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,10a41016e4ae462f5022ac1633c780ab
-Potentially orphaned properties,Propiedades potencialmente huérfanas,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,3aec7fbf85463647858ef0da38b1c135
 Property path,Ruta de propiedad,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,96c4a3cdabc647ffd6d4f798af27bbce
 New path,Ruta nueva,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,aac61668c0ffa2bc2394f1f6deae90cf
 Page IDs,IDs de páginas,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,da9bb690a80908023ed9a1bb896a5212
@@ -440,3 +411,34 @@ Edit Flex metadata on the original file,Edite los metadatos Flex en el archivo o
 Invalid Flex custom metadata property map,Mapa de propiedades de metadatos personalizados Flex no válido,,site/modules/FieldtypeFlex/src/FlexMedia.php,b552a39f59ffc16b85e63ae0e24adf8b
 Incomplete Flex metadata submission; reload and check the PHP input limits,Envío incompleto de metadatos Flex; recargue y compruebe los límites de entrada de PHP,,site/modules/FieldtypeFlex/src/InputfieldFlexMedia.php,61833ed7b3135fb4b22fd106bbe29909
 customFields Page inputs require InputfieldSelect or InputfieldAsmSelect,Los campos Page de customFields requieren InputfieldSelect o InputfieldAsmSelect,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,978879c7cea02aa1427294df26918cbe
+Alternative to a definition file. Configure exactly one source.,Alternativa a un archivo de definición. Configure una sola fuente.,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,2e3d1252ab6e1143edf5104fe76ea2f4
+Configure definitions directory,Configurar el directorio de definiciones,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,2411e851d92761d246963deed335ea42
+Current directory: %s,Directorio actual: %s,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,7f83111f5de6521aefe04438baf1de13
+Definition,Definición,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,0b890b1926b90387673882e6ccae7fdc
+Definitions directory,Directorio de definiciones,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,ca7f103ef6fd875e80f35200459c7be7
+Documentation and examples,Documentación y ejemplos,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,5d9dd41b54fefa368f05a4fd104352c9
+Expected definition files,Archivos de definición esperados,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,dad40bd6debcf292153e27b26c641be1
+Inline JSON,JSON integrado,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,4064edba68f1e856bf1d0dcabcda9dc5
+Make definitions available at the new location before changing this setting. Explicit field paths and inline JSON are unaffected.,Coloque las definiciones en la nueva ubicación antes de cambiar este ajuste. Las rutas explícitas y el JSON integrado no se ven afectados.,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,c7542c8b4e16c5de7e35659c5803355a
+No definition yet.,Todavía no hay ninguna definición.,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,26e04c8bb91ba9bb086553356ec0f7fb
+Optional PHP/JSON path relative to site/templates. Leave blank for automatic lookup or inline JSON.,Ruta PHP/JSON opcional relativa a site/templates. Déjela vacía para la búsqueda automática o el JSON integrado.,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,e7bd488eafeb1f8905e3dad23a981090
+Override definition file,Archivo de definición específico,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,39877271362e79c9d6c11012eff6aad5
+Relative to site/templates. Automatic definitions use FIELD.php or FIELD.json in this directory.,Relativo a site/templates. Las definiciones automáticas usan CAMPO.php o CAMPO.json en este directorio.,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,a4972a9a9fd8e79f26a826e43cf35333
+"Source and structure reflect saved settings, evaluated without a specific page. Page-dependent definitions may differ.","La fuente y la estructura reflejan los ajustes guardados, evaluados sin una página concreta. Las definiciones que dependen de la página pueden variar.",,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,fbd14b99978bcd1e424dba474a1f3175
+Structure,Estructura,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,dc4c71563b9bc39a65be853457e6b7b6
+This definition has no properties.,Esta definición no contiene propiedades.,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,915b63179e11ac55bfc0d8deb096c825
+This directory does not exist yet. No directory or files will be created.,Este directorio todavía no existe. No se crearán directorios ni archivos.,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,e7e860b5096ce0abfe03391717eba1af
+The definition file is not readable.,El archivo de definición no se puede leer.,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,81b8379cfbe55d5acfded4644284b94a
+The definitions directory must resolve inside site/templates.,El directorio de definiciones debe encontrarse dentro de site/templates.,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,c7f602e7732f380dc536bdefb9207d55
+Use a relative definitions directory inside site/templates.,Use un directorio de definiciones relativo dentro de site/templates.,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,0ef2403c9ff74ef8e26d69720a9c1e0c
+Apply checked renames,Aplicar los cambios de nombre comprobados,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,c23170a44c87d498b77824d8a45b5694
+Check renames,Comprobar cambios de nombre,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,d3fc55b97c40785aa7397844a192bc7e
+Check selection,Comprobar selección,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,d55b65fce5dbede6fb624b9b8de673ed
+Check stored values against renamedFrom before applying renames.,Compruebe los valores guardados según renamedFrom antes de aplicar cambios de nombre.,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,2e49d591c044cd4608f60b2e84875bd7
+Find unknown properties,Buscar propiedades desconocidas,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,92083603ce96888308c89ab95cc046c6
+No changes found.,No se encontraron cambios.,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,2a1b165b9c850c8432d7793873e6db1f
+No unknown properties found.,No se encontraron propiedades desconocidas.,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,4f05bb3fcdf38a25a1bc22e430f75d52
+Remove selected properties,Eliminar propiedades seleccionadas,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,c31abaadbd7be216686b05252d7b0194
+Remove unknown properties,Eliminar propiedades desconocidas,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,ae954b0c7015b11cee91c3c6a5c97759
+Resolve reported errors and run a new check. Previously applied changes are retained.,Corrija los errores indicados y repita la comprobación. Se conservan los cambios ya aplicados.,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,09f71ff47c3f0416523b9a769f724d78
+Stored addresses,Direcciones guardadas,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,245be0b36ae2aef28ddc359295e6604f

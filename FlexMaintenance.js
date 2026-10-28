@@ -1,127 +1,152 @@
-/* Explicit field maintenance. All visible values use textContent, never stored HTML. */
+/* Explicit field maintenance; stored values are always rendered as text. */
 (function() {
-	'use strict';
-	document.addEventListener('DOMContentLoaded', function() {
-		document.querySelectorAll('.FlexMaintenance').forEach(function(root) {
-			let batches = [], orphanBatches = [], operation = '', selection = [], running = false;
-			const messages = JSON.parse(root.dataset.messages);
-			const report = root.querySelector('.FlexMaintenanceReport');
-			const progress = root.querySelector('.FlexMaintenanceProgress');
-			const paths = root.querySelector('.FlexMaintenancePaths');
-			const cleanup = root.querySelector('[data-flex-maintenance="cleanup"]');
-			const apply = root.querySelector('[data-flex-maintenance="apply"]');
-			const buttons = Array.from(root.querySelectorAll('button'));
-			async function request(action, payload) {
-				const body = new FormData();
-				const csrf = root.closest('form').querySelector('input._post_token');
-				if(!csrf) throw new Error(messages.csrf);
-				body.set(csrf.name, csrf.value);
-				body.set('flexMaintenanceAction', action);
-				body.set('flexMaintenanceField', root.dataset.field);
-				body.set('flexMaintenancePayload', JSON.stringify(payload));
-				const response = await fetch(window.location.href, {method: 'POST', body: body, credentials: 'same-origin'});
-				const result = await response.json();
-				if(!response.ok || result.error) throw new Error(result.error || response.statusText);
-				return result;
-			}
-			function display(results) {
-				const total = {checked: 0, changed: 0, unchanged: 0, wouldChange: 0, conflicts: [], errors: [], retryPageIds: [], renames: [], properties: Object.create(null)};
-				results.forEach(function(batch) {
-					['checked', 'changed', 'unchanged', 'wouldChange'].forEach(key => total[key] += batch[key]);
-					['conflicts', 'errors', 'retryPageIds', 'renames'].forEach(key => total[key].push(...batch[key]));
-					Object.values(batch.properties).forEach(function(item) {
-						const aggregate = total.properties[item.path] || (total.properties[item.path] = {pageCount: 0, media: 0, pageIds: [], locations: []});
-						aggregate.pageCount += item.pageCount; aggregate.media += item.media;
-						aggregate.pageIds.push(...item.pageIds); aggregate.locations.push(...item.locations);
-					});
-				});
-				report.replaceChildren();
-				function table(title, headers, rows) {
-					if(!rows.length) return;
-					const heading = document.createElement('h3'); heading.textContent = title;
-					const grid = document.createElement('table'); grid.className = 'AdminDataTable uk-table uk-table-striped';
-					const head = document.createElement('thead'), body = document.createElement('tbody'), tr = document.createElement('tr');
-					headers.forEach(function(text) { const cell = document.createElement('th'); cell.textContent = text; tr.append(cell); });
-					head.append(tr); grid.append(head, body);
-					rows.forEach(function(row) {
-						const tr = document.createElement('tr');
-						row.forEach(function(text) { const cell = document.createElement('td'); cell.textContent = String(text); tr.append(cell); });
-						body.append(tr);
-					});
-					report.append(heading, grid);
-				}
-				table(messages.renames, [messages.from, messages.to, messages.pageIds], total.renames.map(item => [item.from, item.to, item.pageId]));
-				table(messages.orphans, [messages.path, messages.pageCount, messages.media, messages.pageIds, messages.address], Object.entries(total.properties).map(([path, item]) => [path, item.pageCount, item.media, item.pageIds.join(', '), item.locations.map(location => location.pageId + ': ' + location.address).join(', ')]));
-				table(messages.issues, [messages.pageIds, messages.path, messages.message], total.conflicts.concat(total.errors).map(item => [item.pageId, item.path, item.message]));
-				if(total.retryPageIds.length) { const retry = document.createElement('p'); retry.textContent = messages.retry + ' ' + total.retryPageIds.join(', '); report.append(retry); }
-				progress.textContent = ['checked', 'changed', 'unchanged', 'wouldChange'].map(key => messages[key] + ': ' + total[key]).join(' · ');
-				return total;
-			}
-			root.addEventListener('click', async function(event) {
-				const button = event.target.closest('[data-flex-maintenance]');
-				if(!button || running) return;
-				event.preventDefault();
-				const action = button.dataset.flexMaintenance;
-				running = true; buttons.forEach(item => item.disabled = true);
-				paths.querySelectorAll('input').forEach(item => item.disabled = true);
-				let valid = false;
-				try {
-					if(action === 'rename' || action === 'orphans') {
-						batches = []; orphanBatches = []; operation = action; paths.replaceChildren();
-						let after = 0;
-						while(true) {
-							const batch = await request(action, {after: after});
-							batches.push(batch); display(batches);
-							if(batch.complete) break;
-							after = batch.lastPageId;
-						}
-						const summary = display(batches);
-						progress.textContent += ' ' + (action === 'rename' && !summary.renames.length && batches.every(batch => batch.success) ? messages.noRenames : messages.previewed);
-						if(action === 'orphans') {
-							orphanBatches = batches;
-							const total = summary;
-							Object.keys(total.properties).forEach(function(path) {
-								const label = document.createElement('label'), check = document.createElement('input');
-								check.type = 'checkbox'; check.value = path;
-								label.append(check, document.createTextNode(' ' + path + ' (' + total.properties[path].pageCount + ') '));
-								paths.append(label, document.createElement('br'));
-							});
-						}
-					} else if(action === 'cleanup') {
-						selection = Array.from(paths.querySelectorAll('input:checked')).map(item => item.value);
-						if(!selection.length) throw new Error(messages.select);
-						const previews = [];
-						for(const batch of batches) previews.push(await request('cleanup', {paths: selection, preview: batch}));
-						batches = previews; operation = 'cleanup'; display(batches); progress.textContent += ' ' + messages.previewed;
-					} else if(action === 'apply') {
-						const results = [];
-						for(const batch of batches) {
-							results.push(await request(operation === 'rename' ? 'applyRename' : 'applyCleanup', {paths: selection, preview: batch}));
-							display(results);
-						}
-						const total = display(results);
-						progress.textContent += total.errors.length || total.conflicts.length ? ' ' + messages.retry : operation === 'rename' ? ' ' + messages.renamed : ' ' + messages.cleaned;
-						batches = []; orphanBatches = []; operation = '';
-					}
-					valid = true;
-				} catch(error) {
-					progress.textContent = error.message + ' ' + messages.retry;
-					batches = []; orphanBatches = []; operation = '';
-				} finally {
-					running = false;
-					buttons.forEach(item => item.disabled = false);
-					paths.querySelectorAll('input').forEach(item => item.disabled = false);
-					cleanup.disabled = !valid || operation !== 'orphans';
-					apply.disabled = !valid || !['rename', 'cleanup'].includes(operation) || !batches.some(batch => Object.keys(batch.pages).length && batch.wouldChange > 0);
-				}
-			});
-			paths.addEventListener('change', function() {
-				if(operation === 'cleanup') {
-					apply.disabled = true;
-					batches = orphanBatches; operation = 'orphans'; selection = [];
-					cleanup.disabled = false;
-				}
-			});
-		});
-	});
+    'use strict';
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.FlexMaintenance').forEach(function(root) {
+            const messages = JSON.parse(root.dataset.messages);
+            let batches = [], inventory = [], selection = [], active = null, running = false;
+            function show(button, visible) {
+                button.hidden = !visible;
+                button.disabled = !visible;
+            }
+            async function request(action, payload) {
+                const body = new FormData(), csrf = root.closest('form').querySelector('input._post_token');
+                if(!csrf) throw new Error(messages.csrf);
+                body.set(csrf.name, csrf.value);
+                body.set('flexMaintenanceAction', action);
+                body.set('flexMaintenanceField', root.dataset.field);
+                body.set('flexMaintenancePayload', JSON.stringify(payload));
+                const response = await fetch(window.location.href, {method: 'POST', body: body, credentials: 'same-origin'});
+                const result = await response.json();
+                if(!response.ok || result.error) throw new Error(result.error || response.statusText);
+                return result;
+            }
+            function table(headers, rows) {
+                const grid = document.createElement('table');
+                grid.className = 'AdminDataTable uk-table uk-table-striped';
+                const head = grid.createTHead().insertRow(), body = grid.createTBody();
+                headers.forEach(function(text) {
+                    const cell = document.createElement('th'); cell.textContent = text; head.append(cell);
+                });
+                rows.forEach(function(values) {
+                    const row = body.insertRow();
+                    values.forEach(function(value) {
+                        const cell = row.insertCell();
+                        if(value instanceof Node) cell.append(value);
+                        else cell.textContent = String(value);
+                    });
+                });
+                return grid;
+            }
+            function display(results, report, progress) {
+                const total = {checked: 0, changed: 0, wouldChange: 0, issues: [], renames: [], properties: Object.create(null)};
+                results.forEach(function(batch) {
+                    ['checked', 'changed', 'wouldChange'].forEach(key => total[key] += batch[key]);
+                    total.issues.push(...batch.conflicts, ...batch.errors);
+                    total.renames.push(...batch.renames);
+                    Object.values(batch.properties).forEach(function(item) {
+                        const entry = total.properties[item.path] || (total.properties[item.path] = {pageCount: 0, media: 0, pageIds: [], locations: []});
+                        entry.pageCount += item.pageCount; entry.media += item.media;
+                        entry.pageIds.push(...item.pageIds); entry.locations.push(...item.locations);
+                    });
+                });
+                report.replaceChildren();
+                if(total.renames.length) report.append(table([messages.from, messages.to, messages.pageIds], total.renames.map(item => [item.from, item.to, item.pageId])));
+                if(total.issues.length) {
+                    const heading = document.createElement('h4'); heading.textContent = messages.issues;
+                    report.append(heading, table([messages.pageIds, messages.path, messages.message], total.issues.map(item => [item.pageId, item.path, item.message])));
+                }
+                progress.textContent = ['checked', 'changed', 'wouldChange'].map(key => messages[key] + ': ' + total[key]).join(' · ');
+                if(total.issues.length) progress.textContent += ' ' + messages.retry;
+                return total;
+            }
+            root.addEventListener('click', async function(event) {
+                const button = event.target.closest('[data-flex-maintenance]');
+                if(!button || button.disabled || running) return;
+                event.preventDefault();
+                const task = button.closest('.FlexMaintenanceTask'), action = button.dataset.flexMaintenance;
+                const report = task.querySelector('.FlexMaintenanceReport'), progress = task.querySelector('.FlexMaintenanceProgress');
+                const paths = task.querySelector('.FlexMaintenancePaths');
+                if(task !== active || action === 'rename' || action === 'orphans') {
+                    batches = []; inventory = []; selection = []; active = task;
+                    root.querySelectorAll('[data-flex-maintenance="cleanup"], [data-flex-maintenance^="apply"]').forEach(item => show(item, false));
+                    root.querySelectorAll('.FlexMaintenancePaths, .FlexMaintenanceReport, .FlexMaintenanceProgress').forEach(item => item.replaceChildren());
+                }
+                const controls = Array.from(root.querySelectorAll('button, input'));
+                const disabled = controls.map(item => item.disabled);
+                running = true; root.setAttribute('aria-busy', 'true'); controls.forEach(item => item.disabled = true);
+                let canApply = false, canPreview = false;
+                try {
+                    if(action === 'rename' || action === 'orphans') {
+                        let after = 0;
+                        while(true) {
+                            const batch = await request(action, {after: after});
+                            batches.push(batch); display(batches, report, progress);
+                            if(batch.complete) break;
+                            after = batch.lastPageId;
+                        }
+                        const total = display(batches, report, progress);
+                        if(action === 'rename') {
+                            canApply = batches.some(batch => Object.keys(batch.pages).length && batch.wouldChange > 0);
+                            if(!total.renames.length && !total.issues.length) progress.textContent += ' ' + messages.noRenames;
+                        } else {
+                            inventory = batches;
+                            const rows = Object.entries(total.properties).map(function([path, item]) {
+                                const label = document.createElement('label'), check = document.createElement('input');
+                                check.type = 'checkbox'; check.value = path;
+                                label.append(check, document.createTextNode(' ' + path));
+                                const details = document.createElement('details'), summary = document.createElement('summary');
+                                summary.textContent = messages.address;
+                                const addresses = document.createElement('pre');
+                                addresses.textContent = item.locations.map(location => location.pageId + ': ' + location.address).join('\n');
+                                details.append(summary, addresses);
+                                return [label, item.pageCount, item.media, item.pageIds.join(', '), details];
+                            });
+                            if(rows.length) paths.append(table([messages.path, messages.pageCount, messages.media, messages.pageIds, messages.address], rows));
+                            else if(!total.issues.length) progress.textContent += ' ' + messages.noOrphans;
+                        }
+                    } else if(action === 'cleanup') {
+                        selection = Array.from(paths.querySelectorAll('input:checked')).map(item => item.value);
+                        if(!selection.length) throw new Error(messages.select);
+                        const previews = [];
+                        for(const batch of inventory) previews.push(await request('cleanup', {paths: selection, preview: batch}));
+                        batches = previews;
+                        const total = display(batches, report, progress);
+                        canApply = batches.some(batch => Object.keys(batch.pages).length && batch.wouldChange > 0);
+                        canPreview = true;
+                        if(!total.wouldChange && !total.issues.length) progress.textContent += ' ' + messages.noChanges;
+                    } else if(action === 'applyRename' || action === 'applyCleanup') {
+                        const results = [];
+                        for(const batch of batches) {
+                            results.push(await request(action, {paths: selection, preview: batch}));
+                            display(results, report, progress);
+                        }
+                        const total = display(results, report, progress);
+                        if(!total.issues.length) progress.textContent += ' ' + (action === 'applyRename' ? messages.renamed : messages.cleaned);
+                        batches = []; inventory = []; selection = [];
+                        if(paths) paths.replaceChildren();
+                    }
+                } catch(error) {
+                    progress.textContent += ' ' + error.message + ' ' + messages.retry;
+                    batches = []; inventory = []; selection = [];
+                } finally {
+                    running = false; root.removeAttribute('aria-busy');
+                    controls.forEach((item, index) => item.disabled = disabled[index]);
+                    const apply = task.querySelector('[data-flex-maintenance^="apply"]');
+                    show(apply, canApply);
+                    const preview = task.querySelector('[data-flex-maintenance="cleanup"]');
+                    if(preview) show(preview, canPreview);
+                }
+            });
+            root.addEventListener('change', function(event) {
+                if(!event.target.matches('.FlexMaintenancePaths input') || running) return;
+                const task = event.target.closest('.FlexMaintenanceTask');
+                batches = []; selection = [];
+                show(task.querySelector('[data-flex-maintenance="applyCleanup"]'), false);
+                show(task.querySelector('[data-flex-maintenance="cleanup"]'), inventory.length > 0 && !!task.querySelector('input:checked'));
+                task.querySelector('.FlexMaintenanceReport').replaceChildren();
+                task.querySelector('.FlexMaintenanceProgress').textContent = '';
+            });
+        });
+    });
 })();

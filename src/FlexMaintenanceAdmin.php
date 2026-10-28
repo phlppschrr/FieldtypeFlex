@@ -19,15 +19,11 @@ final class FlexMaintenanceAdmin extends Wire {
 		$group->label = $this->_('Data maintenance');
 		$group->collapsed = Inputfield::collapsedYes;
 		$input = $modules->get('InputfieldMarkup');
-		$input->label = $this->_('Preview and explicitly apply data changes');
 		$escape = fn($text) => $this->wire()->sanitizer->entities($text);
 		$messages = [
 			'checked' => $this->_('Checked pages'),
 			'changed' => $this->_('Changed pages'),
-			'unchanged' => $this->_('Unchanged pages'),
 			'wouldChange' => $this->_('Pages with proposed changes'),
-			'renames' => $this->_('Renames'),
-			'orphans' => $this->_('Potentially orphaned properties'),
 			'issues' => $this->_('Conflicts and errors'),
 			'path' => $this->_('Property path'),
 			'from' => $this->_('Old path'),
@@ -35,24 +31,35 @@ final class FlexMaintenanceAdmin extends Wire {
 			'pageIds' => $this->_('Page IDs'),
 			'pageCount' => $this->_('Affected pages'),
 			'media' => $this->_('Media references'),
-			'address' => $this->_('Stored address'),
+			'address' => $this->_('Stored addresses'),
 			'message' => $this->_('Message'),
-			'retry' => $this->_('Inspect errors and retry page IDs, then run a new preview.'),
+			'retry' => $this->_('Resolve reported errors and run a new check. Previously applied changes are retained.'),
 			'renamed' => $this->_('Checked old keys migrated. Run a new full preview before removing renamedFrom.'),
 			'cleaned' => $this->_('Selected cleanup completed.'),
 			'select' => $this->_('Select explicit property paths.'),
 			'csrf' => $this->_('Missing CSRF token.'),
-			'previewed' => $this->_('Preview completed.'),
+			'noChanges' => $this->_('No changes found.'),
+			'noOrphans' => $this->_('No unknown properties found.'),
 			'noRenames' => $this->_('No pending renames remain in this complete scan. The checked renamedFrom attributes can now be removed.'),
 		];
+		$button = static function(string $action, string $label, bool $hidden = false) use ($escape): string {
+			return '<button type="button" class="ui-button" data-flex-maintenance="' . $action . '"' . ($hidden ? ' hidden disabled' : '') . '>' . $escape($label) . '</button> ';
+		};
+		$report = '<p class="FlexMaintenanceProgress" role="status" aria-live="polite"></p><div class="FlexMaintenanceReport"></div>';
+		$input->label = '';
 		$input->value = '<div class="FlexMaintenance" data-field="' . (int) $field->id . '" data-messages="' . $escape(json_encode($messages, JSON_THROW_ON_ERROR)) . '">'
-			. '<p>' . $escape($this->_('Potentially orphaned does not mean safe to delete. Dynamic definitions may intentionally omit properties.')) . '</p>'
-			. '<p><button type="button" class="ui-button" data-flex-maintenance="rename">' . $escape($this->_('Preview renames')) . '</button> '
-			. '<button type="button" class="ui-button" data-flex-maintenance="orphans">' . $escape($this->_('List potentially orphaned properties')) . '</button></p>'
-			. '<div class="FlexMaintenancePaths"></div><p>'
-			. '<button type="button" class="ui-button" data-flex-maintenance="cleanup" disabled>' . $escape($this->_('Preview selected cleanup')) . '</button> '
-			. '<button type="button" class="ui-button" data-flex-maintenance="apply" disabled>' . $escape($this->_('Apply checked changes')) . '</button></p>'
-			. '<p class="FlexMaintenanceProgress" role="status"></p><div class="FlexMaintenanceReport"></div></div>';
+			. '<section class="FlexMaintenanceTask"><h3>' . $escape($this->_('Renames')) . '</h3>'
+			. '<p>' . $escape($this->_('Check stored values against renamedFrom before applying renames.')) . '</p><p>'
+			. $button('rename', $this->_('Check renames'))
+			. $button('applyRename', $this->_('Apply checked renames'), true)
+			. '</p>' . $report . '</section>'
+			. '<section class="FlexMaintenanceTask"><h3>' . $escape($this->_('Remove unknown properties')) . '</h3>'
+			. '<p>' . $escape($this->_('Potentially orphaned does not mean safe to delete. Dynamic definitions may intentionally omit properties.')) . '</p><p>'
+			. $button('orphans', $this->_('Find unknown properties')) . '</p><div class="FlexMaintenancePaths"></div><p>'
+			. $button('cleanup', $this->_('Check selection'), true)
+			. $button('applyCleanup', $this->_('Remove selected properties'), true)
+			. '</p>' . $report . '</section></div>';
+
 		$group->add($input);
 		$wrapper->add($group);
 		$this->wire()->config->scripts->add($this->wire()->config->urls->get('FieldtypeFlex') . 'FlexMaintenance.js');
@@ -80,10 +87,18 @@ final class FlexMaintenanceAdmin extends Wire {
 				'applyCleanup' => $this->type->cleanupProperties($field, $payload['paths'] ?? [], $payload['preview'] ?? [], true),
 				default => throw new WireException('Unknown maintenance action'),
 			};
+			// Native admin translations may contain entities. The JSON client uses
+			// textContent, so send human-readable messages rather than HTML text.
+			foreach(['errors', 'conflicts'] as $kind) {
+				foreach($result[$kind] as &$issue) {
+					$issue['message'] = $this->wire()->sanitizer->unentities($issue['message']);
+				}
+				unset($issue);
+			}
 			echo json_encode($result, JSON_THROW_ON_ERROR);
 		} catch(\Throwable $error) {
 			http_response_code(400);
-			echo json_encode(['error' => $error->getMessage()], JSON_THROW_ON_ERROR);
+			echo json_encode(['error' => $this->wire()->sanitizer->unentities($error->getMessage())], JSON_THROW_ON_ERROR);
 		}
 		exit;
 	}

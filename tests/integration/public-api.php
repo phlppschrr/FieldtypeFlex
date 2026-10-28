@@ -112,6 +112,20 @@ $readAssets = static function() use ($wire, $publicField, $id): array {
 $assetsBefore = $readAssets();
 $originalFile = $publicRow->attachment->first()->filename();
 $originalHash = hash_file('sha256', $originalFile);
+$savedModuleConfig = $wire->modules->getConfig('FieldtypeFlex');
+try {
+	$wire->modules->saveConfig('FieldtypeFlex', 'definitionsPath', 'missing-flex-directory-' . bin2hex(random_bytes(4)));
+	$throws(fn() => $type->getDefinitions($publicField, $page), 'path change cannot silently reuse the old automatic definition', FlexDefinitionException::class, 'missing');
+	$publicValue->heading = 'Must not save after path change';
+	$throws(fn() => $page->save($publicName), 'cached value is protected after automatic directory change', FlexDefinitionException::class, 'missing');
+	$throws(fn() => $page->save(), 'whole page is protected after automatic directory change', FlexDefinitionException::class, 'missing');
+	$same($canonicalBefore, $readCanonical(), 'directory change preserves canonical JSON');
+	$same($projectionBefore, $readProjection(), 'directory change preserves row projections');
+	$same($assetsBefore, $readAssets(), 'directory change preserves media ownership');
+	$same($originalHash, hash_file('sha256', $originalFile), 'directory change preserves original media bytes');
+} finally {
+	$wire->modules->saveConfig('FieldtypeFlex', $savedModuleConfig);
+}
 unlink($publicPHP);
 try {
 	$throws(fn() => $type->getDefinitions($publicField, $page), 'lost source is a definition error', FlexDefinitionException::class, 'missing');

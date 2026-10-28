@@ -35,7 +35,9 @@ Native CLI maintenance commands are available on supported ProcessWire versions;
 
 Create a Flex field named `content` and add it to a page template. The example uses the installed `TextformatterEntities` module to escape plain text for HTML output.
 
-Create `site/templates/flex-fields/content.php`:
+Create `site/templates/flex-fields/content.php`. The automatic definitions directory
+can be changed under **Modules → Flex → Definitions directory**; it is relative
+to `site/templates/` and defaults to `flex-fields/`:
 
 ```php
 <?php namespace ProcessWire;
