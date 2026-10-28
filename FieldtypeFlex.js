@@ -39,6 +39,35 @@
     function rows($set) {
         return $set.children('.flex-rows-items').children('.flex-row[data-flex-row]');
     }
+    function activeRows($set) {
+        return rows($set).not('.flex-row-remove-pending');
+    }
+    function removalState($row, removed) {
+        var $body = $row.children('.flex-row-content');
+        $row.toggleClass('flex-row-remove-pending', removed);
+        $row.children('.flex-row-header').toggleClass('ui-state-error', removed);
+        $row.children('.flex-row-remove-value').val(removed ? '1' : '0');
+        $row.children('.flex-row-remove-mirror').remove();
+        if(removed) {
+            // Keep successful native transport values for recovery/undo, while excluding
+            // removed controls from browser validation. Originals remain in the DOM.
+            $body.find(':input').serializeArray().forEach(function(item) {
+                $('<input type="hidden" class="flex-row-remove-mirror">').attr('name', item.name).val(item.value).appendTo($row);
+            });
+            $body.find(':input').each(function() {
+                if($(this).data('flexRemoveDisabled') === undefined) $(this).data('flexRemoveDisabled', this.disabled);
+                this.disabled = true;
+            });
+        } else {
+            $body.find(':input').each(function() {
+                var before = $(this).data('flexRemoveDisabled');
+                if(before !== undefined) { this.disabled = before; $(this).removeData('flexRemoveDisabled'); }
+            });
+        }
+        var $button = $row.children('.flex-row-header').find('[data-flex-row-action="remove"]');
+        var label = $button.attr(removed ? 'data-flex-undo-label' : 'data-flex-remove-label');
+        $button.attr({'aria-pressed': removed ? 'true' : 'false', 'aria-label': label, title: label});
+    }
     function titleParts(format, values, number, type, path, cleanup) {
         var parts = [];
         format.split(/(\[[^\[\]]*\]|_\{[^{}]+\}_|\{[^{}]+\}|#n)/gi).filter(Boolean).forEach(function(part) {
@@ -124,15 +153,18 @@
         var $tree = $set.closest('.InputfieldFlex');
         $tree.data('flexTreeBusy', busy).attr('aria-busy', busy ? 'true' : 'false');
         $tree.find('.flex-rows').each(function() { updateActions($(this)); });
+        var $form = $tree.closest('form');
+        if(!busy && !$form.find('.InputfieldFlex[aria-busy="true"], .flex-row[data-flex-load-failed="1"]').length) $form.children('.flex-form-request-error').remove();
     }
     function updateActions($set) {
-        var count = rows($set).length, min = Number($set.attr('data-flex-min')) || 0;
+        var count = activeRows($set).length, min = Number($set.attr('data-flex-min')) || 0;
         var max = Number($set.attr('data-flex-max')) || 0, busy = treeBusy($set);
         $set.children('.flex-row-add').prop('disabled', busy || (max > 0 && count >= max));
         rows($set).each(function() {
             var $header = $(this).children('.flex-row-header');
+            $header.find('.flex-row-toggle').prop('disabled', busy);
             $header.find('[data-flex-row-action="duplicate"]').prop('disabled', busy || (max > 0 && count >= max));
-            $header.find('[data-flex-row-action="remove"]').prop('disabled', busy || count <= min);
+            $header.find('[data-flex-row-action="remove"]').prop('disabled', busy || (!$(this).hasClass('flex-row-remove-pending') && count <= min));
             $header.find('.flex-row-sort').prop('disabled', busy || count < 2);
         });
         var $list = $set.children('.flex-rows-items');
@@ -176,6 +208,48 @@
         }
         syncToggle($row);
     }
+    function loadRow($row) {
+        if($row.attr('data-flex-loaded') !== '0') return Promise.resolve(true);
+        if($row.data('flexLoadPromise')) return $row.data('flexLoadPromise');
+        var $set = $row.closest('.flex-rows'), $body = $row.children('.flex-row-content');
+        if(treeBusy($set)) return Promise.resolve(false);
+        var operation = (async function() {
+            setTreeBusy($set, true);
+            $body.find('.flex-row-load-status').text(message('loading', 'Loading…'));
+            $body.find('.flex-row-retry').prop('hidden', true);
+            try {
+                var data = new URLSearchParams();
+                data.set('flex_action', 'row-render');
+                data.set('flex_set', $set.attr('data-flex-set'));
+                data.set('flex_source', $row.attr('data-flex-row'));
+                data.set('flex_complete', $set.attr('data-flex-draft'));
+                var token = csrf();
+                if(token) data.set(token.name, token.value);
+                var response = await fetch($set.attr('data-flex-page-url'), {method: 'POST', credentials: 'same-origin',
+                    headers: {'X-Requested-With': 'XMLHttpRequest', 'X-FIELDNAME': $set.attr('data-flex-field'), 'X-FLEX-DRAFT': $set.attr('data-flex-draft')}, body: data});
+                var result = await response.json();
+                if(!response.ok || result.error) throw new Error(result.message || message('unableToLoad', 'Unable to load item'));
+                if(!$row[0].isConnected) return false;
+                var $new = $(result.html), $content = $new.children('.flex-row-content');
+                if($new.attr('data-flex-loaded') !== '1' || !$content.length) throw new Error(message('unableToLoad', 'Unable to load item'));
+                $body.empty().append($content.contents());
+                $row.attr('data-flex-loaded', '1').removeAttr('data-flex-load-failed');
+                setup($row);
+                if($row.hasClass('flex-row-remove-pending')) removalState($row, true);
+                return true;
+            } catch(error) {
+                $row.attr('data-flex-load-failed', '1');
+                $body.find('.flex-row-load-status').text(error instanceof SyntaxError ? message('unableToLoad', 'Unable to load item') : error.message);
+                $body.find('.flex-row-retry').prop('hidden', false);
+                return false;
+            } finally {
+                $row.removeData('flexLoadPromise');
+                setTreeBusy($set, false);
+            }
+        })();
+        $row.data('flexLoadPromise', operation);
+        return operation;
+    }
     function moved($set, $row) {
         var position = rows($set).index($row) + 1;
         $set.children('.flex-rows-status').text(message('itemMoved', 'Item moved to position {position} of {count}')
@@ -186,7 +260,11 @@
             var $set = $(this), $list = $set.children('.flex-rows-items');
             rows($set).each(function() {
                 var $row = $(this);
-                if($row.find('.InputfieldStateError').length) openRow($row, true);
+                if($row.hasClass('flex-row-remove-pending') && !$row.data('flexRemovalReady')) {
+                    removalState($row, true);
+                    $row.data('flexRemovalReady', true);
+                }
+                if(!$row.hasClass('flex-row-remove-pending') && $row.find('.InputfieldStateError').length) openRow($row, true);
                 syncToggle($row);
             });
             if($.fn.sortable && !$list.hasClass('ui-sortable')) {
@@ -222,6 +300,15 @@
     document.addEventListener('submit', function(event) {
         var form = event.target;
         if(!form.matches('form[data-flex-max-input-vars]')) return;
+        var $pending = $(form).find('.InputfieldFlex[aria-busy="true"], .flex-row[data-flex-load-failed="1"]').filter(function() { return !$(this).closest('.flex-row-remove-pending').length; }).first();
+        if($pending.length) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            var $error = $(form).children('.flex-form-limit-error');
+            if(!$error.length) $error = $('<p class="flex-form-limit-error notice-error" role="alert" tabindex="-1"></p>').prependTo(form);
+            $error.addClass('flex-form-request-error').text($pending.is('.flex-row') ? message('unableToLoad', 'Unable to load item') : message('requestPending', 'Wait for the current request to finish before saving.')).trigger('focus');
+            return;
+        }
         var max = Number(form.getAttribute('data-flex-max-input-vars'));
         if(max <= 0) return;
         var count = event.submitter && event.submitter.name && !event.submitter.disabled ? 1 : 0;
@@ -233,13 +320,19 @@
         event.stopImmediatePropagation();
         var $error = $(form).children('.flex-form-limit-error');
         if(!$error.length) $error = $('<p class="flex-form-limit-error notice-error" role="alert" tabindex="-1"></p>').prependTo(form);
-        $error.text(message('inputVarsExceeded', 'This form contains {count} input values, exceeding PHP max_input_vars={max}.')
+        $error.removeClass('flex-form-request-error').text(message('inputVarsExceeded', 'This form contains {count} input values, exceeding PHP max_input_vars={max}.')
             .replace('{count}', count).replace('{max}', max)).trigger('focus');
     }, true);
     $(function() { initRows($(document)); });
     $(document).on('reloaded.flexRows', '.Inputfield', function(event) { initRows($(event.target)); });
     $(document).on('opened.flexRows closed.flexRows', '.flex-row', function(event) {
-        if(event.target === this) syncToggle($(this));
+        if(event.target !== this) return;
+        syncToggle($(this));
+        if(event.type === 'opened') loadRow($(this));
+    });
+    $(document).on('click', '.flex-row-retry', function(event) {
+        event.preventDefault();
+        loadRow($(this).closest('.flex-row'));
     });
     $(document).on('click', '.flex-row-toggle', function(event) {
         event.preventDefault();
@@ -302,6 +395,25 @@
     document.addEventListener('invalid', function(event) {
         $(event.target).parents('.flex-row').each(function() { openRow($(this), true); });
     }, true);
+    $(document).on('dblclick', '[data-flex-row-action="remove"]', function(event) {
+        event.preventDefault();
+        event.stopPropagation();
+        var $button = $(this), $set = $button.closest('.flex-rows');
+        if($button.prop('disabled') || treeBusy($set)) return;
+        // The two preceding clicks restore the original state, just like native Repeaters.
+        var undo = $button.closest('.flex-row').hasClass('flex-row-remove-pending');
+        function applyAll() {
+            rows($set).each(function() {
+                var $row = $(this);
+                if($row.hasClass('flex-row-remove-pending') === undo) {
+                    // Reuse single-row handling, including minItems and input recovery.
+                    $row.children('.flex-row-header').find('[data-flex-row-action="remove"]').trigger('click');
+                }
+            });
+        }
+        if(undo) applyAll();
+        else ProcessWire.confirm(message('removeAll', 'Remove all items?'), applyAll);
+    });
     $(document).on('click', '.flex-row-add, .flex-row-action', async function(event) {
         event.preventDefault();
         event.stopPropagation();
@@ -309,26 +421,38 @@
         if($button.prop('disabled') || treeBusy($set)) return;
         var action = $button.hasClass('flex-row-add') ? 'add' : $button.attr('data-flex-row-action');
         var $error = $set.children('.flex-rows-error').text('');
-        if(action === 'remove') {
-            var $focus = $row.next('.flex-row');
-            if(!$focus.length) $focus = $row.prev('.flex-row');
-            teardown($row);
-            $row.remove();
-            order($set);
-            ($focus.length ? $focus.find('.flex-row-toggle').first() : $set.children('.flex-row-add')).trigger('focus');
+        if(action === 'visibility') {
+            var hidden = !$row.hasClass('flex-row-hidden');
+            $row.toggleClass('flex-row-hidden', hidden);
+            $row.children('.flex-row-hidden-value').val(hidden ? '1' : '0').trigger('change');
+            var label = $button.attr(hidden ? 'data-flex-show-label' : 'data-flex-hide-label');
+            $button.attr({'aria-pressed': hidden ? 'true' : 'false', 'aria-label': label, title: label});
+            $button.find('i').toggleClass('fa-eye', !hidden).toggleClass('fa-eye-slash', hidden);
             return;
         }
+        if(action === 'remove') {
+            var removed = !$row.hasClass('flex-row-remove-pending');
+            if(window.tinymce) window.tinymce.triggerSave();
+            if(removed) openRow($row, false);
+            removalState($row, removed);
+            $row.data('flexRemovalReady', true);
+            order($set);
+            $button.trigger('focus');
+            return;
+        }
+        if(action === 'duplicate' && $row.attr('data-flex-loaded') === '0' && !(await loadRow($row))) return;
         setTreeBusy($set, true);
         updateActions($set);
         try {
             if(window.tinymce) window.tinymce.triggerSave();
             var data = new URLSearchParams();
             data.set('flex_action', action); data.set('flex_set', $set.attr('data-flex-set'));
-            data.set('flex_order', $set.children('.flex-rows-order').val());
+            data.set('flex_order', activeRows($set).map(function() { return $(this).attr('data-flex-row'); }).get().join(','));
             var activeOrders = {};
             $set.closest('.InputfieldFlex').find('.flex-rows').each(function() {
-                var $current = $(this), ids = $current.children('.flex-rows-order').val();
-                activeOrders[$current.attr('data-flex-set')] = ids ? ids.split(',') : [];
+                var $current = $(this);
+                if($current.closest('.flex-row-remove-pending').length) return;
+                activeOrders[$current.attr('data-flex-set')] = activeRows($current).map(function() { return $(this).attr('data-flex-row'); }).get();
             });
             data.set('flex_orders', JSON.stringify(activeOrders));
             if(action === 'add') {
@@ -338,7 +462,11 @@
                 data.set('flex_source', $row.attr('data-flex-row'));
                 // Ancestor/Page dependencies need the same live values as a full save.
                 // Only the requested source row is applied by the duplicate handler.
-                $row.closest('form').serializeArray().forEach(function(item) { data.append(item.name, item.value); });
+                $row.closest('form').serializeArray().forEach(function(item) {
+                    // ProcessPageEdit prioritizes POST id over the owner URL. Inside
+                    // a Repeater the full form id belongs to the main editor Page.
+                    if(item.name !== 'id') data.append(item.name, item.value);
+                });
             }
             var token = csrf();
             if(token) data.set(token.name, token.value);

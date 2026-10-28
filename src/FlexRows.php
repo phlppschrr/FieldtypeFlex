@@ -4,6 +4,7 @@
 class FlexRow extends FlexValue {
 	private string $flexRowId;
 	private string $flexRowType;
+	private bool $hidden;
 
 	/**
 	 * Hydrate a typed row after validating its stable identity.
@@ -15,8 +16,9 @@ class FlexRow extends FlexValue {
 	 * @param string $id Stable row or asset identity.
 	 * @param string $type Stable row type name.
 	 * @param array $values
+	 * @param bool $hidden Row visibility metadata, independent of content properties.
 	 */
-	public function __construct(Page $page, Field $field, FlexFieldDefs $defs, string $set, string $id, string $type, array $values = []) {
+	public function __construct(Page $page, Field $field, FlexFieldDefs $defs, string $set, string $id, string $type, array $values = [], bool $hidden = false) {
 		if(!preg_match('/^[a-f0-9]{32}$/D', $id)) {
 			throw new WireException(__('Invalid Flex row ID'));
 		}
@@ -25,7 +27,38 @@ class FlexRow extends FlexValue {
 		}
 		$this->flexRowId = $id;
 		$this->flexRowType = $type;
+		$this->hidden = $hidden;
 		parent::__construct($page, $field, $defs, $values, "$set.$id");
+	}
+
+	/** Whether this row itself is hidden, independent of its ancestors. */
+	public function isHidden(): bool {
+		return $this->hidden;
+	}
+
+	/** Change visibility on an unformatted row, saved with its owning field. */
+	public function setHidden(bool $hidden): self {
+		if($this->of() || $this->ownerPage()->of()) {
+			throw new WireException($this->_('Disable output formatting before changing repeatable rows'));
+		}
+		if($this->hidden !== $hidden) {
+			$this->hidden = $hidden;
+			$this->trackChange('hidden');
+		}
+		return $this;
+	}
+
+	/** Canonical row envelope; rawArray() remains the leaf property namespace. @internal */
+	public function envelope(): array {
+		$row = ['id' => $this->rowId(), 'type' => $this->rowType(), 'values' => $this->rawArray()];
+		if($this->hidden) $row['hidden'] = true;
+		return $row;
+	}
+
+	/** Copy content and row metadata together, including when duplicating. @internal */
+	public function copyValuesFrom(FlexValue $source): void {
+		parent::copyValuesFrom($source);
+		if($source instanceof self) $this->setHidden($source->isHidden());
 	}
 
 	/**
@@ -74,6 +107,8 @@ class FlexRows extends WireArray implements \JsonSerializable {
 	private string $set;
 	private bool $formatted = false;
 	private bool $hydrating = true;
+	/** Full ordered backing data while the public view is formatted. */
+	private ?array $allRows = null;
 
 	/**
 	 * Hydrate ordered owned rows from a validated persistence envelope.
@@ -118,7 +153,7 @@ class FlexRows extends WireArray implements \JsonSerializable {
 			if(!is_array($item) || !isset($item['id'], $item['type'], $item['values']) || !is_string($item['id']) || !is_string($item['type']) || !is_array($item['values'])) {
 				throw new WireException($this->_('Invalid repeatable row'));
 			}
-			$row = new FlexRow($page, $field, $this->rowSchema($item['type']), $set, $item['id'], $item['type'], $item['values']);
+			$row = new FlexRow($page, $field, $this->rowSchema($item['type']), $set, $item['id'], $item['type'], $item['values'], FlexPath::rowHidden($item));
 			if(isset($this->data[$row->rowId()])) {
 				throw new WireException($this->_('Duplicate Flex row ID'));
 			}
@@ -128,7 +163,7 @@ class FlexRows extends WireArray implements \JsonSerializable {
 		$this->hydrating = false;
 		$this->resetTrackChanges();
 		if(isset($copy)) {
-			$sources = array_values(iterator_to_array($copy));
+			$sources = array_values($copy->allRows ?? $copy->data);
 			foreach(array_values($this->data) as $n => $row) {
 				$source = $sources[$n];
 				$row->copyValuesFrom($source);
@@ -393,9 +428,13 @@ class FlexRows extends WireArray implements \JsonSerializable {
 	public function of(?bool $formatted = null): bool {
 		$before = $this->formatted;
 		if($formatted !== null) {
+			if($this->allRows !== null) $this->data = $this->allRows;
+			$this->allRows = null;
 			$this->formatted = $formatted;
-			foreach($this as $row) {
-				$row->of($formatted);
+			foreach($this->data as $row) $row->of($formatted);
+			if($formatted) {
+				$this->allRows = $this->data;
+				$this->data = array_filter($this->data, static fn($row) => !$row->isHidden());
 			}
 		}
 		return $before;
@@ -426,7 +465,7 @@ class FlexRows extends WireArray implements \JsonSerializable {
 		if(parent::isChanged($what)) {
 			return true;
 		}
-		foreach($this as $row) {
+		foreach($this->allRows ?? $this->data as $row) {
 			if($row->isChanged()) {
 				return true;
 			}
@@ -441,7 +480,7 @@ class FlexRows extends WireArray implements \JsonSerializable {
 	 * @return $this
 	 */
 	public function resetTrackChanges($trackChanges = true) {
-		foreach($this as $row) {
+		foreach($this->allRows ?? $this->data as $row) {
 			$row->resetTrackChanges($trackChanges);
 		}
 		return parent::resetTrackChanges($trackChanges);
@@ -453,9 +492,10 @@ class FlexRows extends WireArray implements \JsonSerializable {
 	 * @return void
 	 */
 	public function __clone() {
-		foreach($this->data as $key => $row) {
-			$this->data[$key] = clone $row;
-		}
+		$all = $this->allRows ?? $this->data;
+		foreach($all as $key => $row) $all[$key] = clone $row;
+		$this->data = array_intersect_key($all, $this->data);
+		if($this->allRows !== null) $this->allRows = $all;
 	}
 
 	/**
@@ -465,13 +505,7 @@ class FlexRows extends WireArray implements \JsonSerializable {
 	 */
 	public function rawArray(): array {
 		$items = [];
-		foreach($this as $row) {
-			$items[] = [
-				'id'     => $row->rowId(),
-				'type'   => $row->rowType(),
-				'values' => $row->rawArray(),
-			];
-		}
+		foreach($this->allRows ?? $this->data as $row) $items[] = $row->envelope();
 		return [
 			'_flex' => FlexStorage::ROWS_FORMAT,
 			'items' => $items,
@@ -499,7 +533,7 @@ class FlexRows extends WireArray implements \JsonSerializable {
 	public function checkLimit(bool $minimum = false): void {
 		$min = (int) ($this->definition['settings']['minItems'] ?? 0);
 		$max = (int) ($this->definition['settings']['maxItems'] ?? 0);
-		if(($minimum && count($this) < $min) || ($max && count($this) > $max)) {
+		if(($minimum && count($this->allRows ?? $this->data) < $min) || ($max && count($this->allRows ?? $this->data) > $max)) {
 			throw new WireException(sprintf($this->_("Repeatable '%s' item count is outside its limits"), $this->set));
 		}
 	}

@@ -15,13 +15,15 @@ $suites = [
 	'schema' => ['schema-evolution.php'],
 	'maintenance' => ['maintenance.php', 'maintenance-repeaters.php'],
 	'inputs' => ['inputs.php'],
-	'admin' => ['admin.php', 'admin-errors.php', 'row-editor.php', 'editor-context.php'],
-	'rows' => ['rows.php', 'row-types.php', 'row-helpers.php'],
+	'admin' => ['admin.php', 'admin-errors.php', 'row-editor.php', 'editor-context.php', 'input-copy.php'],
+	'rows' => ['row-removal.php', 'row-visibility.php', 'rows.php', 'row-types.php', 'row-helpers.php'],
 	'media' => ['media-lifecycle.php', 'media.php', 'media-output.php', 'media-variations.php', 'media-rename.php'],
 	'repeaters' => ['repeaters.php', 'page-tree.php', 'page-tree-context.php'],
 	'nested' => ['nested.php'],
 	'translations' => ['translations.php', 'bundled-translations.php'],
 	'public-api' => ['public-api.php', 'label-helpers.php', 'array-views.php', 'api-examples.php'],
+	'lazy-prototype' => ['lazy-prototype.php'],
+	'lazy' => ['lazy.php'],
 ];
 
 $usage = static function() use ($suites): void {

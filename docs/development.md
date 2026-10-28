@@ -58,11 +58,47 @@ and media lifecycle cases that exercise the changed behavior. Verify both array/
 `type => 'rows'` and native `InputfieldFlexRows` definitions, including AJAX-loaded
 inputs inside native ProcessWire Repeaters.
 
+For duplication requests inside an AJAX-loaded Repeater, keep the main PageEdit
+form's hidden `id` present. Duplicate a root row, edit its unsaved copy and
+duplicate that copy, then duplicate a third-level row with unsaved text. The
+request must follow the Repeater owner's URL without serializing the main form's
+`id` (ProcessPageEdit prioritizes POST `id`). Verify no `Invalid Flex editor
+context` error, distinct IDs and copied values after an actual Save/reload,
+and unchanged sibling Repeater owners through fresh PHP readback. PHP-only AJAX
+handler tests cannot catch incorrect browser form serialization.
+
+For the row type selector layout, place a multi-type Rows collection inside a
+67% ordinary fieldset within a Row. Check Core Original and Default/Konkat: the
+label stays on one line beside the select when there is room; at a 375px viewport
+the controls wrap without page overflow. Retain native `InputfieldSetWidth` on
+the select so the admin column rule cannot force it to 100% width. Add the selected
+type and verify it after a real PageEdit save through fresh PHP readback.
+
 The reusable demo seed is ddev flex-seed. The nested demo has a separate guarded seed:
 
     ddev exec php scripts/seed-nested.php
 
 Only use these scripts with the disposable .dev/pw installation.
+
+## Lazy Row verification
+
+Run `ddev flex-test admin lazy lazy-prototype translations` for focused coverage.
+The admin suite includes native Text limit copying; `lazy` covers actual deferred
+rendering, baseline validation, loaded completeness grants, AJAX authorization,
+schema/revision changes, unknown values, hidden dependencies and fresh saved
+selector projections. `lazy-prototype` retains the earlier validation experiment.
+
+For browser changes, use isolated saved Fields with `rowLazyLoad => true` in JSON
+and native wrapper definitions. Include nested lazy children inside eager parents,
+unchecked controls and ancestor `showIf`/`requiredIf`, invalid-save recovery,
+unopened remove/reorder, duplicate unsaved values, and TinyMCE/media fallback.
+Interrupt a body response after the server rendered it, verify save is blocked,
+then Retry and save. Repeat inside a natively AJAX-loaded Repeater. Check canonical
+values and unchanged media independently after actual ProcessPageEdit submission.
+
+Measure representative editor pages in the browser before enabling lazy loading.
+Compare initial rendering and first-open latency with ordinary collapsed rows.
+Keep test suites and other writes out of measurement series.
 
 ## Native core Fieldtype baseline
 
@@ -163,3 +199,30 @@ New commands have text and JSON modes; all JSON output is JSON-Lines and progres
 is stderr-only. Validate native dispatcher exits where available; the older pinned
 core runs shared adapter cases but has no native CLI dispatcher. No admin input
 behavior changes are involved in these CLI diagnostics.
+
+## Row visibility verification
+
+`ddev flex-test rows formatting admin nested lazy translations` covers metadata,
+formatted backing-data retention, visible-only row/search projections, counts,
+types, same-row/negative/blank predicates, rollback, repair and native validation.
+Use a real PageEdit fixture with eager/media and lazy scalar Rows. Toggle while
+closed, open/edit while hidden, cause and repair a native validation error,
+duplicate unsaved hidden content, reorder, remove and show again. Repeat with
+native wrapper definitions. Read canonical JSON, descendant states, unknown values,
+media ownership and file SHA-256 independently; inspect browser warnings/errors.
+
+## Deferred removal verification
+
+The `rows` suite includes `row-removal.php`: marks, successful Save, invalid-save
+recovery/undo, invalid flags/identities, retained unknown properties, hidden state,
+minItems, registered unsaved rows, nested parent/child removal and lazy body grants.
+Media references and original SHA-256 remain unchanged before the actual Save.
+For browser checks, compare pending Flex and native Repeater headers in Core
+Original and Default/Konkat. Mark an edited row, undo, mark again, fail another
+row's native validation, undo after recovery, and add a replacement at maxItems.
+Independently read persisted IDs before and after the successful PageEdit save.
+Double-click Remove: cancel leaves marks unchanged; confirm marks siblings only.
+Double-click a pending row to undo all sibling marks without a dialog. Check a
+nested collection and `minItems=1` (one active row remains), then Save and verify
+that only marked rows were deleted through fresh PHP readback. Include unopened
+lazy rows so the bulk action does not require loading their bodies.

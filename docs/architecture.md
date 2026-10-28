@@ -65,11 +65,40 @@ row context attached; no fieldset-to-rows adapter is needed. Each type has its o
 
 PHP, JSON and native InputfieldWrapper definitions use the same tree model. PHP executes as trusted code inside the owning ProcessWire API context. Definition errors keep field and source context. In Page Edit, a missing or invalid definition blocks save when existing data is at risk and preserves submitted values for correction.
 
+Editor removal is transient Inputfield state, separate from row visibility metadata.
+Full posted order authenticates every row. InputfieldFlexRows retains an ordered
+render-only row list and removal marks for error recovery, while its processed
+value excludes pending rows. Native processing copies retain valid pending edits;
+pending validation errors are cleared from that subtree rather than blocking a
+row that will be deleted. Removed lazy subtrees have no body-grant obligation.
+The browser retains disabled original controls plus successful hidden transport
+mirrors so HTML validation cannot block deletion and undo/error recovery keeps
+unsaved values. Undo restores prior disabled states. AJAX active orders exclude
+pending rows for maxItems/resource validation and discovery without unregistering
+the rows needed for undo. Canonical JSON and media ownership change only on the
+ordinary owning-field save, under the existing revision and transaction checks.
+
 ## Canonical data and query projections
 
 The JSON field value is the source of truth. Scalar leaves and native IDs are stored in its unformatted representation. Repeatable sets use a versioned rows:1 envelope containing ordered rows with an ID, type and values. File/Image values use versioned files:1 or images:1 envelopes containing registered asset IDs and native metadata.
 
-A separate InnoDB row projection supports typed row selectors and counts. Whole-field search uses flattened property values, not schema names, row IDs or row type markers. Projection updates and canonical JSON saves share the field transaction or savepoint. Normal writes, metadata saves, raw maintenance and clones update projections automatically; native deletion and emptying remove them. Both `deletePageField()` and inherited `emptyPageField()` use the transactional `emptyPageFieldTable()` override. `FlexStorage::rebuildRows()` remains an internal repair/migration tool, outside the supported API. The projection is not a second source of truth.
+Rows may carry an optional boolean `hidden` outside `values`; missing means visible.
+The existing envelope version is unchanged. FlexRows retains all backing objects
+while a formatted view exposes only visible rows; canonical export always walks
+all backing objects. Cloning preserves both the visible view and independent full
+backing data. Unformatting restores the full collection. Canonical content checks
+continue to include hidden data.
+
+A separate InnoDB row projection supports typed row selectors and counts. Whole-field search uses flattened property values, not schema names, row IDs or row type markers. Projection updates and canonical JSON saves share the field transaction or savepoint. Normal writes, metadata saves, raw maintenance and clones update projections automatically; native deletion and emptying remove them. Both `deletePageField()` and inherited `emptyPageField()` use the transactional `emptyPageFieldTable()` override. `FlexStorage::rebuildRows()` remains an internal repair/migration tool, outside the supported API. The projection is not a second source of truth. It contains only rows whose own
+state and every ancestor state are visible. The raw walker still validates and
+visits every row for budgets, maintenance and media. Whole-field search skips hidden
+subtrees. Filtering at projection derivation keeps existing correlated SQL,
+negative/blank handling and count sorts consistent without new query branches.
+Pre-feature projections need no rebuild because missing flags are visible. Internal
+bounded repair locks canonical data and rebuilds both row and search projections
+atomically. Native PageFinder `include=all` does not affect this derivation; an
+all-row SQL option would need additional projection/query/search support and is
+deferred. Unformatted PHP inspection remains available.
 
 Selector values are bound parameters. Property names, operators, type keys and JSON paths are validated against the active schema before SQL is built. Blank, negative and count queries account for absent fields and row ancestors. Same-row expressions correlate every condition to one concrete row and its descendants.
 
@@ -202,3 +231,29 @@ use guarded normal/secure/extended and journal paths; custom native path hooks l
 the check explicitly incomplete. No diagnostics handler repairs or collects. Native
 completion cleanup remains independent and may still run when the PHP process ends.
 API.md defines categories, skipped work, output framing and exit precedence.
+
+## Optional lazy Row bodies
+
+`FlexLazy` owns eligibility, semantic schema fingerprints, draft body grants and
+validation-only baseline transport. `InputfieldFlexRows::renderRow()` emits a
+header and placeholder for eligible closed existing Rows without building their
+concrete Inputfield tree. `renderReady()` still prepares sample inputs/assets per
+declared type. Definitions, canonical JSON and all row identities remain available.
+The feature introduces no persistent format or dependency change.
+
+`FlexAdmin::ajax()` handles `row-render` with the existing editor owner, field,
+permission, CSRF and revision checks, plus schema and issued-row checks. A successful
+render permanently upgrades the draft's row grant; retries reissue it. The browser
+inserts only the body, initializes native Inputfields and prevents submit while
+loading or after failure. Root completeness plus per-body start/end grants reject
+partial submissions even if the browser submit guard is bypassed.
+
+`InputfieldFlex::processInput()` prepares a native validation POST with baseline
+scalar values for unopened Rows; `InputfieldFlexRows::processInput()` validates
+these through the existing dependency bridge but does not apply their leaves.
+Loaded leaves use normal processing. Explicit order controls govern removal and
+sorting; unknown properties survive the ordinary merge. Parents containing Rows
+render directly, so nested children can opt in without partial parent transport.
+Schemas changing mid-editor are rejected; row types remain immutable. Error rows
+render from their processed input trees. No cached fragment HTML or cross-request
+schema evaluation is introduced.

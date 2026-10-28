@@ -3,6 +3,16 @@
 /** Atomic repeatable set; every leaf is a fresh native Inputfield. */
 class InputfieldFlexRows extends Inputfield {
 	private array $rowInputs = [];
+	private array $removedRows = [];
+	private ?array $renderRows = null;
+
+	/** A deletion mark belongs to this form, never to canonical row metadata. @internal */
+	public static function removalRequested(WireInputData $input, string $name, string $address): bool {
+		$value = $input->{FlexPath::controlName($name, $address, 'remove')};
+		if($value === null || $value === '0') return false;
+		if($value !== '1') throw new WireException(__('Invalid Flex row removal'));
+		return true;
+	}
 
 	/**
 	 * Return module metadata and installation requirements.
@@ -16,6 +26,15 @@ class InputfieldFlexRows extends Inputfield {
 			'summary'  => __('Repeatable native inputs inside Flex'),
 			'requires' => 'FieldtypeFlex',
 		];
+	}
+
+	/** Header transport is independent of lazy body loading. @internal */
+	public static function applyVisibility(FlexRow $row, WireInputData $input, string $name): void {
+		$value = $input->{FlexPath::controlName($name, $row->address(), 'hidden')};
+		// Preserve baseline state for older open forms without the new control.
+		if($value === null) return;
+		if($value !== '0' && $value !== '1') throw new WireException(__('Invalid Flex row visibility'));
+		$row->setHidden($value === '1');
 	}
 
 	private function admin(): FlexAdmin {
@@ -217,9 +236,20 @@ class InputfieldFlexRows extends Inputfield {
 	 * @param bool $isNew Whether this is a newly registered editor row.
 	 * @return string
 	 */
-	public function renderRow(FlexRow $row, int $number = 1, bool $isNew = false): string {
+	public function renderRow(FlexRow $row, int $number = 1, bool $isNew = false, bool $forceLoad = false): string {
 		$id = $row->rowId();
-		$inputs = $this->inputsFor($row);
+		$removed = isset($this->removedRows[$id]);
+		$inputs = $this->rowInputs[$id] ?? null;
+		$mode = $this->definition['settings']['rowCollapse'] ?? 0;
+		$collapsed = $removed || ($mode === 1 || ($mode === 0 && !$isNew)) && (!$inputs || !$inputs->getErrors());
+		$lazy = ($this->definition['settings']['rowLazyLoad'] ?? false) && $this->flexDraft !== '' && FlexLazy::supports($row->definitions());
+		$entry = null;
+		if($lazy) {
+			$previous = $this->admin()->draft($this->flexDraft)['lazy'][$row->address()]['loaded'] ?? false;
+			$entry = FlexLazy::register($this->flexRoot, $row, $this->flexDraft, $forceLoad || $isNew || !$collapsed || $previous || $this->wire()->input->get('flex_eager') === '1');
+		}
+		$loaded = !$entry || $entry['loaded'];
+		if($loaded) $inputs = $this->inputsFor($row);
 		$type = $row->rowType();
 		$typeDefinition = $this->typeDefinition($row);
 		$typeLabel = (string) ($typeDefinition['label'] ?? $type);
@@ -241,7 +271,7 @@ class InputfieldFlexRows extends Inputfield {
 		}
 		// Preserve the established default header, including its type badge.
 		if($format === '') $label = '<span class="flex-row-type-badge">' . $entities($typeLabel) . '</span> ' . $label;
-		foreach($inputs->getAll() as $input) {
+		foreach($loaded ? $inputs->getAll() : [] as $input) {
 			$name = (string) $input->_flex_property;
 			if(array_key_exists($name, $values)) {
 				$input->wrapAttr('data-flex-label-property', $name);
@@ -252,24 +282,41 @@ class InputfieldFlexRows extends Inputfield {
 				}
 			}
 		}
-		$mode = $this->definition['settings']['rowCollapse'] ?? 0;
-		$collapsed = ($mode === 1 || ($mode === 0 && !$isNew)) && !$inputs->getErrors();
 		$entities = fn($value) => $this->wire()->sanitizer->entities((string) $value);
 		$bodyId = 'flex_row_' . $this->name . '__' . $id;
+		$hideLabel = $this->_('Hide item');
+		$showLabel = $this->_('Show item');
+		$removeLabel = $this->_('Remove');
+		$undoLabel = $this->_('Undo removal');
 		$buttons = '';
 		foreach([
 			'duplicate' => ['copy', $this->_('Duplicate')],
-			'remove'    => ['trash-o', $this->_('Remove')],
+			'visibility' => [$row->isHidden() ? 'eye-slash' : 'eye', $row->isHidden() ? $showLabel : $hideLabel],
+			'remove' => ['trash-o', $removed ? $undoLabel : $removeLabel],
 		] as $action => [$icon, $actionLabel]) {
-			$buttons .= '<button type="button" class="flex-row-action" data-flex-row-action="' . $action . '" title="' . $entities($actionLabel) . '" aria-label="' . $entities($actionLabel) . '"><i class="fa fa-fw fa-' . $icon . '" aria-hidden="true"></i></button>';
+			$state = '';
+			if($action === 'remove') $state = ' aria-pressed="' . ($removed ? 'true' : 'false') . '" data-flex-remove-label="' . $entities($removeLabel) . '" data-flex-undo-label="' . $entities($undoLabel) . '"';
+			if($action === 'visibility') $state = ' aria-pressed="' . ($row->isHidden() ? 'true' : 'false') . '" data-flex-hide-label="' . $entities($hideLabel) . '" data-flex-show-label="' . $entities($showLabel) . '"';
+			$buttons .= '<button type="button" class="flex-row-action" data-flex-row-action="' . $action . '" title="' . $entities($actionLabel) . '" aria-label="' . $entities($actionLabel) . '"' . $state . '><i class="fa fa-fw fa-' . $icon . '" aria-hidden="true"></i></button>';
 		}
 		$sortLabel = $entities($this->_('Drag to reorder; use Up and Down arrow keys when focused'));
-		return '<li class="Inputfield InputfieldFieldset InputfieldNoFocus flex-row' . ($collapsed ? ' InputfieldStateCollapsed' : '') . '" id="wrap_' . $entities($bodyId) . '" data-flex-row="' . $entities($id) . '" data-flex-type="' . $entities($type) . '" data-flex-type-label="' . $entities($typeLabel) . '" data-flex-label-format="' . $entities($format) . '" data-flex-label-values="' . $entities(json_encode((object) $values, JSON_THROW_ON_ERROR)) . '">' .
-			'<div class="InputfieldHeader flex-row-header"><div class="flex-row-bar uk-background-primary uk-light">' .
+		if($loaded) {
+			$body = $inputs->render();
+			if($entry) $body = FlexLazy::marker($this->flexInputName ?: $this->name, $row->address(), 'body', $entry['grant']) . $body . FlexLazy::marker($this->flexInputName ?: $this->name, $row->address(), 'complete', $entry['grant']);
+		} else {
+			$url = $this->flexRoot->ownerPage()->editUrl() . '&flex_eager=1';
+			$retryLabel = $entities($this->_('Retry'));
+			$fallbackLabel = $entities($this->_('Load all items'));
+			$body = '<p class="flex-row-load-status" role="status"></p><button type="button" class="ui-button flex-row-retry" hidden>' . $retryLabel . '</button><noscript><a href="' . $entities($url) . '">' . $fallbackLabel . '</a></noscript>';
+		}
+		return '<li class="Inputfield InputfieldFieldset InputfieldNoFocus flex-row' . ($collapsed ? ' InputfieldStateCollapsed' : '') . ($row->isHidden() ? ' flex-row-hidden' : '') . ($removed ? ' flex-row-remove-pending' : '') . '" id="wrap_' . $entities($bodyId) . '" data-flex-row="' . $entities($id) . '"' . ($entry ? ' data-flex-loaded="' . ($loaded ? '1' : '0') . '"' : '') . ' data-flex-type="' . $entities($type) . '" data-flex-type-label="' . $entities($typeLabel) . '" data-flex-label-format="' . $entities($format) . '" data-flex-label-values="' . $entities(json_encode((object) $values, JSON_THROW_ON_ERROR)) . '">' .
+			'<input type="hidden" class="flex-row-remove-value" name="' . $entities(FlexPath::controlName($this->flexInputName ?: $this->name, $row->address(), 'remove')) . '" value="' . ($removed ? '1' : '0') . '">' .
+			'<input type="hidden" class="flex-row-hidden-value" name="' . $entities(FlexPath::controlName($this->flexInputName ?: $this->name, $row->address(), 'hidden')) . '" value="' . ($row->isHidden() ? '1' : '0') . '">' .
+			'<div class="InputfieldHeader flex-row-header' . ($removed ? ' ui-state-error' : '') . '"><div class="flex-row-bar uk-background-primary uk-light">' .
 			'<button type="button" class="flex-row-sort" title="' . $sortLabel . '" aria-label="' . $sortLabel . '"><i class="fa fa-fw fa-arrows" aria-hidden="true"></i></button>' .
 			'<button type="button" class="flex-row-toggle" aria-controls="' . $entities($bodyId) . '" aria-expanded="' . ($collapsed ? 'false' : 'true') . '"><span class="flex-row-label"><span class="flex-row-title">' . $label . '</span></span><i class="fa fa-fw fa-angle-down flex-row-chevron" aria-hidden="true"></i></button>' .
 			'<span class="flex-row-controls">' . $buttons . '</span></div></div>' .
-			'<div class="InputfieldContent flex-row-content" id="' . $entities($bodyId) . '">' . $inputs->render() . '</div></li>';
+			'<div class="InputfieldContent flex-row-content" id="' . $entities($bodyId) . '">' . $body . '</div></li>';
 	}
 
 	/**
@@ -285,7 +332,7 @@ class InputfieldFlexRows extends Inputfield {
 		$ids = [];
 		$html = '';
 		$newRows = $this->flexDraft !== '' ? ($this->admin()->draft($this->flexDraft)['rows'][$this->setName] ?? []) : [];
-		foreach($rows as $row) {
+		foreach($this->renderRows ?? $rows as $row) {
 			$ids[] = $row->rowId();
 			$html .= $this->renderRow($row, count($ids), isset($newRows[$row->rowId()]));
 		}
@@ -304,7 +351,8 @@ class InputfieldFlexRows extends Inputfield {
 				$options .= '<option value="' . $entities((string) $type) . '">' . $entities((string) ($typeDefinition['label'] ?? $type)) . '</option>';
 			}
 			$typeLabel = $entities($this->_('New item type'));
-			$typeControl = '<label class="flex-row-type-control" for="' . $entities($typeId) . '"><span>' . $typeLabel . '</span><select class="flex-row-type" id="' . $entities($typeId) . '" aria-label="' . $typeLabel . '">' . $options . '</select></label>';
+			// Native column-width rules must not stretch this compact select to 100%.
+			$typeControl = '<label class="flex-row-type-control" for="' . $entities($typeId) . '"><span>' . $typeLabel . '</span><select class="flex-row-type InputfieldSetWidth" id="' . $entities($typeId) . '" aria-label="' . $typeLabel . '">' . $options . '</select></label>';
 		}
 		return '<div class="flex-rows" data-flex-set="' . $entities($this->setName) . '" data-flex-draft="' . $entities($this->flexDraft) . '" data-flex-page-url="' . $entities($this->flexRoot->ownerPage()->editUrl()) . '" data-flex-field="' . $entities($this->flexRoot->ownerField()->name) . '" data-flex-min="' . (int) ($settings['minItems'] ?? 0) . '" data-flex-max="' . (int) ($settings['maxItems'] ?? 0) . '"' . $attributes . '>' .
 			'<input type="hidden" name="' . $entities(FlexPath::controlName($this->flexInputName ?: $this->name, $this->setName, 'present')) . '" value="1">' .
@@ -347,14 +395,31 @@ class InputfieldFlexRows extends Inputfield {
 				throw new WireException($this->_('Duplicate repeatable row'));
 			}
 			$rows = new FlexRows($this->flexRoot->ownerPage(), $this->flexRoot->ownerField(), $this->setName, $this->definition);
+			$this->renderRows = [];
+			$this->removedRows = [];
 			foreach($ids as $id) {
 				$row = $this->admin()->row($this->flexDraft, $this->setName, $id, $this->flexBaseRoot ?: $this->flexRoot, false);
 				if(!isset($this->rowInputs[$id])) {
 					$view = $this->admin()->row($this->flexDraft, $this->setName, $id, $this->flexRoot);
 					$this->inputsFor($view);
 				}
+				self::applyVisibility($row, $input, $this->flexInputName ?: $this->name);
+				$this->renderRows[$id] = $row;
+				$removed = self::removalRequested($input, $this->flexInputName ?: $this->name, $row->address());
+				if($removed) {
+					$this->removedRows[$id] = true;
+					// Processing copies retain submitted inputs for undo after a failed save.
+					// Removed rows contribute no validation errors or values to persistence.
+					if(!FlexLazy::unloaded($this->flexRoot, $this->flexDraft, $row->address())) {
+						$form = FlexDependencies::processInput($this->inputsFor($row), $this->flexRoot->ownerPage(), $input);
+						if(!$form->getErrors(true)) InputfieldFlex::applyInputs($row, $form, FlexPath::inputPrefix($this->flexInputName ?: $this->name, $row->address()));
+					}
+					continue;
+				}
 				$form = FlexDependencies::processInput($this->inputsFor($row), $this->flexRoot->ownerPage(), $input);
-				InputfieldFlex::applyInputs($row, $form, FlexPath::inputPrefix($this->flexInputName ?: $this->name, $row->address()));
+				if(!FlexLazy::unloaded($this->flexRoot, $this->flexDraft, $row->address())) {
+					InputfieldFlex::applyInputs($row, $form, FlexPath::inputPrefix($this->flexInputName ?: $this->name, $row->address()));
+				}
 				foreach($form->getErrors() as $error) {
 					$this->error($error);
 				}

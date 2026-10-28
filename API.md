@@ -47,7 +47,7 @@ Individual properties retain types appropriate to their definitions. **The Page'
 | Page reference (`derefAsPage=1`) | `Page` or `false` | Same, with unpublished pages omitted | Page ID or `false` |
 | Page reference (`derefAsPage=2`) | `Page` or `NullPage` | Same, with unpublished pages omitted | Page ID or `0` |
 | Multilingual text | `LanguagesPageFieldValue` | Current-language `string`, formatted by configured Textformatters | Map keyed by language ID |
-| `rows` | `FlexRows` containing `FlexRow` | Same classes, formatted leaf values | `rows:1` envelope |
+| `rows` | `FlexRows` containing `FlexRow` | Visible rows, formatted leaf values | `rows:1` envelope |
 | File / Image | `FlexFiles` / `FlexImages` | Collection, compatible `Pagefile` / `Pageimage`, or `null` | Media metadata envelope |
 
 Page-reference mutation follows native `FieldtypePage` rules; see [Page references](#page-references).
@@ -294,6 +294,36 @@ Use these `FieldtypeFlex` constants for `rowCollapse`:
 
 The matching integers and numeric strings are also accepted; invalid values fall back to `FieldtypeFlex::ROW_COLLAPSE_EXISTING`. Rows with input errors remain open. Invalid non-string labels and row titles use their normal defaults. `minItems` and `maxItems` apply across all types; `maxItems=0` means no per-collection maximum within the field's resource budgets.
 
+### Optional lazy row bodies
+
+Set `rowLazyLoad => true` on a Rows definition (or `$rows->rowLazyLoad = true`
+on a native InputfieldFlexRows definition). The default is `false`; only the
+boolean `true` enables it. This is independent of `rowCollapse`: collapse chooses
+the initial open/closed state; lazy loading defers eligible closed row bodies
+until they are opened. Expanded, new and validation-error rows render directly.
+
+The first implementation supports ordinary native Text, Textarea, Email, URL,
+Integer, Float, Checkbox, Select, SelectMultiple, Checkboxes and Radios, including
+ordinary fieldsets. Rows containing nested collections, media, rich-text editors,
+date/Page inputs, multilingual inputs, custom Inputfield classes, native AJAX
+collapse modes or custom nonempty unchecked checkbox values render directly.
+A nested collection can independently opt in for its eligible child rows.
+Eligibility is per row type; mixed collections keep their existing editor behavior
+for unsupported types. Native assets still preload once per declared type.
+
+Opening uses an authenticated, CSRF-protected editor request. Saving validates
+all retained rows through native Inputfields, including unopened values against
+current `showIf`/`requiredIf` sources. Unopened values and unknown properties are
+preserved; loaded checkboxes and choices clear normally when absent. Loading a
+body does not save content. A failed load offers Retry and blocks saving until
+resolved; issued body markers protect against missing/truncated input. Changed
+schemas or stale content require reloading the editor. The no-JavaScript link
+loads the full editor with `flex_eager=1`.
+
+This reduces initial row input construction, HTML and DOM size, not JSON hydration,
+definition evaluation, asset downloads or validation work at save time. Measure
+representative fields before enabling it.
+
 ### `FlexRow`: inspect a row
 
 ```php
@@ -305,6 +335,95 @@ $row->hasValue('heading');         // Property contains logical content
 ```
 
 `rowTypeLabel(): string` uses the evaluated type label or a title-case fallback. It does **not** automatically HTML-encode the label for output; escape it when rendering. `hasProperty(string $name): bool` checks the current row type's schema, not its stored content. Normal fieldset leaves are flat; nested row properties must be inspected on their own `FlexRow` objects.
+
+### Row visibility
+
+Every row has `isHidden(): bool` and `setHidden(bool $hidden): self`:
+
+```php
+$page->of(false);
+$row = $page->content->blocks->first();
+$row->setHidden(true);
+$page->save('content');
+```
+
+Rows are visible by default. The optional boolean `hidden` belongs to the row
+inside the existing `rows:1` envelope, outside its content properties. Missing
+metadata means visible; nonboolean stored metadata is rejected. Showing a row
+removes the optional flag on canonical export. Duplicating copies its state.
+Visibility changes require an unformatted value and Page and participate in normal
+change tracking, revision checks and field saves.
+
+With output formatting enabled, iteration, `getArray()`, `getById()`, `first()`,
+`count()` and type helpers expose only visible rows, recursively. Hiding a parent
+hides its entire subtree without changing child states. Reacquire the unformatted
+field to access **all rows**, including hidden ones:
+
+```php
+$allRows = $page->getUnformatted('content')->blocks;
+```
+
+`rawArray()` and JSON serialization retain every row even on a formatted view.
+Canonical content checks (`hasValue()`), storage, maintenance, media ownership,
+`minItems`/`maxItems` and resource budgets still include hidden content. Formatting
+never prunes data or copies/deletes media. Hidden content is an editorial state,
+not an access-control boundary; do not use raw export as filtered frontend output.
+
+The editor always includes every row. The eye button immediately before Remove
+changes the current form, persisted with ordinary Page Save. Hidden rows have a
+native theme's faded header and a struck-through title; hover and keyboard focus
+restore full header contrast. Open bodies and all actions remain usable.
+Native required/dependency validation still applies, including lazy unopened rows.
+Submitted visibility survives native validation errors.
+
+Row selectors, type selectors, same-row expressions, counts and count sorting use
+only rows whose own flag **and every ancestor's flag** are visible. Negative and
+blank queries use this same set: a collection of hidden rows is query-empty.
+A visible matching row still matches beside hidden rows. Flex whole-field text
+search excludes hidden subtrees while retaining ordinary root properties.
+
+Native `include=all` controls PageFinder's Page status/access handling and does
+**not** include hidden Flex rows. There is currently no SQL opt-out. For explicit
+all-row inspection, first select suitable owner Pages using ordinary Page/root
+criteria, then use the unformatted PHP collection above. Paginating/counting those
+owners is not equivalent to an SQL row predicate. An SQL opt-out would require
+retaining a second projection or adding visibility columns plus ancestor-aware
+query context and a separate whole-field text-search path. That additional API
+is deferred rather than overloading native `include` semantics.
+
+Existing installations require no schema migration, envelope version change or
+initial rebuild: all pre-feature rows lack the flag and remain visible, so their
+existing projections are already correct. Normal writes atomically replace row
+and text projections with canonical JSON. The internal bounded
+`FlexStorage::rebuildRows()` repair path now rebuilds **both** projections under
+one per-owner lock/transaction, without rewriting canonical data or touching media.
+It is an implementation repair tool, not a new public maintenance duty.
+
+### Removing rows in Page Edit
+
+Remove marks a row for deletion in the current form. It stays at its position,
+collapses, and uses the native theme's warning header with a struck-through title.
+The same trash button becomes **Undo removal** (`aria-pressed=true`); undo restores
+the row and its unsaved inputs. Only trash and expand/collapse remain in its header.
+Pending body inputs are inactive; undo restores their previous input states.
+
+Double-click Remove to mark all siblings in that collection after a native
+confirmation, respecting `minItems`. Double-click Undo removal to undo all sibling
+marks without confirmation. Other collections and nested child marks are unchanged.
+
+Only an ordinary successful owning-field save deletes the marked row and its
+subtree through the existing transactional projection/media path. A failed
+validation retains the mark, edited inputs and undo action without deleting stored
+content or media. Pending rows are excluded from native leaf validation and from
+the collection that would be saved; minimum/maximum checks use the remaining rows.
+A marked row therefore frees a slot for a replacement. Undo remains available;
+restoring too many rows must be corrected before Save. Hidden rows that are **not**
+marked still count toward all limits as usual.
+
+The mark is editor transport only: there is no persisted deletion flag, trash
+collection or change to the PHP `removeRow()` API. Leaving without saving discards
+the mark. Registered unsaved rows, nested rows and unopened lazy bodies use the
+same mechanism, with existing draft/revision/permission checks.
 
 ### `FlexRows`: add, find, filter, and reorder
 

@@ -2,6 +2,14 @@
 
 /** Internal instance addressing and bounded traversal shared by storage and editor code. */
 final class FlexPath {
+	/** Missing metadata is visible; reject malformed stored states everywhere. @internal */
+	public static function rowHidden(array $row): bool {
+		if(array_key_exists('hidden', $row) && !is_bool($row['hidden'])) {
+			throw new WireException(__('Invalid Flex row visibility'));
+		}
+		return $row['hidden'] ?? false;
+	}
+
 	public const JSON_DEPTH = 512;
 	public const MAX_JSON_DEPTH = 100;
 
@@ -133,6 +141,7 @@ final class FlexPath {
 				if(!is_array($row) || !is_string($row['id'] ?? null) || !preg_match('/^[a-f0-9]{32}$/D', $row['id']) || !is_string($row['type'] ?? null) || !preg_match('/^[a-z][a-z0-9_]{0,63}$/D', $row['type']) || $row['type'] === 'count' || !is_array($row['values'] ?? null) || isset($identities[$row['id']])) {
 					throw new WireException(sprintf(__('Invalid retained Flex row at %s'), $set));
 				}
+				self::rowHidden($row);
 				$identities[$row['id']] = true;
 				$address = $set . '.' . $row['id'];
 				$data = array_filter($row['values'], static fn($v) => !is_array($v) || ($v['_flex'] ?? '') !== FlexStorage::ROWS_FORMAT);

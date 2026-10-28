@@ -134,10 +134,14 @@ class InputfieldFlex extends Inputfield {
 		$this->wire()->config->styles->add($base . 'FieldtypeFlex.css');
 		$this->wire()->config->js('FieldtypeFlex', [
 			'unableToAdd'           => $this->_('Unable to add item'),
+			'unableToLoad'          => $this->_('Unable to load item'),
+			'loading'               => $this->_('Loading…'),
+			'requestPending'        => $this->_('Wait for the current request to finish before saving.'),
 			'uploading'             => $this->_('Uploading {name}…'),
 			'unableToUpload'        => $this->_('Unable to upload file'),
 			'unableToRefreshImage'  => $this->_('Unable to refresh image'),
 			'itemMoved'             => $this->_('Item moved to position {position} of {count}'),
+			'removeAll'             => $this->_('Remove all items?'),
 			'inputVarsExceeded'     => $this->_('This form contains {count} input values, exceeding PHP max_input_vars={max}. Reduce the content or ask the administrator to raise the PHP limit before saving.'),
 		]);
 		// Repeaters preload only their direct subfields. Flex is atomic to the outer form,
@@ -229,8 +233,13 @@ class InputfieldFlex extends Inputfield {
 		}
 		try {
 			$inputs = $this->inputs();
+			if($this->flexDraft !== '') $input = FlexLazy::prepare($this->value, $this->flexDraft, $input);
 		} catch(FlexDefinitionException $error) {
 			$this->reportDefinitionError($error);
+			return $this;
+		} catch(WireException $error) {
+			if($this->isDatabaseInputFailure($error)) throw $error;
+			$this->reportAdminInputError($error->getMessage());
 			return $this;
 		}
 		try {

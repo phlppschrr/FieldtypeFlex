@@ -8,11 +8,13 @@ if(PHP_SAPI !== 'cli' || !isset($same, $createField)) {
 // Execute the actual reference snippets in the existing disposable suite fixture.
 $api = file_get_contents(dirname(__DIR__, 2) . '/API.md');
 preg_match_all('/```php\n(.*?)```/s', $api, $matches);
-$same(24, count($matches[1]), 'all API PHP examples have an execution context');
+$same(26, count($matches[1]), 'all API PHP examples have an execution context');
 $blocks = array_combine(range(1, count($matches[1])), $matches[1]);
 $rowTitleFragment = $blocks[9];
-$dependencyFragment = $blocks[21];
-unset($blocks[9], $blocks[21]);
+$visibilityExample = $blocks[11];
+$allRowsExample = $blocks[12];
+$dependencyFragment = $blocks[23];
+unset($blocks[9], $blocks[11], $blocks[12], $blocks[23]);
 $blocks = array_combine(range(1, count($blocks)), array_values($blocks));
 $modules = $wire->modules;
 $fields = $wire->fields;
@@ -162,3 +164,10 @@ $emptyValue = $type->getBlankValue($page, $emptyField);
 $same([], $emptyValue->rawArray(), 'empty API value has an empty PHP property array');
 $same('[]', json_encode($emptyValue), 'empty API JSON view follows PHP array shape');
 $same('{}', FlexStorage::encode($emptyValue->rawArray()), 'database JSON preserves an empty property object');
+
+// Visibility examples use the same live owner and save through the public API.
+$visibilityCode = str_replace(['$page->content', "'content'"], ['$page->' . $name, "'$name'"], $visibilityExample);
+$snippet($visibilityCode, $context);
+$same(true, $wire->pages->getFresh($id)->getUnformatted($name)->blocks->first()->isHidden(), 'API visibility example persists hidden state');
+$r = $snippet(str_replace("'content'", "'$name'", $allRowsExample), $context);
+$same(2, count($r['allRows']), 'API explicit unformatted access includes hidden rows');

@@ -129,12 +129,12 @@ class FlexAdmin extends Wire {
 	private function loadRow(string $token, string $set, string $id, FlexValue $parent, string $name, bool $includeMedia = true): FlexRow {
 		$draft = $this->draft($token);
 		$row = $parent->getUnformatted($name)->getById($id);
-		$raw = $row ? ['id' => $id, 'type' => $row->rowType(), 'values' => $row->rawArray()] : ($draft['rows'][$set][$id] ?? null);
+		$raw = $row ? $row->envelope() : ($draft['rows'][$set][$id] ?? null);
 		if(!is_array($raw) || ($raw['id'] ?? '') !== $id || !is_string($raw['type'] ?? null) || !is_array($raw['values'] ?? null)) {
 			throw new WirePermissionException($this->_('Invalid Flex editor context'));
 		}
 		$schema = $parent->definitions()->rowType($name, $raw['type'])['schema'];
-		$copy = new FlexRow($parent->ownerPage(), $parent->ownerField(), $schema, $set, $id, $raw['type'], $raw['values']);
+		$copy = new FlexRow($parent->ownerPage(), $parent->ownerField(), $schema, $set, $id, $raw['type'], $raw['values'], FlexPath::rowHidden($raw));
 		return $includeMedia ? $this->overlay($token, $copy) : $copy;
 	}
 
@@ -173,11 +173,7 @@ class FlexAdmin extends Wire {
 		if(isset($draft['orders'][$set]) && !in_array($row->rowId(), $draft['orders'][$set], true)) {
 			$draft['orders'][$set][] = $row->rowId();
 		}
-		$draft['rows'][$set][$row->rowId()] = [
-			'id'     => $row->rowId(),
-			'type'   => $row->rowType(),
-			'values' => $row->rawArray(),
-		];
+		$draft['rows'][$set][$row->rowId()] = $row->envelope();
 		$this->put($token, $draft);
 		try {
 			$root = $row->ownerPage()->getUnformatted($row->ownerField()->name);
@@ -285,7 +281,7 @@ class FlexAdmin extends Wire {
 		};
 		$raw = $walk($value->rawArray(), $value->definitions(), $value->address() === '' ? '' : $value->address() . '.');
 		if($value instanceof FlexRow) {
-			return new FlexRow($value->ownerPage(), $value->ownerField(), $value->definitions(), substr($value->address(), 0, -33), $value->rowId(), $value->rowType(), $raw);
+			return new FlexRow($value->ownerPage(), $value->ownerField(), $value->definitions(), substr($value->address(), 0, -33), $value->rowId(), $value->rowType(), $raw, $value->isHidden());
 		}
 		return new FlexValue($value->ownerPage(), $value->ownerField(), $value->definitions(), $raw);
 	}
@@ -571,7 +567,22 @@ class FlexAdmin extends Wire {
 			$page->of(false);
 			$value = $page->getUnformatted($field->name);
 			$action = (string) $this->wire()->input->post('flex_action');
-			if(in_array($action, ['add', 'duplicate'], true)) {
+			FlexLazy::assertSchema($value, $token);
+			if($action === 'row-render') {
+				if($this->wire()->input->post('flex_complete') !== $token) throw new WireException($this->_('Incomplete Flex row request; check the PHP input limits'));
+				$set = (string) $this->wire()->input->post('flex_set');
+				[$parent, $setName, $definition] = $this->collection($token, $set, $value, true);
+				$row = $this->row($token, $set, (string) $this->wire()->input->post('flex_source'), $value);
+				if(empty($definition['settings']['rowLazyLoad']) || !FlexLazy::supports($row->definitions()) || !isset($draft['lazy'][$row->address()])) throw new WirePermissionException($this->_('Invalid Flex editor context'));
+				$input = $this->wire(new InputfieldFlexRows());
+				$input->name = FlexPath::inputPrefix($draft['input'], $parent->address()) . $setName;
+				$input->definition = $definition;
+				$input->flexDraft = $token;
+				$input->flexRoot = $value;
+				$input->setName = $set;
+				$input->flexInputName = $draft['input'];
+				$response = ['error' => false, 'html' => $input->renderRow($row, 1, false, true)];
+			} else if(in_array($action, ['add', 'duplicate'], true)) {
 				if($this->wire()->input->post('flex_complete') !== $token) {
 					throw new WireException($this->_('Incomplete Flex row request; check the PHP input limits'));
 				}
@@ -616,10 +627,12 @@ class FlexAdmin extends Wire {
 					if($postedType !== null && $postedType !== $source->rowType()) {
 						throw new WirePermissionException($this->_('An existing Flex row cannot change type'));
 					}
+					InputfieldFlexRows::applyVisibility($source, $this->wire()->input->post, $draft['input']);
 					$prefix = FlexPath::inputPrefix($draft['input'], $source->address());
 					$inputs = $source->definitions()->getInputfields($source, $prefix, $token, $value);
-					$form = FlexDependencies::processInput($inputs, $page, $this->wire()->input->post);
-					InputfieldFlex::applyInputs($source, $form, $prefix);
+					$post = FlexLazy::prepare($value, $token, $this->wire()->input->post);
+					$form = FlexDependencies::processInput($inputs, $page, $post);
+					if(!FlexLazy::unloaded($value, $token, $source->address())) InputfieldFlex::applyInputs($source, $form, $prefix);
 					if($form->getErrors()) {
 						throw new WireException(implode('; ', $form->getErrors()));
 					}

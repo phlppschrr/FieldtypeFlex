@@ -96,9 +96,14 @@
 }
 .flex-rows > .flex-row-type-control {
     display: inline-flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: .5rem;
+    max-width: calc(100% - .5rem);
     margin: 0 .5rem .5rem 0;
+}
+.flex-row-type-control > span {
+    flex: none;
 }
 .flex-row-type-control > select {
     width: auto;
@@ -118,9 +123,6 @@
 .flex-row-header button:hover:not(:disabled):not(.flex-row-toggle) {
     outline: 1px solid currentColor;
     outline-offset: -1px;
-}
-.flex-row-header button:focus-visible {
-    outline: none;
 }
 .flex-row-header button:disabled {
     opacity: .3;
@@ -155,5 +157,72 @@
 .flex-rows-status:empty {
     display: none;
 }
+.flex-row-load-status,
+.flex-row-retry {
+    margin: .75rem;
+}
 
 .FlexMaintenanceReport { overflow-x: auto; }
+
+/* Native Repeater headers retain their theme palette and fade only the header.
+   Hover/focus restores the controls; the open body always stays fully readable. */
+.flex-row.InputfieldStateCollapsed > .flex-row-header {
+    opacity: .9;
+}
+.flex-row.flex-row-hidden > .flex-row-header {
+    opacity: .5;
+}
+/* Default/Konkat preserves the header surface and fades its contents instead. */
+.AdminThemeUikit:not(.AdminThemeUikitOriginal) .flex-row-hidden > .flex-row-header {
+    opacity: 1;
+}
+.AdminThemeUikit:not(.AdminThemeUikitOriginal) .flex-row-hidden > .flex-row-header .flex-row-bar > * {
+    opacity: .5;
+}
+.AdminThemeUikit:not(.AdminThemeUikitOriginal) .flex-row-hidden > .flex-row-header:hover .flex-row-bar > *,
+.AdminThemeUikit:not(.AdminThemeUikitOriginal) .flex-row-hidden > .flex-row-header:focus-within .flex-row-bar > * {
+    opacity: 1;
+}
+.flex-row > .flex-row-header:hover,
+.flex-row > .flex-row-header:focus-within {
+    opacity: 1;
+}
+.AdminThemeUikitOriginal .flex-row-bar > button,
+.AdminThemeUikitOriginal .flex-row-header .flex-row-controls > button {
+    min-height: 2rem;
+}
+.flex-row-hidden > .flex-row-header .flex-row-title {
+    text-decoration: line-through;
+}
+.flex-row-header button:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: -3px;
+}
+
+/* Match native RepeaterDeletePending: warning header, title strike, trash to undo. */
+.flex-row.flex-row-remove-pending > .flex-row-header {
+    opacity: 1;
+}
+.AdminThemeUikitOriginal .flex-row-remove-pending > .flex-row-header .flex-row-bar {
+    /* Native Repeater danger palette; override UIKit's primary utility. */
+    background-color: #bc283d !important;
+    color: #fff;
+}
+.flex-row-remove-pending > .flex-row-header .flex-row-title {
+    text-decoration: line-through;
+}
+.flex-row-remove-pending > .flex-row-header .flex-row-sort,
+.flex-row-remove-pending > .flex-row-header .flex-row-action:not([data-flex-row-action="remove"]) {
+    display: none;
+}
+.flex-rows .flex-row-remove-pending {
+    border-color: var(--pw-error-inline-text-color, #bc283d);
+}
+.AdminThemeUikit:not(.AdminThemeUikitOriginal) .flex-row-remove-pending > .flex-row-header .flex-row-bar {
+    /* Override UIKit's !important background utility, as native error headers do. */
+    background-color: var(--pw-alert-danger) !important;
+    color: var(--pw-error-inline-text-color);
+}
+.AdminThemeUikit:not(.AdminThemeUikitOriginal) .flex-row-remove-pending > .flex-row-header .flex-row-bar > * {
+    opacity: 1;
+}

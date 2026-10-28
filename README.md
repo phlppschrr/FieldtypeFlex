@@ -202,6 +202,11 @@ For example, sections can contain content blocks, and individual blocks can cont
 
 There is no fixed two-level nesting limit. The effective depth depends on database JSON limits and configurable resource budgets.
 
+Optional `rowLazyLoad => true` defers closed simple Row bodies until opening.
+Rich text, media and other specialized inputs retain direct rendering; nested
+collections can opt in for their simple children. See the
+[lazy loading contract](API.md#optional-lazy-row-bodies).
+
 See the [typed and nested Rows example](examples/08-rows.php) and [API reference](API.md#nested-repeatables-and-resource-limits).
 
 ## More examples

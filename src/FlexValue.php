@@ -438,6 +438,11 @@ class FlexValue extends WireData implements \JsonSerializable {
 			return false;
 		}
 		if($value instanceof FlexRows) {
+			// Content checks describe canonical data, independent of output visibility.
+			if($value->of()) {
+				$value = clone $value;
+				$value->of(false);
+			}
 			foreach($value as $row) {
 				foreach($row->definitions()->properties() as $property => $_) {
 					if($row->hasValue($property)) {

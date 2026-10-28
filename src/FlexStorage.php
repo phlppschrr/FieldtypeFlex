@@ -173,7 +173,10 @@ class FlexStorage extends Wire {
 
 	/** The single derivation used by writes and read-only consistency checks. @internal */
 	public static function projection(array $raw): \Generator {
+		$visible = ['' => true];
 		foreach(FlexPath::rows($raw) as $entry) {
+			$visible[$entry['address']] = $visible[$entry['parent']] && !FlexPath::rowHidden($entry['row']);
+			if(!$visible[$entry['address']]) continue;
 			yield [
 				'key' => hash('sha256', $entry['set']), 'name' => $entry['set'],
 				'schema_key' => hash('sha256', $entry['schema']), 'schema' => $entry['schema'],
@@ -215,7 +218,7 @@ class FlexStorage extends Wire {
 	}
 
 	/**
-	 * Rebuild row projections for a bounded batch of saved pages.
+	 * Rebuild row and search projections atomically for a bounded batch of saved pages.
 	 *
 	 * @param Field $field Owning Flex field.
 	 * @param int $after Resume after this page ID.
@@ -237,7 +240,11 @@ class FlexStorage extends Wire {
 				continue;
 			}
 			$this->atomic(function() use ($page, $field) {
-				$this->projectRows($page, $field, $this->persisted($page, $field, true));
+				$raw = $this->persisted($page, $field, true);
+				$this->projectRows($page, $field, $raw);
+				$table = $this->wire()->database->escapeTable($field->table);
+				$update = $this->wire()->database->prepare("UPDATE `$table` SET search=:search WHERE pages_id=:page");
+				$update->execute(['search' => self::search($raw), 'page' => $page->id]);
 			});
 			$last = (int) $id;
 			++$count;
@@ -311,7 +318,7 @@ class FlexStorage extends Wire {
 			if(is_array($value)) {
 				if(($value['_flex'] ?? '') === FlexStorage::ROWS_FORMAT) {
 					foreach($value['items'] as $row) {
-						$walk($row['values']);
+						if(!FlexPath::rowHidden($row)) $walk($row['values']);
 					}
 					return;
 				}

@@ -49,6 +49,11 @@ final class FlexDependencies {
 			: $wire->modules->getModule($source->className(), ['noCache' => true]);
 		foreach($source->getArray() as $key => $value) $copy->set($key, $value);
 		foreach($source->getAttributes() as $key => $value) $copy->attr($key, $value);
+		// Text exports minlength as data-minlength and omits maxlength=0 for HTML.
+		// A processing copy needs the original semantic limits, not those defaults.
+		if($source instanceof InputfieldText) {
+			foreach(['minlength', 'maxlength'] as $key) $copy->attr($key, $source->attr($key));
+		}
 		if(method_exists($source, 'getOptions') && method_exists($copy, 'addOptions')) $copy->addOptions($source->getOptions());
 		$copy->label = $source->label;
 		$copy->editable($source->editable());

@@ -410,3 +410,20 @@ Unsupported Flex dependency path: %s,Ruta de dependencia Flex no compatible: %s,
 A parent dependency requires a Flex row,Una dependencia parent requiere una fila Flex,,site/modules/FieldtypeFlex/src/FlexDependencies.php,c0406d34785b042d533d89f0fabe5d35
 Flex dependency graph exceeds its safety limit,El grafo de dependencias Flex supera su límite de seguridad,,site/modules/FieldtypeFlex/src/FlexDependencies.php,a2944e613b00b513dcc6fd5aef51c118
 Flex dependency field is unavailable or unsupported: %s,El campo de dependencia Flex no está disponible o no es compatible: %s,,site/modules/FieldtypeFlex/src/FlexDependencies.php,d3173c2c6a62a5aa47658dfa2e97d211
+The Flex definition changed. Reload the editor before continuing.,La definición de Flex ha cambiado. Recargue el editor antes de continuar.,,site/modules/FieldtypeFlex/src/FlexLazy.php,3a4565304b4994a57e73b522863e1628
+Incomplete Flex form submission; reload and check the PHP input limits,Envío incompleto del formulario Flex; vuelva a cargar y compruebe los límites de entrada de PHP,,site/modules/FieldtypeFlex/src/FlexLazy.php,01cf2b9a2041ba2c0f179f9153d6dcca
+Missing repeatable order,Falta el orden de los elementos repetibles,,site/modules/FieldtypeFlex/src/FlexLazy.php,f197b69d803f31f683c95d91b101644f
+Duplicate repeatable row,Fila repetible duplicada,,site/modules/FieldtypeFlex/src/FlexLazy.php,8f25789911db1cf49e3f4033dc81f435
+Invalid Flex editor context,Contexto del editor Flex no válido,,site/modules/FieldtypeFlex/src/FlexLazy.php,dc9b38bd730b3173d6f26ccd3affac66
+Unable to load item,No se ha podido cargar el elemento,,site/modules/FieldtypeFlex/InputfieldFlex.module.php,646dd467835f4b7796847022dcce0200
+Loading…,Cargando…,,site/modules/FieldtypeFlex/InputfieldFlex.module.php,5f02f05c744a0f875aebb8625ae1486f
+Wait for the current request to finish before saving.,Espere a que termine la solicitud actual antes de guardar.,,site/modules/FieldtypeFlex/InputfieldFlex.module.php,363d244041a47beb8e03cdc48e60d754
+Retry,Reintentar,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,6327b4e59f58137083214a1fec358855
+Load all items,Cargar todos los elementos,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,0eebde661ef29045f5800c4421c0c548
+Show item,Mostrar elemento,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,a1f6a40da5867b943cab530c122719de
+Hide item,Ocultar elemento,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,897ae3630f6d6c038ef4c3af2a1517d7
+Invalid Flex row visibility,Visibilidad de fila Flex no válida,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,d6a674360291a25e093fc22f8b06783b
+Invalid Flex row visibility,Visibilidad de fila Flex no válida,,site/modules/FieldtypeFlex/src/FlexPath.php,d6a674360291a25e093fc22f8b06783b
+Undo removal,Deshacer eliminación,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,5b92e819d882b56fac9257489cb3400a
+Invalid Flex row removal,Marca de eliminación de fila Flex no válida,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,210477ec9451ce0d33970012963d17ff
+Remove all items?,¿Eliminar todos los elementos?,,site/modules/FieldtypeFlex/InputfieldFlex.module.php,0ba1cc4a44ed1aace333e9865c70f93c

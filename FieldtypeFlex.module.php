@@ -6,6 +6,7 @@ require_once __DIR__ . '/src/FlexValue.php';
 require_once __DIR__ . '/src/FlexRows.php';
 require_once __DIR__ . '/src/FlexPath.php';
 require_once __DIR__ . '/src/FlexDependencies.php';
+require_once __DIR__ . '/src/FlexLazy.php';
 require_once __DIR__ . '/src/FlexStorage.php';
 require_once __DIR__ . '/src/FlexMaintenance.php';
 require_once __DIR__ . '/src/FlexMaintenanceCli.php';

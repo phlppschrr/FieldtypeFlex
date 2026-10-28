@@ -1,5 +1,52 @@
 # Changelog
 
+## Unreleased — Row type selector layout
+
+- Keep `New item type` on one line beside its select inside native Inputfield
+  columns. Wrap the controls when space is limited instead of squeezing the label.
+
+## Unreleased — Row duplication inside native Repeaters
+
+- Fix `Invalid Flex editor context` when duplicating a Flex row inside a native
+  Repeater. Preserve unsaved dependency values without overriding the request's
+  owning Page with the main editor form's `id`.
+
+## Unreleased — Deferred editor row removal
+
+- Make Remove mark a row with the native Repeater warning appearance and an
+  accessible Undo removal action; keep the row and its inputs until Save.
+- Preserve marks and unsaved edits after failed validation. Skip pending rows
+  during validation, and apply counts/limits to the rows that would be saved.
+- Remove rows, descendants and media references only through the normal field
+  save transaction. No canonical deletion metadata or PHP removal API change.
+
+## Unreleased — Native Repeater header appearance
+
+- Match native Repeater fading in both supported themes: Core Original fades
+  the header, Default/Konkat fades its contents while preserving the surface.
+- Retain the theme palette, match Original header height, and restore header
+  contrast on hover or keyboard focus. Open bodies stay fully readable.
+
+## Unreleased — Row visibility
+
+- Add row visibility metadata, `isHidden()` / `setHidden()` and an accessible eye
+  button before Remove. Hidden rows keep editable bodies and native validation.
+- Filter formatted collections and row/text search projections recursively; counts,
+  negatives, blanks and same-row selectors use the same visible subtree.
+- Preserve all canonical data, unknown values, media, drafts and limits. Missing
+  metadata remains visible; no schema migration or initial rebuild is needed.
+- Rebuild both derived projections atomically in the bounded internal repair path.
+  Native `include=all` does not override row visibility.
+
+## Unreleased — optional lazy row bodies
+
+- Add opt-in `rowLazyLoad` for closed Rows with supported native scalar inputs,
+  independently of `rowCollapse`, with per-type fallback for specialized inputs.
+- Load bodies through authenticated editor requests with retry and completeness
+  protection; validate unopened baselines using current dependency sources and
+  retain unknown values. Nested simple children may load independently.
+- Preserve native Text `minlength` and unlimited `maxlength=0` in processing copies.
+
 ## Unreleased — dependency contexts
 
 - Extend native `showIf` and `requiredIf` with `parent.`, `root.`, `page.` and

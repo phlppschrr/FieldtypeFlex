@@ -431,7 +431,7 @@ class FlexFieldDefs extends Wire {
 				throw new WireException(sprintf($this->_('Unsupported Flex definition setting: %s'), $key));
 			}
 		}
-		foreach(['types', 'minItems', 'maxItems', 'addRowLabel', 'rowCollapse'] as $key) {
+		foreach(['types', 'minItems', 'maxItems', 'addRowLabel', 'rowCollapse', 'rowLazyLoad'] as $key) {
 			if(!$isRows && array_key_exists($key, $settings)) {
 				throw new WireException(sprintf($this->_('%s requires type rows'), $key));
 			}
@@ -473,6 +473,7 @@ class FlexFieldDefs extends Wire {
 		$settings['rowCollapse'] = in_array($collapse, array_merge($collapseModes, array_map('strval', $collapseModes)), true)
 			? (int) $collapse
 			: FieldtypeFlex::ROW_COLLAPSE_EXISTING;
+		$settings['rowLazyLoad'] = ($settings['rowLazyLoad'] ?? false) === true;
 		$types = $settings['types'] ?? null;
 		if(!is_array($types) || !$types || array_is_list($types)) {
 			throw new WireException($this->_('Rows types must be a non-empty map'));
