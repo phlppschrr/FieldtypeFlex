@@ -1,0 +1,12 @@
+/.dev/
+/.scratch/
+/vendor/
+/node_modules/
+/test-results/
+/.playwright-mcp/
+/.openchamber/
+.DS_Store
+*.log
+
+__pycache__/
+*.py[cod]

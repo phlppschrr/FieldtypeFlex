@@ -1,0 +1,9 @@
+# Installation archives retain documentation and the runtime example catalog.
+/.ddev/ export-ignore
+/.github/ export-ignore
+/scripts/ export-ignore
+/tests/ export-ignore
+/FieldtypeFlex.test.php export-ignore
+/.editorconfig export-ignore
+/.gitattributes export-ignore
+/.gitignore export-ignore

@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+## Description: Install FieldtypeFlex and seed the demonstration page
+## Usage: flex-seed
+set -euo pipefail
+php /var/www/html/scripts/seed.php

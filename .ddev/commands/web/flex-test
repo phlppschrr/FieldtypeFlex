@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+## Description: Run FieldtypeFlex integration suites against the isolated ProcessWire fixture
+## Usage: flex-test [suite ...]
+## Example: ddev flex-test nested
+set -euo pipefail
+php /var/www/html/tests/run.php "$@"

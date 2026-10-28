@@ -1,0 +1,74 @@
+name: Integration tests
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    name: ${{ matrix.processwire.version }} / PHP ${{ matrix.php }} / ${{ matrix.database }}
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.1', '8.3']
+        database: ['mariadb:10.11', 'mysql:8.0']
+        processwire:
+          - version: '3.0.259'
+            ref_file: scripts/processwire-3.0.259-ref.txt
+          - version: '3.0.274 dev'
+            ref_file: scripts/processwire-ref.txt
+    services:
+      database:
+        image: ${{ matrix.database }}
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: db
+          MYSQL_USER: db
+          MYSQL_PASSWORD: db
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=10s --health-timeout=5s --health-retries=10
+    steps:
+      - uses: actions/checkout@v6
+      # Rollback tests inject SQL failures with triggers under the ordinary fixture user.
+      - name: Enable fault-injection triggers in the disposable MySQL service
+        if: matrix.database == 'mysql:8.0'
+        run: docker exec "${{ job.services.database.id }}" mysql -uroot -proot -e 'SET GLOBAL log_bin_trust_function_creators = 1'
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: pdo_mysql, gd, mbstring, fileinfo, dom
+          coverage: none
+      - run: bash scripts/setup-ci.sh
+        env:
+          FLEX_DB_HOST: 127.0.0.1
+          FLEX_PROCESSWIRE_REF_FILE: ${{ matrix.processwire.ref_file }}
+      - run: composer lint
+      - run: composer validate --no-check-publish
+      - run: python3 scripts/package.py HEAD /tmp/FieldtypeFlex.zip
+      - run: node --check FieldtypeFlex.js
+      - run: php tests/integration.php
+      - id: wiretests
+        name: Check native WireTests availability
+        run: |
+          if [ -f .dev/pw/wire/modules/System/WireTests/WireTests.module.php ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "This ProcessWire core does not include WireTests; skipping its contract and lifecycle checks."
+          fi
+      - name: Run full native WireTests contract
+        if: steps.wiretests.outputs.available == 'true'
+        run: php scripts/wiretest.php
+      - name: Run core-only native WireTests contract
+        if: steps.wiretests.outputs.available == 'true'
+        run: FLEX_WIRETEST_MEDIA=0 FLEX_WIRETEST_OPTIONAL=0 php scripts/wiretest.php
+      - name: Run WireTests lifecycle checks
+        if: steps.wiretests.outputs.available == 'true'
+        run: php tests/wiretest-lifecycle.php
+      - name: Show fixture error diagnostics
+        if: failure()
+        run: |
+          for log in .dev/pw/site/assets/logs/{errors,exceptions}.txt; do
+            if [ -f "$log" ]; then tail -v -n 80 "$log"; fi
+          done

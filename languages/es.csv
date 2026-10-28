@@ -1,0 +1,407 @@
+text,es,description,file,hash
+"The page form is incomplete. No changes were saved. Check PHP max_input_vars and post_max_size, then reload the editor.",El formulario de la página está incompleto. No se guardó ningún cambio. Compruebe PHP max_input_vars y post_max_size y vuelva a cargar el editor.,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,10227b2d8c00570f52db828d3813bcfd
+"Save an unformatted, owned Flex file on a live page",Guarde un archivo Flex sin formato que pertenezca a una página actual,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,8d080dcaba7f2c0a75505680ce56d7a6
+Unsupported Flex file metadata column,Columna de metadatos de archivo Flex no admitida,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,f248e80612ad816d7d63bb3f6369eac6
+Flex file changed; reload before saving metadata,El archivo Flex ha cambiado; vuelva a cargar antes de guardar los metadatos,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,527e6ef8d5d2559f460fa29397cab0e5
+Save new or replaced files with the containing Flex field,Guarde los archivos nuevos o reemplazados con el campo Flex que los contiene,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,c68dde7f91e5df6942c446570fc71d72
+Sort only a Flex collection count; repeated leaf sorting is ambiguous,Ordene solo por el número de elementos de una colección Flex; ordenar por propiedades repetidas es ambiguo,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,02b308508b3096e4ffab9da33e72b886
+Flex page values must be arrays or FlexValue objects,Los valores de página Flex deben ser arrays u objetos FlexValue,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,00f2b8410f64f8dfa28327aae5f0701b
+Corrupt Flex JSON in %1$s on page %2$d,JSON de Flex dañado en %1$s en la página %2$d,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,54eaf698de1e87247011edfe44e972ba
+Stored Flex data must be a JSON object,Los datos Flex almacenados deben ser un objeto JSON,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,012ebcced99b828afa5c3b60e452013c
+Saving Flex page versions is not supported,No se admite guardar versiones de página de Flex,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,da37b119ece18ec64589b7e96a096f0a
+This Flex field changed before the save completed. Reload before saving.,Este campo Flex cambió antes de finalizar el guardado. Vuelva a cargar antes de guardar.,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,40d9536fb82ac829d4bdd34f7970fc5a
+Unable to save canonical Flex value,No se pudo guardar el valor canónico de Flex,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,7a212d3035e58416afdcde36889b7e77
+An existing Flex row cannot change type,No se puede cambiar el tipo de una fila Flex existente,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,27437bd02f4b8a2813efaf63dd956f9a
+Remove saved Flex fields before uninstalling FieldtypeFlex,Elimine los campos Flex guardados antes de desinstalar FieldtypeFlex,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,44c596edf843b647e95d2596c90de641
+FieldtypeFlex currently requires MySQL or MariaDB,FieldtypeFlex requiere actualmente MySQL o MariaDB,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,195814c6577f453497902c77cb1b1366
+Definition file,Archivo de definición,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,527341b211a417892828b5a0616c635c
+Relative to site/templates. Automatic: flex-fields/NAME.php or .json. Configure exactly one source.,Ruta relativa a site/templates. Automático: flex-fields/NAME.php o .json. Configure exactamente una fuente.,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,9e7a313f703c86f26eb25291ac0e8360
+Inline JSON definition,Definición JSON integrada,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,f64d78e1f8db3cd2845b3257d66038a2
+Optional alternative to a definition file. PHP is only loaded from trusted template files.,Alternativa opcional a un archivo de definición. PHP solo se carga desde archivos de plantilla de confianza.,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,bcf8fb1487202ef87c7273faea8eb1c3
+Entity encode text with output formatting,Codificar el texto como entidades HTML al formatear la salida,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,408e3c67b9e2c7fed46cbb8399188d93
+Enabled by default. Rich HTML from TinyMCE is preserved.,Activado de forma predeterminada. Se conserva el HTML de TinyMCE.,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,da01d64dea3732cb0e39fef71a01fed6
+Remove undefined properties on save,Eliminar las propiedades no definidas al guardar,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,7e3237d9a8596f4dd3ca1df3d3e11aea
+Enabled by default. Disable for dynamic schemas that temporarily hide properties.,Activado de forma predeterminada. Desactívelo para esquemas dinámicos que oculten propiedades temporalmente.,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,0a676a41ada8eb540d5293eb567caf36
+Hide outer field label,Ocultar la etiqueta del campo contenedor,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,0a0411c4b5ea78a187bdd1a96c8d55ec
+Display the child inputs without the Flex heading.,Mostrar los campos secundarios sin el encabezado Flex.,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,cb9449da92c2d4bf85b36b07ca267aa5
+Definition source and structure,Fuente y estructura de la definición,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,5cd74143e6e66b44f22e6c4b8e382ea9
+Automatic,Automático,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,086247a9b57fde6eefee2a0c4752242d
+Configured,Configurado,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,61aa63eb3ac1c3408640463ee5fe8aa3
+Inline JSON is active.,El JSON integrado está activo.,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,c884fae2c5f398404db64af198db02d8
+%1$s file: %2$s,Archivo %1$s: %2$s,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,e1c444eee533406bbd5be80f425db947
+No definition file is active; automatic lookup is allowed.,No hay ningún archivo de definición activo; se permite la búsqueda automática.,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,6faf6e099b879f0ccbcc86f0580dbc88
+Active source,Fuente activa,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,a51bbd65445cff414616dbd04c2c34d2
+Automatic search paths,Rutas de búsqueda automática,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,7f9279ecb53150176ddf55e0512301d3
+Fieldset,Grupo de campos,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,5b3a50aadfa94048d38820473b25ec57
+Repeatable set,Colección repetible,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,6a60d9d10d4516bf9988133d12619b7f
+Row type,Tipo de fila,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,6f524ce004ca3d42571f5690b27ae756
+required,obligatorio,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,ac67ede5a84eb5a1add7ff4440e9a485
+multilingual,multilingüe,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,39b54e52b6cb2f51165f2736030781ed
+showIf: %s,showIf: %s,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,18716430bba356523c4380ee020ff7c6
+requiredIf: %s,requiredIf: %s,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,d8775f1afc79dd7ef15aa9a960eae894
+"min %1$d, max %2$d","mín. %1$d, máx. %2$d",,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,23c2031946f70e9366ca813ad3580e40
+No properties yet. See the module examples directory.,Todavía no hay propiedades. Consulte el directorio de ejemplos del módulo.,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,6c0bc51a330022b9e843b28ff0872ab2
+Structure in the NullPage context,Estructura en el contexto NullPage,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,43f3f55b2763f2040a5af2c2ccd02869
+Technical cause,Causa técnica,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,4c8af2ac03d1b81d0c74cc24a234c5c6
+Example catalog,Catálogo de ejemplos,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,9d2817bd69b5c1b30677f3b218ad7475
+Browse and copy source files. Viewing examples does not execute or install them.,Explore y copie los archivos fuente. Ver los ejemplos no los ejecuta ni los instala.,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,2c70fa0aadd8c4d494f90e7a6a2053d0
+Category,Categoría,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,3adbdb3ac060038aa0e6e6c138ef9873
+Copy beside this definition,Copiar junto a esta definición,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,e513d9fc77b3b61cca53a2aa5c405ffa
+Optional modules,Módulos opcionales,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,f90f4ac8085102bf149598c730ddb371
+Helper file only; this is not a field definition.,Solo es un archivo auxiliar; no es una definición de campo.,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,6405959982e0e7525251d65aad9ca05a
+Flex,Flex,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,09d2bd168181f1e64c2b1651a80a8aa8
+PHP/JSON-defined compound fields with native inputs and selectors,Campos compuestos definidos en PHP/JSON con entradas y selectores nativos,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,9560bda478132dee41d442a929c0db97
+FieldtypeFlex contributors,Colaboradores de FieldtypeFlex,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,e7a4050b5d397c44f13cba2eaffb47ff
+InputfieldFlex needs hasPage and hasField,InputfieldFlex necesita hasPage y hasField,,site/modules/FieldtypeFlex/InputfieldFlex.module.php,4e70f145f0f2983e251e5cb2411b4c37
+Editing is disabled while the Flex definition has an error. Existing values are preserved.,La edición está desactivada mientras la definición Flex contenga un error. Se conservan los valores existentes.,,site/modules/FieldtypeFlex/InputfieldFlex.module.php,32f42fdab11d4c0899125dd6d2ed3cd2
+Unable to add item,No se pudo añadir el elemento,,site/modules/FieldtypeFlex/InputfieldFlex.module.php,9f8148a6c050f2934a6c1d0edc27a263
+Uploading {name}…,Subiendo {name}…,,site/modules/FieldtypeFlex/InputfieldFlex.module.php,3cabe4992ff7628edca0873cbab58bcf
+Unable to upload file,No se pudo subir el archivo,,site/modules/FieldtypeFlex/InputfieldFlex.module.php,5fa39d9ce25ad502405e70ff7b86dd70
+Unable to refresh image,No se pudo actualizar la imagen,,site/modules/FieldtypeFlex/InputfieldFlex.module.php,8cefedb699f6111078d4cddf0313501a
+Item moved to position {position} of {count},Elemento movido a la posición {position} de {count},,site/modules/FieldtypeFlex/InputfieldFlex.module.php,d7e4e0bf010bcb35810be24615938ecc
+"This form contains {count} input values, exceeding PHP max_input_vars={max}. Reduce the content or ask the administrator to raise the PHP limit before saving.",Este formulario contiene {count} valores y supera PHP max_input_vars={max}. Reduzca el contenido o pida al administrador que aumente el límite de PHP antes de guardar.,,site/modules/FieldtypeFlex/InputfieldFlex.module.php,b04f5d2c66230ce43461b163129f4a77
+Missing Flex editor draft,Falta el borrador del editor Flex,,site/modules/FieldtypeFlex/InputfieldFlex.module.php,81cb206bf4afc4a60e27cc66aa0b09e6
+Incomplete Flex form submission; reload and check the PHP input limits,Envío incompleto del formulario Flex; vuelva a cargar y compruebe los límites de entrada de PHP,,site/modules/FieldtypeFlex/InputfieldFlex.module.php,01cf2b9a2041ba2c0f179f9153d6dcca
+Flex,Flex,,site/modules/FieldtypeFlex/InputfieldFlex.module.php,09d2bd168181f1e64c2b1651a80a8aa8
+Schema-defined compound input,Entrada compuesta definida por un esquema,,site/modules/FieldtypeFlex/InputfieldFlex.module.php,cd8f33361c4cd83f0fea0b2892983ead
+Duplicate,Duplicar,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,ed75712b0eb1913c28a3872731ffd48d
+Remove,Eliminar,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,1063e38cb53d94d386f21227fcd84717
+Drag to reorder; use Up and Down arrow keys when focused,Arrastre para reordenar; use las flechas arriba y abajo cuando tenga el foco,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,577a545637affab25d1eb0110ff4886d
+Add item,Añadir elemento,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,ff19c966036b4a0c7350b2fc7e2861c2
+New item type,Tipo del nuevo elemento,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,edf59eea341f3a52af54a917a3aaf0c9
+Missing repeatable order,Falta el orden de los elementos repetibles,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,f197b69d803f31f683c95d91b101644f
+Duplicate repeatable row,Fila repetible duplicada,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,8f25789911db1cf49e3f4033dc81f435
+Flex rows,Filas Flex,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,72878b311d12f5ca4d48fbdd8445eb9f
+Repeatable native inputs inside Flex,Entradas nativas repetibles dentro de Flex,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,6cdf4ab51032cdd36ca4a667d2467c63
+Invalid Flex editor context,Contexto del editor Flex no válido,,site/modules/FieldtypeFlex/src/FlexAdmin.php,dc9b38bd730b3173d6f26ccd3affac66
+Invalid Flex draft token,Token de borrador Flex no válido,,site/modules/FieldtypeFlex/src/FlexAdmin.php,5357ecd96c3aaca1c2c85a941ab2c1d6
+Flex editor draft expired; reload the editor,El borrador del editor Flex ha caducado; vuelva a cargar el editor,,site/modules/FieldtypeFlex/src/FlexAdmin.php,9fcf8873fe662a29d9a4fe21c06ff5b1
+This Flex field changed in another request. Reload before saving.,Este campo Flex cambió en otra solicitud. Vuelva a cargar antes de guardar.,,site/modules/FieldtypeFlex/src/FlexAdmin.php,ba8401a197d964edfe9b08a7b813b4ac
+Unknown repeatable set,Colección repetible desconocida,,site/modules/FieldtypeFlex/src/FlexAdmin.php,c64f088070d9d79a3ec35c215e3217b1
+Unable to create native media input,No se pudo crear la entrada de medios nativa,,site/modules/FieldtypeFlex/src/FlexAdmin.php,9552feb83c8bc49e1928f1cea76c5e47
+This Flex field is not editable,Este campo Flex no se puede editar,,site/modules/FieldtypeFlex/src/FlexAdmin.php,1a0ef5c7f79376cd53f2d66d78cd61d3
+This Flex property is not editable,Esta propiedad Flex no se puede editar,,site/modules/FieldtypeFlex/src/FlexAdmin.php,386a09c75e7480dae842d245396bd08e
+Manage Flex image variations through the Pageimage API,Gestione las variantes de imagen Flex mediante la API Pageimage,,site/modules/FieldtypeFlex/src/FlexAdmin.php,f9df4b847e6cf73a3bd9972b64ab695d
+Image editing is not permitted,No se permite editar imágenes,,site/modules/FieldtypeFlex/src/FlexAdmin.php,cc0c2588e50361855cd62dd933813946
+Only committed images can be selected,Solo se pueden seleccionar imágenes guardadas,,site/modules/FieldtypeFlex/src/FlexAdmin.php,b3bcbe494c0d88447a4d7a70c5f4f0ca
+Image no longer belongs to this draft,La imagen ya no pertenece a este borrador,,site/modules/FieldtypeFlex/src/FlexAdmin.php,ffa9e2a25fc8114bdce3c4bcbb18e75e
+Unsupported Flex image request,Solicitud de imagen Flex no admitida,,site/modules/FieldtypeFlex/src/FlexAdmin.php,a49db856c77ebb230d7329de71c6afc4
+Image change prepared. Save the page to apply it.,Cambio de imagen preparado. Guarde la página para aplicarlo.,,site/modules/FieldtypeFlex/src/FlexAdmin.php,cc3b590c1ce96f5e238b10d782d45d31
+Incomplete Flex row request; check the PHP input limits,Solicitud de fila Flex incompleta; compruebe los límites de entrada de PHP,,site/modules/FieldtypeFlex/src/FlexAdmin.php,2635dc7f870863c5c42c7dfd729643f2
+Duplicate row in request,Fila duplicada en la solicitud,,site/modules/FieldtypeFlex/src/FlexAdmin.php,3871f578f50d03016a7ecc20a8842047
+Maximum repeatable item count reached,Se alcanzó el número máximo de elementos repetibles,,site/modules/FieldtypeFlex/src/FlexAdmin.php,165d63f16b1b32b968a235b83d4adf67
+An existing Flex row cannot change type,No se puede cambiar el tipo de una fila Flex existente,,site/modules/FieldtypeFlex/src/FlexAdmin.php,27437bd02f4b8a2813efaf63dd956f9a
+Uploads are disabled for this property,Las subidas están desactivadas para esta propiedad,,site/modules/FieldtypeFlex/src/FlexAdmin.php,fe573f7b1e9e5b61163753f756872eb8
+Native upload did not produce the reserved file,La subida nativa no generó el archivo reservado,,site/modules/FieldtypeFlex/src/FlexAdmin.php,7b7a7c4abcfbff8f3a445ace89b5d7a0
+Invalid native upload response,Respuesta de subida nativa no válida,,site/modules/FieldtypeFlex/src/FlexAdmin.php,df7e379d0522ef0a324362c45d5d090b
+Definition must return an array or InputfieldWrapper,La definición debe devolver un array o un InputfieldWrapper,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,2053c68e7183a72801e5bc245bb725bb
+The definition file is missing. Restore a definition before reading or saving existing Flex values.,Falta el archivo de definición. Restaure una definición antes de leer o guardar los valores Flex existentes.,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,325bebdf9914dccfd735b5f2093337a1
+Unable to read the definition file.,No se pudo leer el archivo de definición.,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,3e47feb507a87de32f71586be1465e4f
+Invalid Flex definition JSON: %s,JSON de definición Flex no válido: %s,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,c2237f4b7f44c25742a0cca85b804e4c
+Flex definition JSON must be an object keyed by property name,El JSON de definición Flex debe ser un objeto con nombres de propiedad como claves,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,d19bf634635af51a8460f5b6c4e4ed4a
+Invalid or reserved Flex property name: %s,Nombre de propiedad Flex no válido o reservado: %s,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,a6207185b4c93296edd4aa0a16b97b22
+Duplicate Flex property name: %s,Nombre de propiedad Flex duplicado: %s,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,fce79e79ae38b3edea56579344ebbfec
+Unknown Flex input type: %s,Tipo de entrada Flex desconocido: %s,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,c3943f7759301e1a0b4b4830b4e8e69f
+%s is not a supported Flex definition input,%s no es una entrada admitida en una definición Flex,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,625d98eb20d930d755e7114600520125
+"useLanguages must be true, false or ""auto""","useLanguages debe ser true, false o ""auto""",,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,49b8b1bb8898114ba73e7e13de0e9d48
+Automatic language support requires a Text or Textarea input,La compatibilidad automática de idiomas requiere una entrada Text o Textarea,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,bfb539967c29bab650a421feba494fdc
+useLanguages on '%s' requires LanguageSupport and LanguageSupportFields,useLanguages en «%s» requiere LanguageSupport y LanguageSupportFields,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,9e21157c2503f48a1d9f0ca9db19d73a
+Flex fieldset tree is cyclic or too deep,El árbol de grupos de campos Flex es cíclico o demasiado profundo,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,f37d2bb0ecfd0c1a51367038368ada94
+Flex property '%s' must be an array,La propiedad Flex «%s» debe ser un array,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,8a12a05730ce24337d04b6ca073a45df
+Unable to load %s,No se pudo cargar %s,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,e440ac52213ba86df69fb025acda3c64
+Unknown inheritField: %s,inheritField desconocido: %s,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,4022ec637ec38699a0d68df17da58a35
+inheritField must use %s,inheritField debe usar %s,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,9eea04d63566ef5708c6d42a89e8e9c2
+types requires a repeatable fieldset,types requiere un grupo de campos repetible,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,9b7d38d4802853571cf52a97f955c7f5
+children of '%s' must be an array,children de «%s» debe ser un array,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,5155121b0667edd1d885cad7c04f9f24
+repeatable requires a fieldset,repeatable requiere un grupo de campos,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,ada3a4518db7402600e8cb705f7e0a82
+%s must be a non-negative integer,%s debe ser un entero no negativo,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,10f8d2a99fdddbc72df8371e69894295
+minItems must not exceed maxItems,minItems no debe superar maxItems,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,42635a24cd5f93ea3c9d469692f71f4d
+"%s belongs to a repeatable type, not the set","%s pertenece a un tipo repetible, no a la colección",,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,dcc2789d387e5a9e931124ae6c19ded1
+Repeatable types must be a non-empty map,Los tipos repetibles deben formar un mapa no vacío,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,4f014ac84fe52bd776e45cd0d3d23f5b
+Invalid or reserved Flex row type: %s,Tipo de fila Flex no válido o reservado: %s,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,494f1af3974891140e2d2ed60c809be8
+Settings for row type %s must be an array,La configuración del tipo de fila %s debe ser un array,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,a135ec89b74ae4b4f25d0707a601e5c5
+Unsupported row type setting: %s,Ajuste de tipo de fila no admitido: %s,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,8bef0d4a783784eeb869ff8d4d617ab9
+Repeatable children must be definitions or a wrapper,Los elementos secundarios repetibles deben ser definiciones o un contenedor,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,716d9729cf025c437d6f9a1692a9608c
+Invalid renamedFrom for '%s',renamedFrom no válido para «%s»,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,6f90dccbaf9f861437264d8c9bc84787
+"Flex media outputFormat must be 0 (auto), 1 (collection) or 2 (single)","outputFormat de medios Flex debe ser 0 (automático), 1 (colección) o 2 (único)",,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,06ed598bdc8c096a6ac2ff91af21c255
+Flex media uses owned collections and staged replacement; overwrite/custom metadata templates/archive extraction are unsupported,"Los medios Flex usan colecciones con propietario y reemplazo diferido; no se admiten la sobrescritura, las plantillas de metadatos personalizadas ni la extracción de archivos comprimidos",,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,b4d12c0c1ad3600fee1452fb9f3d9c17
+File properties require allowed extensions,Las propiedades de archivo requieren extensiones permitidas,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,2c14342988ad2f8e311df79fc203ddeb
+Flex media requires a non-negative file limit and free-form tags,Los medios Flex requieren un límite de archivos no negativo y etiquetas libres,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,075fbc0ef0a26aa23037c892648ee069
+Unknown Flex row type: %1$s.%2$s,Tipo de fila Flex desconocido: %1$s.%2$s,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,9bce0652ce4f8d3206787ef9e86b6d30
+Ambiguous renamedFrom: %s,renamedFrom ambiguo: %s,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,d9ddf6444aeca3327a9c939c4583f5ab
+Flex rename collision: '%1$s' and '%2$s' both contain different values,Conflicto de cambio de nombre Flex: «%1$s» y «%2$s» contienen valores diferentes,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,cabc3434082e67f1e6c84bc5aa62e1b2
+"Invalid Flex definition for field ""%1$s"" from %2$s: %3$s",Definición Flex no válida para el campo «%1$s» de %2$s: %3$s,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,104794e82fe8eb5985c38219d6490523
+(line %d),(línea %d),,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,3b62ff03671cc6e0745bfe32631947e4
+inline JSON,JSON integrado,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,530abb4fee0f0960a041de69eed9f87c
+automatic lookup,búsqueda automática,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,c61726f4debdb4ca7d1292d718d73657
+configured file,archivo configurado,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,f6e1bdc4f11b4fcd4fae16959e16a15d
+automatic file %s,archivo automático %s,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,86c007312a25a75057270fabfa81ec8d
+file %s,archivo %s,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,f3370904528868b0a624cf63ee53da2b
+Flex definition exceeds its depth budget,La definición Flex supera su límite de profundidad,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,8b5544b36f9ce58fae0c0e6d4acb9d34
+"Configure either an inline JSON definition or a definition file, not both.","Configure una definición JSON integrada o un archivo de definición, pero no ambos.",,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,86de6d0f148ddf577e80fe2d8753431e
+"Multiple automatic definition files exist. Keep one PHP or JSON file, or configure an explicit file.",Existen varios archivos de definición automática. Conserve un archivo PHP o JSON o configure un archivo explícito.,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,44628e21308375baac346e01f06f37ae
+The site/templates directory could not be resolved.,No se pudo resolver el directorio site/templates.,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,f1d831732d2b8d6125a7a5a95ecd367c
+The automatic definition file is no longer available.,El archivo de definición automática ya no está disponible.,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,a36b563c93e070ea49691db0106ac7be
+The configured definition file does not exist.,El archivo de definición configurado no existe.,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,33447dedee94fde84f74ed7e84a8111b
+The definition file must resolve inside site/templates.,El archivo de definición debe estar dentro de site/templates.,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,cf821bcded600e6e9b79f7579bd399db
+Definition files must use the PHP or JSON extension.,Los archivos de definición deben usar la extensión PHP o JSON.,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,916efed4f547a75316c00e95ca8d4711
+Invalid Flex asset identity,Identidad de recurso Flex no válida,,site/modules/FieldtypeFlex/src/FlexMedia.php,4d2a051e1b8e5b311e2bda72545a9250
+Invalid Flex media value: %s,Valor de medios Flex no válido: %s,,site/modules/FieldtypeFlex/src/FlexMedia.php,594a0bc2c3ad0dcdcdf6d9b294c0b074
+Duplicate media identity,Identidad de medios duplicada,,site/modules/FieldtypeFlex/src/FlexMedia.php,b6c57f3fc923217e2f21fdbaeca3cb0c
+Media copy source no longer exists,El origen de la copia de medios ya no existe,,site/modules/FieldtypeFlex/src/FlexMedia.php,09473cab0f8d44ac3ef63f2ce2ce165e
+Duplicate media basename,Nombre de archivo de medios duplicado,,site/modules/FieldtypeFlex/src/FlexMedia.php,995df33fd94aa9de0133dba7bb29af82
+Disable output formatting before changing Flex files,Desactive el formato de salida antes de modificar archivos Flex,,site/modules/FieldtypeFlex/src/FlexMedia.php,1a534417785bd2f8696024a3ec089e7e
+Flex media cannot be changed on a page version,No se pueden modificar los medios Flex en una versión de página,,site/modules/FieldtypeFlex/src/FlexMedia.php,907a015cc09662a20c3574a4e4588187
+Add a local file path or Pagefile to a Flex media collection,Añada una ruta de archivo local o un Pagefile a una colección de medios Flex,,site/modules/FieldtypeFlex/src/FlexMedia.php,fd14b3a71bc84fc49cbac99bb5b0920d
+Flex imports require a readable local file,Las importaciones Flex requieren un archivo local legible,,site/modules/FieldtypeFlex/src/FlexMedia.php,7da10cfb8e69c85c2505f0b812435dc0
+A Flex file must belong to its collection,Un archivo Flex debe pertenecer a su colección,,site/modules/FieldtypeFlex/src/FlexMedia.php,702083c1d97abad259864a2b881175d8
+File does not belong to this collection,El archivo no pertenece a esta colección,,site/modules/FieldtypeFlex/src/FlexMedia.php,46a0a2643d0076f562b791bc0146d229
+Unknown media original,Original de medios desconocido,,site/modules/FieldtypeFlex/src/FlexMedia.php,17e0f163b204eb858d053954a336e79f
+Save the owner page before committing its files,Guarde la página propietaria antes de confirmar sus archivos,,site/modules/FieldtypeFlex/src/FlexMedia.php,a68ccac7f4b7d809710ebafd36dca707
+Maximum Flex file count reached,Se alcanzó el número máximo de archivos Flex,,site/modules/FieldtypeFlex/src/FlexMedia.php,34629dc95acc25c639c1ff72150ee68d
+Unknown Flex file clone option,Opción de clonación de archivo Flex desconocida,,site/modules/FieldtypeFlex/src/FlexMedia.php,d4dab82606b1193e2780dd07b6a0bf81
+Add the source file to the target Flex collection when copying between collections,Añada el archivo de origen a la colección Flex de destino al copiar entre colecciones,,site/modules/FieldtypeFlex/src/FlexMedia.php,1caaafa7e41ab8ff859593f5b9f22717
+Unknown Flex file clone action,Acción de clonación de archivo Flex desconocida,,site/modules/FieldtypeFlex/src/FlexMedia.php,20342f398b68c773ebaf1c38a4f995ac
+Media staging requires an independent connection,La preparación de medios requiere una conexión independiente,,site/modules/FieldtypeFlex/src/FlexMedia.php,48021ab6d5987c0ee4c313998c0b8956
+Media staging needs a saved owner and field,La preparación de medios requiere un propietario y un campo guardados,,site/modules/FieldtypeFlex/src/FlexMedia.php,7b9e9ed5e3f7d031313aaa77a92ae118
+Invalid page assets directory,Directorio de recursos de página no válido,,site/modules/FieldtypeFlex/src/FlexMedia.php,c58fc48aa12c5debc0128645a32a308e
+Page assets directory does not match the Flex owner,El directorio de recursos de página no coincide con el propietario Flex,,site/modules/FieldtypeFlex/src/FlexMedia.php,1d9f6c69e1498ef46eb18275dda08a10
+Invalid file extension,Extensión de archivo no válida,,site/modules/FieldtypeFlex/src/FlexMedia.php,611d3495c1e0dad701d535ccafd84330
+Cannot reserve unique media filename,No se pudo reservar un nombre de archivo de medios único,,site/modules/FieldtypeFlex/src/FlexMedia.php,49f271561fa5318767eabe9b0b6255c8
+Media copy source is not a readable local file,El origen de la copia de medios no es un archivo local legible,,site/modules/FieldtypeFlex/src/FlexMedia.php,d3d14a956e6320f6f8d655a2e069480d
+Unsupported file extension,Extensión de archivo no admitida,,site/modules/FieldtypeFlex/src/FlexMedia.php,d0226906bdd5efb9b28187a06a7765b4
+Invalid image file,Archivo de imagen no válido,,site/modules/FieldtypeFlex/src/FlexMedia.php,7abcf2c313d07cb71ef102966529e78d
+File exceeds maxFilesize,El archivo supera maxFilesize,,site/modules/FieldtypeFlex/src/FlexMedia.php,b011a2e03c8b3a83361ad86faf8cb31f
+Unable to stage media copy,No se pudo preparar la copia de medios,,site/modules/FieldtypeFlex/src/FlexMedia.php,0ee168a3321e948a0006ec8a28e83a37
+Invalid upload reservation,Reserva de subida no válida,,site/modules/FieldtypeFlex/src/FlexMedia.php,c5a78da6ce30acdb96d50bdef429d854
+Image must belong to Flex,La imagen debe pertenecer a Flex,,site/modules/FieldtypeFlex/src/FlexMedia.php,0c5d955f2fbe3fb93ea0b6198b14907d
+Invalid image dimensions,Dimensiones de imagen no válidas,,site/modules/FieldtypeFlex/src/FlexMedia.php,7edd421d28592e5de1bb58c5a90919c3
+Crop is outside the image,El recorte está fuera de la imagen,,site/modules/FieldtypeFlex/src/FlexMedia.php,0744f5d862666f5b0fea03c6d808120f
+Unsupported Flex image action,Acción de imagen Flex no admitida,,site/modules/FieldtypeFlex/src/FlexMedia.php,7535cd1d9b0a83726bb1d0281c38d318
+Unable to transform staged image,No se pudo transformar la imagen preparada,,site/modules/FieldtypeFlex/src/FlexMedia.php,84344e8dc8438e3ed02e33f44a1af6d4
+Two properties cannot share a Flex asset,Dos propiedades no pueden compartir un recurso Flex,,site/modules/FieldtypeFlex/src/FlexMedia.php,5ac1606297bf03f30308bffb7af7ccba
+Flex asset ownership does not match canonical value,El propietario del recurso Flex no coincide con el valor canónico,,site/modules/FieldtypeFlex/src/FlexMedia.php,0e231db06c5acad524148da66b11cec6
+Upload has not completed,La subida no ha finalizado,,site/modules/FieldtypeFlex/src/FlexMedia.php,0f04947c0e712bae53d75670968a01cb
+missing,falta,,site/modules/FieldtypeFlex/src/FlexMedia.php,ea21841da70e6405af19fabc4ff8bdd9
+"Page clone %1$d did not copy a complete Flex original (%2$s: expected %3$d, actual %4$s); repair it before use","La copia de página %1$d no copió un original Flex completo (%2$s: esperado %3$d, real %4$s); repárela antes de usarla",,site/modules/FieldtypeFlex/src/FlexMedia.php,68b3eb6042ad46d4da35af176b056ada
+Repair a saved Flex clone outside a transaction,Repare una copia Flex guardada fuera de una transacción,,site/modules/FieldtypeFlex/src/FlexMedia.php,3313717938e1eba312a60fc3c1307aa2
+Clone source ownership is no longer available,El propietario del origen de clonación ya no está disponible,,site/modules/FieldtypeFlex/src/FlexMedia.php,e333f2502da5bba630893b42255efac8
+Unable to repair cloned original,No se pudo reparar el original clonado,,site/modules/FieldtypeFlex/src/FlexMedia.php,d6ccf0c759f8d171118bdd934c47c61e
+Run Flex file cleanup after the outer database transaction commits,Ejecute la limpieza de archivos Flex después de confirmar la transacción externa de la base de datos,,site/modules/FieldtypeFlex/src/FlexMedia.php,1b9c1a3ff794666f00881f9ef25bd5d2
+Invalid cleanup limit,Límite de limpieza no válido,,site/modules/FieldtypeFlex/src/FlexMedia.php,604ec17d3abc7d4cf9fc5e97d63b4676
+Unable to remove owned image variation,No se pudo eliminar la variante de imagen perteneciente a Flex,,site/modules/FieldtypeFlex/src/FlexMedia.php,d09e9c1298dc08e835ede2693ddadeac
+Unable to remove owned file or variation,No se pudo eliminar el archivo o la variante perteneciente a Flex,,site/modules/FieldtypeFlex/src/FlexMedia.php,389e1efcc461fa52cb17cfaddda22099
+Invalid staged assets directory,Directorio de recursos preparados no válido,,site/modules/FieldtypeFlex/src/FlexMedia.php,071f25340127b1ce2fe2ed23b7e84134
+Staged assets directory does not match the recorded owner,El directorio de recursos preparados no coincide con el propietario registrado,,site/modules/FieldtypeFlex/src/FlexMedia.php,38bd17dabfd2aee73b280c846c0beb12
+Staged path escaped page assets,La ruta preparada salió del directorio de recursos de página,,site/modules/FieldtypeFlex/src/FlexMedia.php,53e44c3fe4a1b315dfc7f93ce0f25b89
+Unable to remove staged orphan,No se pudo eliminar el recurso preparado huérfano,,site/modules/FieldtypeFlex/src/FlexMedia.php,2114820b314cf6fd76e3acc5ddf19f42
+Invalid Flex file metadata,Metadatos de archivo Flex no válidos,,site/modules/FieldtypeFlex/src/FlexMedia.php,65062e637314d3178438d8d8079d963a
+Invalid Flex instance address,Dirección de instancia Flex no válida,,site/modules/FieldtypeFlex/src/FlexPath.php,60ee7da591eadc66c4b431f5216815ab
+Invalid Flex row address: %s,Dirección de fila Flex no válida: %s,,site/modules/FieldtypeFlex/src/FlexPath.php,9d0cfd17453446143728e8756d43a8f5
+Flex row no longer exists: %s,La fila Flex ya no existe: %s,,site/modules/FieldtypeFlex/src/FlexPath.php,733ff305ceea216219de4bab28272e0e
+Invalid Flex property address,Dirección de propiedad Flex no válida,,site/modules/FieldtypeFlex/src/FlexPath.php,60cd4161d04c71899c934eb1e0ae595f
+Flex property no longer exists: %s,La propiedad Flex ya no existe: %s,,site/modules/FieldtypeFlex/src/FlexPath.php,4a080b07f3a26f8f41b7d5d12e8bf360
+Flex tree exceeds the traversal safety limit,El árbol Flex supera el límite de seguridad del recorrido,,site/modules/FieldtypeFlex/src/FlexPath.php,45d7086741a0f23407cf4f9b7721fa03
+Invalid retained Flex row collection,Colección de filas Flex conservada no válida,,site/modules/FieldtypeFlex/src/FlexPath.php,773ee25a4c941b2e81751125dcfc78ae
+Invalid retained Flex row at %s,Fila Flex conservada no válida en %s,,site/modules/FieldtypeFlex/src/FlexPath.php,078cb7040ccb6855612576fa6cce66c1
+Flex value exceeds its byte budget,El valor Flex supera su límite de bytes,,site/modules/FieldtypeFlex/src/FlexPath.php,f98aacef004c9ad9de6e37447b297b19
+Flex JSON exceeds the database depth budget of %d,El JSON Flex supera el límite de profundidad de la base de datos de %d,,site/modules/FieldtypeFlex/src/FlexPath.php,6d4c169c937a08deed451ba05ccb955b
+Flex tree budget exceeded at %s,Límite del árbol Flex superado en %s,,site/modules/FieldtypeFlex/src/FlexPath.php,8f7201e6ca829d50625b96ed7741fef7
+Invalid Flex selector property,Propiedad de selector Flex no válida,,site/modules/FieldtypeFlex/src/FlexQuery.php,03ac917f154ea4f8c3052c3e0b855c77
+Unknown Flex selector property: %1$s.%2$s. Page-dependent schemas must expose queryable properties without a page context.,Propiedad de selector Flex desconocida: %1$s.%2$s. Los esquemas dependientes de una página deben exponer propiedades consultables sin contexto de página.,,site/modules/FieldtypeFlex/src/FlexQuery.php,697874c1d5a9e4eab3aede4c244c1256
+Use a Flex media count or blank selector,Use un selector de número de medios Flex o de valor vacío,,site/modules/FieldtypeFlex/src/FlexQuery.php,be312dda2f009ee3b4fb7c06d640f270
+Invalid Flex date selector,Selector de fecha Flex no válido,,site/modules/FieldtypeFlex/src/FlexQuery.php,3f5d29a3f618595284a85b3eefd30852
+Multi-selection Flex properties support = and != membership,Las propiedades Flex de selección múltiple admiten pertenencia con = y !=,,site/modules/FieldtypeFlex/src/FlexQuery.php,f11e84878ef84ea529249d8cd7a262b0
+Numeric Flex selectors require a number,Los selectores numéricos Flex requieren un número,,site/modules/FieldtypeFlex/src/FlexQuery.php,1dd6b8d6d32347b964297615e06c4dba
+OR between nested Flex paths is not supported,No se admite OR entre rutas Flex anidadas,,site/modules/FieldtypeFlex/src/FlexQuery.php,bf29bfb27147d27d1efc5eef202f3767
+Invalid Flex selector path,Ruta de selector Flex no válida,,site/modules/FieldtypeFlex/src/FlexQuery.php,fa5fd5fcad8167565ba1f9dd16c892db
+Unknown row property: %s,Propiedad de fila desconocida: %s,,site/modules/FieldtypeFlex/src/FlexQuery.php,57602568f3558529e32d7093af14cc6e
+Use a row media count or blank selector,Use un selector de número de medios de fila o de valor vacío,,site/modules/FieldtypeFlex/src/FlexQuery.php,0ed9d2e1dee1a1597572fe9738b93abf
+Invalid row property path: %s,Ruta de propiedad de fila no válida: %s,,site/modules/FieldtypeFlex/src/FlexQuery.php,184c4112a46f04e651924993bbd8b863
+Unknown repeatable path: %s,Ruta de colección repetible desconocida: %s,,site/modules/FieldtypeFlex/src/FlexQuery.php,95e27f20f99c9660f49ff6d3c5d182d1
+Unknown Flex row type: %s,Tipo de fila Flex desconocido: %s,,site/modules/FieldtypeFlex/src/FlexQuery.php,25190f2f0dca01df858567d77610872f
+Invalid Flex collection path,Ruta de colección Flex no válida,,site/modules/FieldtypeFlex/src/FlexQuery.php,c85048f815dc0dff6a09afe563d5afd1
+Flex counts require a number,Los recuentos Flex requieren un número,,site/modules/FieldtypeFlex/src/FlexQuery.php,773bd704517bad0c92de788bf5eda45a
+Flex row type selectors require = or != and a known type or blank,Los selectores de tipo de fila Flex requieren = o != y un tipo conocido o un valor vacío,,site/modules/FieldtypeFlex/src/FlexQuery.php,d40728388ddba3a629a689b0df5eab84
+A row collection supports blank or same-row selectors,Una colección de filas admite selectores de valor vacío o de la misma fila,,site/modules/FieldtypeFlex/src/FlexQuery.php,58ce744a11c1e6a52a5821a6795076d6
+Same-row selectors require a type and a quoted selector string,Los selectores de la misma fila requieren un tipo y una cadena de selector entre comillas,,site/modules/FieldtypeFlex/src/FlexQuery.php,cf37c965cbb91d25721d1021bb39d6ac
+Empty same-row selector,Selector de la misma fila vacío,,site/modules/FieldtypeFlex/src/FlexQuery.php,c7eb22c1491b103ed129c17c77536e71
+Same-row selectors require one property path,Los selectores de la misma fila requieren una ruta de propiedad,,site/modules/FieldtypeFlex/src/FlexQuery.php,e362cdea83c95e10b155de5e4bc00a39
+Unsupported Flex selector operator: %s,Operador de selector Flex no admitido: %s,,site/modules/FieldtypeFlex/src/FlexQuery.php,8f21f0e26f2e9232fe8937fd1e96df5e
+Repeated leaf sorting is ambiguous; sort the set count,Ordenar por propiedades repetidas es ambiguo; ordene por el número de elementos de la colección,,site/modules/FieldtypeFlex/src/FlexQuery.php,868f07b3538015d9d91cf93499c97d4c
+Sorting multi-selection Flex properties is ambiguous,Ordenar por propiedades Flex de selección múltiple es ambiguo,,site/modules/FieldtypeFlex/src/FlexQuery.php,29866319ac4c068b1035f357ca69e54c
+No rows,Sin filas,,site/modules/FieldtypeFlex/src/FlexQuery.php,3684f8d4192956d5d375d2ec2d5cedaa
+Item count,Número de elementos,,site/modules/FieldtypeFlex/src/FlexQuery.php,0f3085ada06196d3250211981e5f5252
+Item type,Tipo de elemento,,site/modules/FieldtypeFlex/src/FlexQuery.php,c0d051bc5ff12804b83f6b0c9dbbf63b
+No media,Sin medios,,site/modules/FieldtypeFlex/src/FlexQuery.php,38b8ef09a16dcd7478c622ca3cb58729
+File count,Número de archivos,,site/modules/FieldtypeFlex/src/FlexQuery.php,c8bad294b523a99b6b5966db11e556f7
+None,Ninguno,,site/modules/FieldtypeFlex/src/FlexQuery.php,6adf97f83acf6453d4a6a4b1070f3754
+Invalid repeatable value: %s,Valor repetible no válido: %s,,site/modules/FieldtypeFlex/src/FlexRows.php,441e74df4df0a78237ded77f8d0721c1
+Invalid repeatable row,Fila repetible no válida,,site/modules/FieldtypeFlex/src/FlexRows.php,8e66421fe8384811e0827a50e1f19535
+Duplicate Flex row ID,ID de fila Flex duplicado,,site/modules/FieldtypeFlex/src/FlexRows.php,c9a8a36609fb6866aa17cec6c82c1904
+Maximum repeatable item count reached,Se alcanzó el número máximo de elementos repetibles,,site/modules/FieldtypeFlex/src/FlexRows.php,165d63f16b1b32b968a235b83d4adf67
+Use addRow() to create a row in this collection,Use addRow() para crear una fila en esta colección,,site/modules/FieldtypeFlex/src/FlexRows.php,c39585833410b6a101a82cc606b90a7d
+Row schema does not belong to this repeatable type,El esquema de fila no pertenece a este tipo repetible,,site/modules/FieldtypeFlex/src/FlexRows.php,652f0a99f5700d08def8f9b077d6a538
+Duplicate Flex row identity,Identidad de fila Flex duplicada,,site/modules/FieldtypeFlex/src/FlexRows.php,1f2f6550087f71c1697dd20dd896dad1
+A row key must match its identity,La clave de una fila debe coincidir con su identidad,,site/modules/FieldtypeFlex/src/FlexRows.php,3f7dd2886c64a8e70967b86adb91de07
+Unknown repeatable row,Fila repetible desconocida,,site/modules/FieldtypeFlex/src/FlexRows.php,1962357b2600139c3fe24ddbb053096e
+Repeatable '%s' item count is outside its limits,El número de elementos repetibles de «%s» está fuera de los límites,,site/modules/FieldtypeFlex/src/FlexRows.php,7afa54a1a365c5561c4a46c610604e1e
+Unknown Flex row type: %1$s.%2$s,Tipo de fila Flex desconocido: %1$s.%2$s,,site/modules/FieldtypeFlex/src/FlexRows.php,9bce0652ce4f8d3206787ef9e86b6d30
+Disable output formatting before changing repeatable rows,Desactive el formato de salida antes de modificar filas repetibles,,site/modules/FieldtypeFlex/src/FlexRows.php,6d60660e1706935674eeeb89c45554b9
+Invalid Flex row ID,ID de fila Flex no válido,,site/modules/FieldtypeFlex/src/FlexRows.php,7df8578e2ad8ce22b9e904cf001470fe
+Invalid Flex row type,Tipo de fila Flex no válido,,site/modules/FieldtypeFlex/src/FlexRows.php,5758782d416d80cc3aebe8a43414c759
+Install Flex storage outside a database transaction,Instale el almacenamiento Flex fuera de una transacción de base de datos,,site/modules/FieldtypeFlex/src/FlexStorage.php,c794515ade5c92752dc9a59f749149ce
+Structured Flex values require an InnoDB field table,Los valores Flex estructurados requieren una tabla de campo InnoDB,,site/modules/FieldtypeFlex/src/FlexStorage.php,296a096d98dd39e00bcfbe7bbd24b941
+Invalid canonical Flex JSON,JSON canónico de Flex no válido,,site/modules/FieldtypeFlex/src/FlexStorage.php,8db52074c1dfab7abea4e21581e79019
+The Flex row index schema is invalid. Repair the module installation before saving or querying Flex fields.,El esquema del índice de filas Flex no es válido. Repare la instalación del módulo antes de guardar o consultar campos Flex.,,site/modules/FieldtypeFlex/src/FlexStorage.php,63e0d25450c38376e3d41dd36f9de103
+Invalid Flex repair request,Solicitud de reparación Flex no válida,,site/modules/FieldtypeFlex/src/FlexStorage.php,7a6bdaa2a62cdb4f0bb435726140fa58
+Flex JSON tree is cyclic or exceeds the platform depth budget,El árbol JSON de Flex es cíclico o supera el límite de profundidad de la plataforma,,site/modules/FieldtypeFlex/src/FlexStorage.php,f59884958d5594ea5b8e0ed4ac7dc8be
+Unknown Flex property: %s,Propiedad Flex desconocida: %s,,site/modules/FieldtypeFlex/src/FlexValue.php,60476f516cf3510774659c5ef9a496e5
+Disable page output formatting before changing Flex values,Desactive el formato de salida de la página antes de modificar valores Flex,,site/modules/FieldtypeFlex/src/FlexValue.php,b16bcd4c1055c3217a801864fbb50c15
+Flex '%s' requires a scalar value,Flex «%s» requiere un valor escalar,,site/modules/FieldtypeFlex/src/FlexValue.php,b69ad20106f674c5a21c50863af528b2
+Invalid date for Flex '%s',Fecha no válida para Flex «%s»,,site/modules/FieldtypeFlex/src/FlexValue.php,caf135cec083e357abab5a490a051cdb
+Flex '%s' requires a number,Flex «%s» requiere un número,,site/modules/FieldtypeFlex/src/FlexValue.php,480ea5bafedd7379a8f43aa3dd28efc5
+Upload Flex files with the editor upload control before saving the page.,Suba los archivos Flex con el control de subida del editor antes de guardar la página.,,site/modules/FieldtypeFlex/src/InputfieldFlexMedia.php,9846c12527b9ceba9b9be425f57d7abd
+Rotate 90°,Girar 90°,,site/modules/FieldtypeFlex/src/InputfieldFlexMedia.php,6174ad1ae2f9bcd2afdcea846cb4a800
+Rotate 180°,Girar 180°,,site/modules/FieldtypeFlex/src/InputfieldFlexMedia.php,c3f606a2e1fae204da410754e5823017
+Flip horizontally,Voltear horizontalmente,,site/modules/FieldtypeFlex/src/InputfieldFlexMedia.php,00c77fa1672629fb03a1562ca053ec44
+Flip vertically,Voltear verticalmente,,site/modules/FieldtypeFlex/src/InputfieldFlexMedia.php,9e0f97ca38e0d74e484a1d4692287b6d
+Summary,Resumen,,site/modules/FieldtypeFlex/examples/advanced.php,290612199861c31d1036b185b4e69b75
+Category,Categoría,,site/modules/FieldtypeFlex/examples/advanced.php,3adbdb3ac060038aa0e6e6c138ef9873
+Categories,Categorías,,site/modules/FieldtypeFlex/examples/advanced.php,af1b98adf7f686b84cd0b443e022b7a0
+Body,Contenido,,site/modules/FieldtypeFlex/examples/advanced.php,ac101b32dda4448cf13a93fe283dddd8
+Country,País,,site/modules/FieldtypeFlex/examples/advanced.php,59716c97497eb9694541f7c3d37b1a4d
+Enable link,Activar enlace,,site/modules/FieldtypeFlex/examples/advanced.php,408730069c574f1774b533a7cdc90bf7
+Link,Enlace,,site/modules/FieldtypeFlex/examples/advanced.php,97e7c9a7d06eac006a28bf05467fcc8b
+Heading,Encabezado,,site/modules/FieldtypeFlex/examples/advanced.php,0101316665d4f82adaa26d86fbbb2d6e
+Country,País,,site/modules/FieldtypeFlex/examples/choices.php,59716c97497eb9694541f7c3d37b1a4d
+Interests,Intereses,,site/modules/FieldtypeFlex/examples/choices.php,c70952e4ab3806c049737cd7d2b8896b
+Code,Programación,,site/modules/FieldtypeFlex/examples/choices.php,ca0dbad92a874b2f69b549293387925e
+Design,Diseño,,site/modules/FieldtypeFlex/examples/choices.php,1afa74da05ca145d3418aad9af510109
+Writing,Escritura,,site/modules/FieldtypeFlex/examples/choices.php,af96ab416602c6852b1ba5201feaacf6
+Send me occasional news,Recibir noticias ocasionalmente,,site/modules/FieldtypeFlex/examples/choices.php,f60266e776419d095eca8e1285825342
+First name,Nombre,,site/modules/FieldtypeFlex/examples/contact.php,20db0bfeecd8fe60533206a2b5e9891a
+Email,Correo electrónico,,site/modules/FieldtypeFlex/examples/contact.php,ce8ae9da5b7cd6c3df2929543a9af92d
+Address,Dirección,,site/modules/FieldtypeFlex/examples/contact.php,dd7bf230fde8d4836917806aff6a6b27
+City,Ciudad,,site/modules/FieldtypeFlex/examples/contact.php,57d056ed0984166336b7879c2af3657f
+Country,País,,site/modules/FieldtypeFlex/examples/contact.php,59716c97497eb9694541f7c3d37b1a4d
+Start date,Fecha de inicio,,site/modules/FieldtypeFlex/examples/dates.php,4d34f1097f6c8b9cee28bca8b78bbee9
+Start date and time,Fecha y hora de inicio,,site/modules/FieldtypeFlex/examples/dates.php,eddaab14098e70b5cc9d8a4f6776c156
+Add a link,Añadir un enlace,,site/modules/FieldtypeFlex/examples/dependencies.php,083f62fcae98023532c130f6c6506bd5
+URL,URL,,site/modules/FieldtypeFlex/examples/dependencies.php,e6b391a8d2c4d45902a23a8b6585703d
+Link text,Texto del enlace,,site/modules/FieldtypeFlex/examples/dependencies.php,63a11faa3a692d4e00fa8e03bbe8a0d6
+Start date and time,Fecha y hora de inicio,,site/modules/FieldtypeFlex/examples/inherit-field.php,eddaab14098e70b5cc9d8a4f6776c156
+Body,Contenido,,site/modules/FieldtypeFlex/examples/inherit-field.php,ac101b32dda4448cf13a93fe283dddd8
+Heading,Encabezado,,site/modules/FieldtypeFlex/examples/languages-auto.php,0101316665d4f82adaa26d86fbbb2d6e
+Summary,Resumen,,site/modules/FieldtypeFlex/examples/languages-auto.php,290612199861c31d1036b185b4e69b75
+Title,Título,,site/modules/FieldtypeFlex/examples/languages.php,b78a3223503896721cca1303f776159b
+Summary,Resumen,,site/modules/FieldtypeFlex/examples/languages.php,290612199861c31d1036b185b4e69b75
+Contact form,Formulario de contacto,,site/modules/FieldtypeFlex/examples/manifest.php,c661cf76442d8d2cb318d560285a2a57
+Contact form — PHP,Formulario de contacto — PHP,,site/modules/FieldtypeFlex/examples/manifest.php,789c35d89df1a84345df05261b5c683a
+"A short contact schema with a required name, an email address and an ordinary fieldset. Uses the shared translated options helper.","Un esquema de contacto breve con un nombre obligatorio, una dirección de correo y un grupo de campos normal. Usa el archivo auxiliar compartido de opciones traducidas.",,site/modules/FieldtypeFlex/examples/manifest.php,4f08351ce531bfb40701227c3f6a8fc2
+Contact form — JSON,Formulario de contacto — JSON,,site/modules/FieldtypeFlex/examples/manifest.php,b5d243c552222f23b45b67c9b385743c
+"The same contact schema as the PHP version, using a plain JSON object.","El mismo esquema de contacto que la versión PHP, con un objeto JSON simple.",,site/modules/FieldtypeFlex/examples/manifest.php,09214b897a7d429f8ba4e9b2cd5ad240
+Contact form — Inputfield objects,Formulario de contacto — objetos Inputfield,,site/modules/FieldtypeFlex/examples/manifest.php,5c1fadd091fee4d9c55dfd5698692fb3
+The same contact form assembled with native Inputfield objects for IDE completion.,El mismo formulario de contacto construido con objetos Inputfield nativos para el autocompletado del IDE.,,site/modules/FieldtypeFlex/examples/manifest.php,b29f5cc7fe0d458f8efff099ecdc17d8
+Common inputs,Entradas comunes,,site/modules/FieldtypeFlex/examples/manifest.php,6012faf9ac4d92ee198bfa87441c6fe8
+Choices and checkboxes,Opciones y casillas de verificación,,site/modules/FieldtypeFlex/examples/manifest.php,de36e033f2d55154f7508cb474b44382
+"Select, checkbox collection and single checkbox examples.","Ejemplos de listas de selección, grupos de casillas y casillas individuales.",,site/modules/FieldtypeFlex/examples/manifest.php,bcc2680a16bdb7866f0c99287c724dcf
+Date and time,Fecha y hora,,site/modules/FieldtypeFlex/examples/manifest.php,2b0b7c9cbd6d6e9fa6b99aa06e828673
+Native date inputs expose canonical strings with output formatting disabled.,Las entradas de fecha nativas ofrecen cadenas canónicas con el formato de salida desactivado.,,site/modules/FieldtypeFlex/examples/manifest.php,3f22dd47311115a6ab10c295af05ce4c
+Conditional inputs,Entradas condicionales,,site/modules/FieldtypeFlex/examples/manifest.php,ce23741afc33b6517f3419388e4d5048
+showIf and requiredIf use native ProcessWire form dependency processing.,showIf y requiredIf usan el procesamiento nativo de dependencias de formularios de ProcessWire.,,site/modules/FieldtypeFlex/examples/manifest.php,b4b724099b72d43164798beb7b700142
+Optional modules,Módulos opcionales,,site/modules/FieldtypeFlex/examples/manifest.php,f90f4ac8085102bf149598c730ddb371
+Multilingual text,Texto multilingüe,,site/modules/FieldtypeFlex/examples/manifest.php,a4a6ae762e1a19387464381d6c4867dc
+"Uses LanguageSupport, LanguageSupportFields and native language field values. Install both modules before requiring multilingual values.","Usa LanguageSupport, LanguageSupportFields y valores de campo de idioma nativos. Instale ambos módulos antes de requerir valores multilingües.",,site/modules/FieldtypeFlex/examples/manifest.php,20682c569e9afac11abf650a6046a253
+Optional multilingual text,Texto multilingüe opcional,,site/modules/FieldtypeFlex/examples/manifest.php,9b5cbddb0e69e71412acd48466fb5991
+"Uses useLanguages auto to enable multilingual text when LanguageSupport and LanguageSupportFields are installed, otherwise plain text.","Usa useLanguages auto para activar texto multilingüe cuando LanguageSupport y LanguageSupportFields están instalados; de lo contrario, texto simple.",,site/modules/FieldtypeFlex/examples/manifest.php,f37f3628291e9f8eee56a169d3ac7480
+Native references,Referencias nativas,,site/modules/FieldtypeFlex/examples/manifest.php,5c0c5c142ec5fcd87ec9c0db886675a7
+Page references,Referencias de páginas,,site/modules/FieldtypeFlex/examples/manifest.php,28204b430b00c1eb8c40a8e24d1bc9cd
+Single and multiple Page inputs use native page discovery and derefAsPage behavior.,Las entradas Page simples y múltiples usan la búsqueda nativa de páginas y el comportamiento derefAsPage.,,site/modules/FieldtypeFlex/examples/manifest.php,be67d42172113ce3a760624cfe758754
+Rich text,Texto enriquecido,,site/modules/FieldtypeFlex/examples/manifest.php,8566a361dba8d7bd3ad44ea37ca49161
+Uses the TinyMCE input module. HTML values remain rich text when formatted.,Usa el módulo de entrada TinyMCE. Los valores HTML conservan el texto enriquecido al formatearse.,,site/modules/FieldtypeFlex/examples/manifest.php,5a6e681e0da4b4daff12a567c688fc68
+Native TinyMCE settingsField,settingsField nativo de TinyMCE,,site/modules/FieldtypeFlex/examples/manifest.php,29078e996a7d07ec4cdc5e9043c9c0a7
+Requires a TinyMCE textarea field named rich_text_source. Native TinyMCE applies its editor settings at render/input time.,Requiere un campo textarea TinyMCE llamado rich_text_source. TinyMCE aplica sus ajustes de editor durante el renderizado y la entrada.,,site/modules/FieldtypeFlex/examples/manifest.php,4b10c3bec2b082ba85350c184193e517
+Flex inheritField,inheritField de Flex,,site/modules/FieldtypeFlex/examples/manifest.php,ba842b600f3061b9a4b3e7e646dd227a
+Requires Datetime field date_input_source and TinyMCE textarea field rich_text_source. Flex reuses their Inputfields and then applies local overrides; storage and formatters are not inherited.,Requiere el campo Datetime date_input_source y el campo textarea TinyMCE rich_text_source. Flex reutiliza sus Inputfields y aplica ajustes locales; no se heredan el almacenamiento ni los formateadores.,,site/modules/FieldtypeFlex/examples/manifest.php,599bf9a647897a7a1eda0815ffce1c72
+Combined example,Ejemplo combinado,,site/modules/FieldtypeFlex/examples/manifest.php,63c8e425f5525e9ea7d95d1b8aef2743
+Curated combination,Combinación seleccionada,,site/modules/FieldtypeFlex/examples/manifest.php,5a5e56d376fb622bfda8eb7fb70df3c7
+"A compact combination of multilingual text, Page references, TinyMCE, choices, dependencies and the Flex renamedFrom extension.","Una combinación compacta de texto multilingüe, referencias de páginas, TinyMCE, opciones, dependencias y la extensión Flex renamedFrom.",,site/modules/FieldtypeFlex/examples/manifest.php,8c95bd8ea76b1b7eb4d02c4a15efb787
+Flex extensions,Extensiones Flex,,site/modules/FieldtypeFlex/examples/manifest.php,b651d739286816950974e7bfbc8e871c
+Nested repeatable fieldsets,Grupos de campos repetibles anidados,,site/modules/FieldtypeFlex/examples/manifest.php,d1a4ef9f2aba7a673cea5201ecd8a95a
+Sections contain typed text/image blocks; text blocks contain repeatable notes. Three levels share the same API and media lifecycle.,Las secciones contienen bloques de texto/imagen con tipos; los bloques de texto contienen notas repetibles. Tres niveles comparten la misma API y el ciclo de vida de medios.,,site/modules/FieldtypeFlex/examples/manifest.php,4251abbee4f1efd613b2351044f51463
+Rows and media,Filas y medios,,site/modules/FieldtypeFlex/examples/manifest.php,e412069b205ea7fdef7922dc28914e9e
+"Typed rows with uniform slides and facts plus mixed text, image and quote blocks; these are Flex extensions.","Filas con tipos para diapositivas y datos uniformes, además de bloques mixtos de texto, imagen y cita; son extensiones Flex.",,site/modules/FieldtypeFlex/examples/manifest.php,e4cef3327fdc3e5811367274b9b635fd
+Typed rows — Inputfield objects,Filas con tipos — objetos Inputfield,,site/modules/FieldtypeFlex/examples/manifest.php,9f0bd30475f4aa931cc25429e584848e
+"The mixed text, image and quote row types assembled on a native InputfieldFieldset wrapper.","Tipos de fila mixtos de texto, imagen y cita construidos en un contenedor InputfieldFieldset nativo.",,site/modules/FieldtypeFlex/examples/manifest.php,eba319eaa3e72a5f771377ba21da683e
+Native Repeater,Repeater nativo,,site/modules/FieldtypeFlex/examples/manifest.php,a45e5ce442353a6b00c159f33698869e
+Flex inside a native Repeater,Flex dentro de un Repeater nativo,,site/modules/FieldtypeFlex/examples/manifest.php,3d57f9d006aea1ac29690dc6fc1b4984
+Uses native Repeater ownership with TinyMCE and optional multilingual children.,Usa la propiedad nativa de Repeater con TinyMCE y campos secundarios multilingües opcionales.,,site/modules/FieldtypeFlex/examples/manifest.php,fa90412e1188617f3f8d15b80630594d
+Helper files,Archivos auxiliares,,site/modules/FieldtypeFlex/examples/manifest.php,214c7a5f11547c97b9f134f06146ca43
+Shared options helper,Archivo auxiliar compartido de opciones,,site/modules/FieldtypeFlex/examples/manifest.php,4a7a5bf7b16a7f9e84cadc5229127011
+A translated country-options map included by several PHP definitions. Copy it beside the definition; it is not a field schema.,Un mapa de opciones de países traducidas incluido por varias definiciones PHP. Cópielo junto a la definición; no es un esquema de campo.,,site/modules/FieldtypeFlex/examples/manifest.php,bcea38baa889914132a8d1548afe4324
+Sections,Secciones,,site/modules/FieldtypeFlex/examples/nested.php,855c3eca6c7aaef477b4f03e4699944d
+Add section,Añadir sección,,site/modules/FieldtypeFlex/examples/nested.php,deaacc1b560b4ac7dd5c493a419b5fd7
+Section,Sección,,site/modules/FieldtypeFlex/examples/nested.php,d2c24d59e0baff4d0155fbdf62590867
+Section heading,Encabezado de sección,,site/modules/FieldtypeFlex/examples/nested.php,3b4836a97d69d11cad15c98b1756d9a7
+Blocks,Bloques,,site/modules/FieldtypeFlex/examples/nested.php,04c4f9f595c4f21d1de65eb07056c15a
+Add block,Añadir bloque,,site/modules/FieldtypeFlex/examples/nested.php,2ff8071bcd15a31f9a743f1b06d0d00f
+Text,Texto,,site/modules/FieldtypeFlex/examples/nested.php,9dffbf69ffba8bc38bc4e01abf4b1675
+Block heading,Encabezado de bloque,,site/modules/FieldtypeFlex/examples/nested.php,223795d3a336ef80c5b6a070ae4e0d2a
+Body,Contenido,,site/modules/FieldtypeFlex/examples/nested.php,ac101b32dda4448cf13a93fe283dddd8
+Notes,Notas,,site/modules/FieldtypeFlex/examples/nested.php,f4c6f851b00d5518bf888815de279aba
+Add note,Añadir nota,,site/modules/FieldtypeFlex/examples/nested.php,50cd1871f950375eef4e2efce35366c6
+Note,Nota,,site/modules/FieldtypeFlex/examples/nested.php,3b0649c72650c313a357338dcdfb64ec
+Note text,Texto de la nota,,site/modules/FieldtypeFlex/examples/nested.php,941819d612234a738bf742852b626e2a
+Image,Imagen,,site/modules/FieldtypeFlex/examples/nested.php,be53a0541a6d36f6ecb879fa2c584b08
+Caption,Pie de imagen,,site/modules/FieldtypeFlex/examples/nested.php,272ba7d164aa836995be6319a698be84
+First name,Nombre,,site/modules/FieldtypeFlex/examples/objects.php,20db0bfeecd8fe60533206a2b5e9891a
+Email,Correo electrónico,,site/modules/FieldtypeFlex/examples/objects.php,ce8ae9da5b7cd6c3df2929543a9af92d
+Address,Dirección,,site/modules/FieldtypeFlex/examples/objects.php,dd7bf230fde8d4836917806aff6a6b27
+City,Ciudad,,site/modules/FieldtypeFlex/examples/objects.php,57d056ed0984166336b7879c2af3657f
+Country,País,,site/modules/FieldtypeFlex/examples/objects.php,59716c97497eb9694541f7c3d37b1a4d
+Germany,Alemania,,site/modules/FieldtypeFlex/examples/options.php,d8b00929dec65d422303256336ada04f
+Austria,Austria,,site/modules/FieldtypeFlex/examples/options.php,9891739094756d2605946c867b32ad28
+Category,Categoría,,site/modules/FieldtypeFlex/examples/pages.php,3adbdb3ac060038aa0e6e6c138ef9873
+Related pages,Páginas relacionadas,,site/modules/FieldtypeFlex/examples/pages.php,75f00d1026324ea73916cb24389e4c1a
+Item heading,Encabezado del elemento,,site/modules/FieldtypeFlex/examples/repeater.php,743da401cbe0b962dc0c6975356b6751
+Body,Contenido,,site/modules/FieldtypeFlex/examples/repeater.php,ac101b32dda4448cf13a93fe283dddd8
+Translated details,Detalles traducidos,,site/modules/FieldtypeFlex/examples/repeater.php,40716b1bc582f0aba1c09a5069bc9432
+Translated rich text,Texto enriquecido traducido,,site/modules/FieldtypeFlex/examples/repeater.php,e97e5a7c8bf98951d7631a0dbc08a10f
+Body,Contenido,,site/modules/FieldtypeFlex/examples/rich-text.php,ac101b32dda4448cf13a93fe283dddd8
+Body,Contenido,,site/modules/FieldtypeFlex/examples/settings-field.php,ac101b32dda4448cf13a93fe283dddd8
+Content heading,Encabezado del contenido,,site/modules/FieldtypeFlex/examples/structured.php,a33f3a371782138f4b2977084fd1f719
+Hero image,Imagen principal,,site/modules/FieldtypeFlex/examples/structured.php,2c0e05278896f66ab2af09394e393f31
+Downloads,Descargas,,site/modules/FieldtypeFlex/examples/structured.php,c20c35ef53bf1b70789ce94e66800147
+Slides,Diapositivas,,site/modules/FieldtypeFlex/examples/structured.php,a8d90ed8f17c347c8d46e0ef22c85ecb
+Add slide,Añadir diapositiva,,site/modules/FieldtypeFlex/examples/structured.php,056f53405bf3cf4bde3731c26d725365
+Slide,Diapositiva,,site/modules/FieldtypeFlex/examples/structured.php,6160a53ece50ce6d4f5ef4452549835e
+Slide heading,Encabezado de diapositiva,,site/modules/FieldtypeFlex/examples/structured.php,49ef24d72173b5b2d60a96fdb7f3e72a
+Slide image,Imagen de diapositiva,,site/modules/FieldtypeFlex/examples/structured.php,495bc3ee1e44cfd8ea290d068ce693dd
+Slide text,Texto de diapositiva,,site/modules/FieldtypeFlex/examples/structured.php,3f009377566507e00c81bf9fe80028b9
+Summary,Resumen,,site/modules/FieldtypeFlex/examples/structured.php,290612199861c31d1036b185b4e69b75
+Price,Precio,,site/modules/FieldtypeFlex/examples/structured.php,3601146c4e948c32b6424d2c0a7f0118
+Enable link,Activar enlace,,site/modules/FieldtypeFlex/examples/structured.php,408730069c574f1774b533a7cdc90bf7
+Link,Enlace,,site/modules/FieldtypeFlex/examples/structured.php,97e7c9a7d06eac006a28bf05467fcc8b
+Facts,Datos,,site/modules/FieldtypeFlex/examples/structured.php,cb0fec4f6f3462ce2ee816c1c60d1e2c
+Add fact,Añadir dato,,site/modules/FieldtypeFlex/examples/structured.php,e49862dba7a931b796996ec3a233811f
+Fact,Dato,,site/modules/FieldtypeFlex/examples/structured.php,b9e5b231986b70601158fee91a5a6298
+Number,Número,,site/modules/FieldtypeFlex/examples/structured.php,b2ee912b91d69b435159c7c3f6df7f5f
+Content blocks,Bloques de contenido,,site/modules/FieldtypeFlex/examples/structured.php,7e265727def7bfe8208ef70be024a52d
+Add block,Añadir bloque,,site/modules/FieldtypeFlex/examples/structured.php,2ff8071bcd15a31f9a743f1b06d0d00f
+Text,Texto,,site/modules/FieldtypeFlex/examples/structured.php,9dffbf69ffba8bc38bc4e01abf4b1675
+Heading,Encabezado,,site/modules/FieldtypeFlex/examples/structured.php,0101316665d4f82adaa26d86fbbb2d6e
+Body,Contenido,,site/modules/FieldtypeFlex/examples/structured.php,ac101b32dda4448cf13a93fe283dddd8
+Image,Imagen,,site/modules/FieldtypeFlex/examples/structured.php,be53a0541a6d36f6ecb879fa2c584b08
+Caption,Pie de imagen,,site/modules/FieldtypeFlex/examples/structured.php,272ba7d164aa836995be6319a698be84
+Quote,Cita,,site/modules/FieldtypeFlex/examples/structured.php,c48e929b2b1eabba2ba036884433345e
+Author,Autor,,site/modules/FieldtypeFlex/examples/structured.php,a517747c3d12f99244ae598910d979c5
+Content blocks,Bloques de contenido,,site/modules/FieldtypeFlex/examples/typed-objects.php,7e265727def7bfe8208ef70be024a52d
+Add block,Añadir bloque,,site/modules/FieldtypeFlex/examples/typed-objects.php,2ff8071bcd15a31f9a743f1b06d0d00f
+Text,Texto,,site/modules/FieldtypeFlex/examples/typed-objects.php,9dffbf69ffba8bc38bc4e01abf4b1675
+Heading,Encabezado,,site/modules/FieldtypeFlex/examples/typed-objects.php,0101316665d4f82adaa26d86fbbb2d6e
+Body,Contenido,,site/modules/FieldtypeFlex/examples/typed-objects.php,ac101b32dda4448cf13a93fe283dddd8
+Image,Imagen,,site/modules/FieldtypeFlex/examples/typed-objects.php,be53a0541a6d36f6ecb879fa2c584b08
+Caption,Pie de imagen,,site/modules/FieldtypeFlex/examples/typed-objects.php,272ba7d164aa836995be6319a698be84
+Quote,Cita,,site/modules/FieldtypeFlex/examples/typed-objects.php,c48e929b2b1eabba2ba036884433345e
+Author,Autor,,site/modules/FieldtypeFlex/examples/typed-objects.php,a517747c3d12f99244ae598910d979c5

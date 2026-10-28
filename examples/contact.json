@@ -1,0 +1,29 @@
+{
+	"first_name": {
+		"type": "text",
+		"label": "First name",
+		"required": true
+	},
+	"email": {
+		"type": "email",
+		"label": "Email"
+	},
+	"address": {
+		"type": "fieldset",
+		"label": "Address",
+		"children": {
+			"city": {
+				"type": "text",
+				"label": "City"
+			},
+			"country": {
+				"type": "select",
+				"label": "Country",
+				"options": {
+					"DE": "Germany",
+					"AT": "Austria"
+				}
+			}
+		}
+	}
+}
