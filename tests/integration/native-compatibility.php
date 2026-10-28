@@ -84,6 +84,69 @@ foreach([0, 1, 2] as $mode) {
 			$p = $wire->pages->getFresh($id);
 			$p->of(false);
 			$same($shape($p->get($n->name)), $shape($p->get($f->name)->ref), 'PageArray mutation and whole-page save match native');
+
+			// Existing selections distinguish append/no-op commands from replacement.
+			$withOwner = $wire->pages->newPageArray();
+			$withOwner->add($hidden)->add($p);
+			$commands = [
+				'null preserves selection' => null,
+				'blank preserves selection' => '',
+				'false preserves selection' => false,
+				'zero preserves selection' => 0,
+				'empty array preserves selection' => [],
+				'ID array appends' => [$hidden->id],
+				'Page appends' => $hidden,
+				'pipe-separated IDs append' => "$reference->id|$hidden->id",
+				'newline-separated IDs append' => "$reference->id\n$hidden->id",
+				'selector filters selectable pages' => 'id=' . $hidden->id,
+				'PageArray replaces and excludes owner' => $withOwner,
+				'empty PageArray clears' => $wire->pages->newPageArray(),
+			];
+			foreach($commands as $command => $input) {
+				$seed = $wire->pages->newPageArray();
+				$seed->add($reference);
+				$p->set($n->name, clone $seed);
+				$p->get($f->name)->ref = clone $seed;
+				// Compare Fieldtype semantics: Page::set(field, null) has its own unset shortcut.
+				$nativeValue = $n->type->sanitizeValue($p, $n, $input instanceof PageArray ? clone $input : $input);
+				$p->set($n->name, $nativeValue);
+				$source = $input instanceof PageArray ? $shape($input) : null;
+				$p->get($f->name)->ref = $input;
+				$same($shape($p->get($n->name)), $shape($p->get($f->name)->ref), "Page multi allow=$allow $command matches native assignment");
+				if($input instanceof PageArray) {
+					$same($source, $shape($input), "Page multi allow=$allow $command leaves supplied container intact");
+				}
+				$p->save($n->name);
+				$p->save($f->name);
+				$p = $wire->pages->getFresh($id);
+				$p->of(false);
+				$same($shape($p->get($n->name)), $shape($p->get($f->name)->ref), "Page multi allow=$allow $command matches native reload");
+			}
+			foreach([
+				'first selected ID' => '-' . $reference->id,
+				'last selected ID' => '-' . $hidden->id,
+				'unselected ID matching index one' => '-1',
+				'zero matching index zero' => '-0',
+				'missing ID' => '-2147483647',
+			] as $case => $command) {
+				$seed = $wire->pages->newPageArray();
+				$seed->add($reference)->add($hidden);
+				$p->set($n->name, clone $seed);
+				$p->get($f->name)->ref = clone $seed;
+				foreach([1, 2] as $attempt) {
+					$previous = $p->get($f->name)->ref;
+					$before = $shape($previous);
+					$p->set($n->name, $n->type->sanitizeValue($p, $n, $command));
+					$p->get($f->name)->ref = $command;
+					$same($shape($p->get($n->name)), $shape($p->get($f->name)->ref), "Page negative allow=$allow $case attempt=$attempt matches native");
+					$same($before, $shape($previous), "Page negative allow=$allow $case leaves previous container intact");
+				}
+				$p->save($n->name);
+				$p->save($f->name);
+				$p = $wire->pages->getFresh($id);
+				$p->of(false);
+				$same($shape($p->get($n->name)), $shape($p->get($f->name)->ref), "Page negative allow=$allow $case matches native reload");
+			}
 		}
 	}
 }
@@ -356,3 +419,15 @@ $same(2, count($sourceSelection), 'native hydration filtering does not mutate a 
 $same(1, count($page->get($f->name)->ref), 'owned hydrated PageArray applies native unpublished filtering');
 $sourceSelection->add($hidden);
 $same(1, count($page->get($f->name)->ref), 'bulk-assigned PageArray retains independent Flex ownership');
+
+// Discovery has no owning template and must not wake stored IDs as live references.
+foreach([0, 1, 2] as $mode) {
+	$f = $createField('flex_reference_discovery', ['ref' => ['type' => 'page', 'derefAsPage' => $mode]]);
+	$owner = $wire->pages->newNullPage();
+	$defs = $type->getDefinitions($f, $owner);
+	$value = new FlexValue($owner, $f, $defs, ['ref' => [$reference->id]]);
+	$blankField = $wire->wire(new Field());
+	$blankField->derefAsPage = $mode;
+	$nativeBlank = $wire->modules->get('FieldtypePage')->getBlankValue($owner, $blankField);
+	$same($shape($nativeBlank), $shape($value->ref), "Page discovery mode=$mode uses native blank without a template");
+}

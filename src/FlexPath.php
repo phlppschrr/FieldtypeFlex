@@ -2,6 +2,18 @@
 
 /** Internal instance addressing and bounded traversal shared by storage and editor code. */
 final class FlexPath {
+	/**
+	 * Get the collection address of an owned row, retaining all ancestor scopes.
+	 *
+	 * @param FlexRow $row Row with a validated concrete address.
+	 * @return string
+	 * @internal
+	 */
+	public static function rowSet(FlexRow $row): string {
+		$address = $row->address();
+		return substr($address, 0, strrpos($address, '.'));
+	}
+
 	/** Missing metadata is visible; reject malformed stored states everywhere. @internal */
 	public static function rowHidden(array $row): bool {
 		if(array_key_exists('hidden', $row) && !is_bool($row['hidden'])) {

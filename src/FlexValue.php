@@ -60,6 +60,8 @@ class FlexValue extends WireData implements \JsonSerializable {
 	private Field $flexField;
 	private FlexFieldDefs $definitions;
 	private bool $formatted = false;
+	/** Bypass output conversion without releasing a formatted view's write guards. */
+	private bool $rawRead = false;
 	private array $unknown = [];
 	private array $unknownMediaCopies = [];
 	private string $flexAddress;
@@ -275,6 +277,7 @@ class FlexValue extends WireData implements \JsonSerializable {
 		$previous = $this->formatted;
 		if($formatted !== null) {
 			$this->formatted = $formatted;
+			$this->rawRead = false;
 			foreach($this->data as $value) {
 				if($value instanceof FlexRows) {
 					$value->of($formatted);
@@ -294,8 +297,23 @@ class FlexValue extends WireData implements \JsonSerializable {
 	 */
 	public function getUnformatted(string $name) {
 		$value = parent::get($name);
+		if($this->formatted && $value instanceof FlexRows) return $value->unformattedCollection();
 		if($this->formatted && $value instanceof Pagefiles) return $value->unformattedCollection();
 		return ($this->definitions->property($name)['kind'] ?? '') === 'date' && $value !== '' ? strtotime($value) : $value;
+	}
+
+	/**
+	 * Clone a row's native values while retaining its formatting-based write guards.
+	 * Nested collections bypass output conversion when read, like native media views.
+	 *
+	 * @return static
+	 * #pw-internal
+	 * @internal
+	 */
+	public function unformattedView() {
+		$view = clone $this;
+		$view->rawRead = true;
+		return $view;
 	}
 
 	/**
@@ -376,7 +394,7 @@ class FlexValue extends WireData implements \JsonSerializable {
 			}
 		};
 		$flatten($options, $translated);
-		if($this->formatted) {
+		if($this->formatted && !$this->rawRead) {
 			foreach($labels as $key => $label) {
 				$labels[$key] = $this->wire()->sanitizer->entities($label);
 			}
@@ -449,6 +467,9 @@ class FlexValue extends WireData implements \JsonSerializable {
 						return true;
 					}
 				}
+				if($this->containsContent($row->unknown)) {
+					return true;
+				}
 			}
 			return false;
 		}
@@ -459,6 +480,10 @@ class FlexValue extends WireData implements \JsonSerializable {
 			return count($value) > 0;
 		}
 		if(is_array($value)) {
+			// Retained collections count their leaves, never row identity metadata.
+			if(($value['_flex'] ?? '') === FlexStorage::ROWS_FORMAT) {
+				$value = array_column($value['items'], 'values');
+			}
 			foreach($value as $item) {
 				if($this->containsContent($item)) {
 					return true;
@@ -476,6 +501,9 @@ class FlexValue extends WireData implements \JsonSerializable {
 	 * @return mixed
 	 */
 	public function get($key) {
+		if($this->rawRead) {
+			return $this->getUnformatted((string) $key);
+		}
 		$value = parent::get($key);
 		$def = $this->definitions->property((string) $key);
 		if($def && $def['kind'] === 'page') {
@@ -490,7 +518,17 @@ class FlexValue extends WireData implements \JsonSerializable {
 			$format = $language && !$language->isDefault() ? $def['input']->get('dateOutputFormat' . $language->id) : '';
 			return $this->wire()->datetime->formatDate($timestamp, $format ?: $def['input']->dateOutputFormat);
 		}
-		if($this->formatted && $def && $def['kind'] === 'text' && !$def['input'] instanceof InputfieldToggle) {
+		if($def && $def['input'] instanceof InputfieldToggle) {
+			$format = $def['settings']['formatType'];
+			if(!$this->formatted || $value === '' || $format === 0) return $value;
+			if($format === 1) return $value === 0 ? false : ($value === 1 ? true : $value);
+			// FieldtypeToggle::formatValue() sanitizes away custom numeric keys.
+			// Use its native label pipeline directly, preserving all Inputfield options.
+			$input = $def['input'];
+			$label = $input->getValueLabel($value);
+			return $format === 3 ? $input->formatLabel($label, false) : $label;
+		}
+		if($this->formatted && $def && $def['kind'] === 'text') {
 			$field = $this->textformatterField((string) $key, $def);
 			return $field->type->formatValue($this->flexPage, $field, (string) $value);
 		}
@@ -603,7 +641,7 @@ class FlexValue extends WireData implements \JsonSerializable {
 		$language = $this->wire()->user->language;
 		$suffix = $language && !$language->isDefault() ? (string) $language->id : '';
 		$label = (string) ($input->get('label' . $suffix) ?: $input->label);
-		return $this->formatted ? $this->wire()->sanitizer->entities($label) : $label;
+		return $this->formatted && !$this->rawRead ? $this->wire()->sanitizer->entities($label) : $label;
 	}
 
 	/**
@@ -725,6 +763,46 @@ class FlexValue extends WireData implements \JsonSerializable {
 		return $field;
 	}
 
+	/**
+	 * Wake stored Page references or apply native single/multiple assignment rules.
+	 * Multiple assignments start from the previous owned selection; a PageArray
+	 * replaces it. Caller-owned containers stay independent.
+	 */
+	private function hydratePageReference(string $name, $value, bool $assignment) {
+		$type = $this->wire()->modules->get('FieldtypePage');
+		$field = $this->pageReferenceField($name);
+		if(!$assignment && $value instanceof PageArray) $value = clone $value;
+		// Native field context requires a template; query discovery has only a NullPage.
+		if(!$assignment) return $this->flexPage->template
+			? $type->wakeupValue($this->flexPage, $field, $value) : $type->getBlankValue($this->flexPage, $field);
+		if(!$this->definitions->property($name)['multiple']) return $type->sanitizeValue($this->flexPage, $field, $value);
+		if($value instanceof PageArray) {
+			$result = clone $value;
+			$result->remove($this->flexPage);
+			return $result;
+		}
+		$result = parent::get($name);
+		$result = $result instanceof PageArray ? clone $result : $this->wire()->pages->newPageArray();
+		if(!$value) return $result;
+		$field->derefAsPage = 2;
+		if(is_string($value) && Selectors::stringHasOperator($value)) {
+			$items = $field->getInputfield($this->flexPage)->getSelectablePages($this->flexPage)->filter($value);
+		} else {
+			$split = is_string($value) && (strpbrk($value, "|\r\n") !== false || preg_match('/^\d+(?:[, ]+\d+)+$/D', $value));
+			$items = is_array($value) ? $value : ($split ? preg_split('/[|,\r\n ]+/', $value, -1, PREG_SPLIT_NO_EMPTY) : [$value]);
+		}
+		foreach($items as $item) {
+			if(is_string($item) && preg_match('/^-\d+$/D', $item)) {
+				// Numeric remove() arguments are collection indexes, not Page IDs.
+				$result->remove('id=' . substr($item, 1));
+			} else {
+				$target = $type->sanitizeValue($this->flexPage, $field, $item);
+				if($target instanceof Page && $target->id) $result->add($target);
+			}
+		}
+		return $result;
+	}
+
 	private function hydrate(string $name, $value, bool $assignment = false) {
 		$def = $this->definitions->property($name);
 		$input = $def['input'];
@@ -761,37 +839,7 @@ class FlexValue extends WireData implements \JsonSerializable {
 			return new LanguagesPageFieldValue($this->flexPage, $synthetic, $value);
 		}
 		if($def['kind'] === 'page') {
-			$type = $this->wire()->modules->get('FieldtypePage');
-			$field = $this->pageReferenceField($name);
-			if(!$assignment && $value instanceof PageArray) $value = clone $value;
-			// Native field context requires a template; query discovery has only a NullPage.
-			if(!$assignment) return $this->flexPage->template
-				? $type->wakeupValue($this->flexPage, $field, $value) : $type->getBlankValue($this->flexPage, $field);
-			if(!$def['multiple']) return $type->sanitizeValue($this->flexPage, $field, $value);
-			if($value instanceof PageArray) {
-				$result = clone $value;
-				$result->remove($this->flexPage);
-				return $result;
-			}
-			$result = parent::get($name);
-			$result = $result instanceof PageArray ? clone $result : $this->wire()->pages->newPageArray();
-			if(!$value) return $result;
-			$field->derefAsPage = 2;
-			if(is_string($value) && Selectors::stringHasOperator($value)) {
-				$items = $field->getInputfield($this->flexPage)->getSelectablePages($this->flexPage)->filter($value);
-			} else {
-				$split = is_string($value) && (strpbrk($value, "|\r\n") !== false || preg_match('/^\d+(?:[, ]+\d+)+$/D', $value));
-				$items = is_array($value) ? $value : ($split ? preg_split('/[|,\r\n ]+/', $value, -1, PREG_SPLIT_NO_EMPTY) : [$value]);
-			}
-			foreach($items as $item) {
-				if(is_string($item) && preg_match('/^-\d+$/D', $item)) {
-					$result->remove((int) substr($item, 1));
-				} else {
-					$target = $type->sanitizeValue($this->flexPage, $field, $item);
-					if($target instanceof Page && $target->id) $result->add($target);
-				}
-			}
-			return $result;
+			return $this->hydratePageReference($name, $value, $assignment);
 		}
 		if($def['multiple']) {
 			if($value === '' || $value === null) {
@@ -799,7 +847,11 @@ class FlexValue extends WireData implements \JsonSerializable {
 			}
 			return array_values(array_map('strval', is_array($value) ? $value : [$value]));
 		}
-		if($input instanceof InputfieldToggle) return $input->sanitizeValue($value);
+		if($input instanceof InputfieldToggle) {
+			$value = $input->sanitizeValue($value);
+			// Older cores retain negative custom keys submitted as strings.
+			return $value === '' ? '' : (int) $value;
+		}
 		if($def['kind'] === 'tags' && is_array($value)) {
 			return implode(' ', array_map('strval', $value));
 		}

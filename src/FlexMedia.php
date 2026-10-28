@@ -815,6 +815,8 @@ trait FlexMediaCollection {
 	 *
 	 * @param int $limit Maximum visible files; zero means unlimited.
 	 * @return static
+	 * #pw-internal
+	 * @internal
 	 */
 	public function outputCollection(int $limit = 0) {
 		$view = clone $this;

@@ -41,7 +41,7 @@ Individual properties retain types appropriate to their definitions. **The Page'
 | HTML textarea, TinyMCE | `string` | HTML string | String |
 | Integer / Float | `int` / `float`, or `''` | Same | Number or `''` |
 | Checkbox | `1` / `0` by default; custom non-empty checked/unchecked values supported | Same | Scalar |
-| Toggle | `0`, `1`, `2` or `''` | Same (native `formatNone` behavior) | Number or `''` |
+| Toggle | `0`, `1`, `2` or `''`; custom integer keys supported | Per `formatType`: key, boolean or label | Number or `''` |
 | Multiple choices | `string[]` | Same raw keys | Array of keys |
 | TextTags | Space-separated string | Same raw keys | String |
 | Datetime | Unix timestamp `int`, or `''` | Formatted string; timestamp if no output format (or `U`); `''` if empty | `Y-m-d` or `Y-m-d H:i:s` |
@@ -70,9 +70,9 @@ $json = json_encode($page->content);  // Unformatted JSON view
 
 `getArray()` and iteration expose known runtime properties in the current formatting state, retaining objects such as Rows, Page references and media collections. A row exposes its own properties; `FlexRows::getArray()` is keyed by stable row IDs.
 
-`rawArray()`, `(string) $value` and `json_encode($value)` export canonical unformatted data, including unknown keys and hidden rows. A `FlexRow` exports its content properties; its ID, type and visibility are included in the containing collection's envelope. JSON includes media metadata, never file bytes. These exports are **not HTML-safe** or a way to copy owned media between Pages.
+`rawArray()`, `(string) $value` and `json_encode($value)` export canonical unformatted data, including unknown keys and hidden rows. A `FlexRow` exports its content properties; its ID, type and visibility are included in the containing collection's envelope. These exports are **not HTML-safe**. Media metadata contains no file bytes: it is not a portable media archive, though assigning registered media to another owner in the same installation creates independent copies on save.
 
-Both array methods describe current memory, including unsaved edits; neither saves, refreshes nor returns a deep copy. Neither accepts a property argument. JSON exports describe logical data rather than exact database bytes: empty PHP property arrays encode as `[]`, while storage preserves property maps as `{}`. Do not edit storage envelopes or selector projections directly.
+Both array methods describe current memory, including unsaved edits; neither saves, refreshes nor returns a deep copy. Neither accepts a property argument. JSON exports describe logical data rather than exact database bytes: empty PHP maps encode as `[]`; storage keeps the root and Row/media `values` maps as `{}`, while ordinary empty lists remain `[]`. Do not edit storage envelopes or selector projections directly.
 
 ## Reading and writing values
 
@@ -87,7 +87,7 @@ $page->content->set('summary', 'An example');
 $page->save('content');
 ```
 
-Unknown ordinary property reads return `null`; unknown writes throw `WireException`. Inherited [[WireData]] lookups remain available; use a row's `hasProperty()` or inspect definitions for schema membership. API assignments normalize values; native editor validation, purification and dependencies run during form processing. Validate application input before assigning it.
+Unknown ordinary property reads return `null`; unknown writes throw `WireException`. Inherited [[WireData]] read lookups remain available; use a row's `hasProperty()` or inspect definitions for schema membership. API assignments normalize values; native editor validation, purification and dependencies run during form processing. Validate application input before assigning it.
 
 | `FlexValue` method | Purpose |
 | --- | --- |
@@ -103,11 +103,20 @@ Unknown ordinary property reads return `null`; unknown writes throw `WireExcepti
 | `of(?bool $formatted = null): bool` | Read or change this value's formatting state; returns previous state |
 | `isChanged($name = ''): bool` | Inspect change tracking |
 
-`hasValue()` checks canonical content regardless of formatting or row visibility. Empty strings, `null`, `false`, empty collections, `NullPage` and unchecked checkboxes are empty. Numeric `0` and string `'0'` otherwise count as content, as does whitespace. Any populated language or row leaf counts; row identity alone does not. Media entries count without checking files on disk. This is separate from editor-required validation.
+`hasValue()` checks canonical content regardless of formatting or row visibility. Empty strings, `null`, `false`, empty collections, `NullPage` and unchecked checkboxes are empty. Numeric `0` and string `'0'` otherwise count as content, as does whitespace. Any populated language or row leaf counts, including retained unknown row properties; row identity alone does not. Unknown property names themselves return false. Media entries count without checking files on disk. Native required validation still applies to individual editor inputs.
 
 `isChanged()` includes nested Rows, PageArrays, language values and media; a direct property name limits the check. Read helpers do not mark changes.
 
 Page-formatted values are cloned views. Reacquire `$page->content` after `$page->of(false)` before editing: retained formatted values stay formatted. `getUnformatted()` bypasses one property's output conversion, but does not make the value or its nested objects writable. Setters require both the value and owning Page to be unformatted.
+
+On a formatted value, `getUnformatted('blocks')` returns an independent Rows collection containing
+all backing rows, including hidden parents and children, with raw native leaf
+values. Row IDs and types are retained. Formatting state still protects writes;
+reading raw values does not disable that protection. Native language and PageArray
+containers are detached from the source. In contrast, `find()` on an ordinary
+formatted collection continues to count only visible children and shares the
+selected source row objects. On an unformatted original, `getUnformatted()` keeps
+returning the live owned collection.
 
 ### Property and option labels
 
@@ -131,7 +140,9 @@ Datetime returns Unix timestamps unformatted and uses current-language/default `
 
 Integer/Float normalize numeric strings and reject non-numeric input with `WireException`; blank/null becomes `''`. Float `precision` rounds on assignment and hydration (`2` by default; null, blank or negative disables rounding). Normal PHP/JSON floating-point precision applies.
 
-Email/URL assignments use native sanitizers and their IDN/relative-URL settings; Toggle normalizes native yes/no/other values. Text and rich HTML use the configured [Textformatters](#textformatters); absent formatters leave text unescaped.
+Email/URL assignments use native sanitizers and their IDN/relative-URL settings. Toggle uses `0`/`1`/`2` for no/yes/other (`useOther => true` shows the third option), or custom `options` with integer keys from -128 to 127; `''` means no selection. Text and rich HTML use the configured [Textformatters](#textformatters); absent formatters leave text unescaped.
+
+Toggle `formatType` accepts `0` (default: integer key), `1` (only `0`/`1` become `false`/`true`), `2` (label), or `3` (HTML-encoded label without icons), also as numeric strings. Invalid modes raise a definition error. `inheritField` supplies the mode unless locally overridden. No selection remains `''`; other keys stay integers in boolean mode. Unformatted reads, `rawArray()`, JSON and selectors retain raw keys. Read-only editors always use native safe label rendering.
 
 ### Page references
 
@@ -141,6 +152,10 @@ Flex uses native `FieldtypePage` for hydration, output filtering and save-time v
 
 Single references accept Page/PageArray, ID, path/name or native selector input. Multi-reference assignment of a Page/ID/ID array/string **appends**; a `PageArray` **replaces**. Null/blank multi assignment does not clear the selection; use `removeAll()` or an empty `PageArray`. Editor submissions replace selections. Saving enforces native selectable-page rules (`parent_id`, `template_id`, `findPagesSelector`); referenced Pages must be saved separately. See [selector traversal](#root-page-reference-traversal).
 
+To remove one selected multi-reference by Page ID, assign a negative ID **string**,
+for example `$value->references = '-' . $target->id`, then save the owning field.
+An ID absent from the selection is ignored; other references retain their order.
+
 ### Limits of native compatibility
 
 Flex reuses native Inputfields and selected Fieldtype behavior, with these boundaries:
@@ -149,7 +164,7 @@ Flex reuses native Inputfields and selected Fieldtype behavior, with these bound
 | --- | --- |
 | Text / HTML | Native output options apply, but storage-time Textarea markup QA and link abstraction do not. Configure Textformatters explicitly for HTML text escaping. |
 | Integer / Float / Datetime | Integer/Float preserve explicit zero. Invalid numbers/dates raise `WireException` rather than using permissive native conversion or blank fallback. |
-| Checkbox / Toggle | Custom checkbox scalars are supported. Toggle's optional boolean/string/entity `formatType` modes are not applied. |
+| Checkbox / Toggle | Custom checkbox scalars are supported. Toggle supports native `formatType` output modes; custom integer option keys remain supported. |
 | Choices | Values are raw keys, not native FieldtypeOptions objects or option IDs. |
 | File / Image | Compatible objects use Flex-owned storage; see [media restrictions](#adding-saving-and-ownership). |
 | Rows / layout | Rows are not Repeater Pages. Ordinary fieldsets and Markup have no stored value. |
@@ -182,7 +197,7 @@ return [
 ];
 ```
 
-`type` selects a native ProcessWire Inputfield (`text` means `InputfieldText`) or Flex's own structure type `rows`. Property keys are stored names: they must begin with a letter or underscore and contain only ASCII letters, digits and underscores. `data`, `pages_id` and `count` are reserved.
+PHP files return a property array or `InputfieldWrapper`; JSON uses an object keyed by property name (empty `[]` is also accepted). `type` defaults to `text` and selects a native ProcessWire Inputfield (`text` means `InputfieldText`) or Flex's own structure type `rows`. The default label is derived from the property name. Property keys are stored names: they must begin with a letter or underscore and contain only ASCII letters, digits and underscores. `data`, `pages_id` and `count` are reserved.
 
 An ordinary `fieldset` groups native inputs, but its `children` remain **flat properties in the containing value**. A `rows` property introduces a separate typed collection and data scope. See [Rows](#rows).
 
@@ -339,7 +354,7 @@ Remove marks a row in the current form and changes its trash button to **Undo re
 
 Double-click Remove to mark siblings in the current collection after confirmation, respecting `minItems`. Double-click Undo removal to undo sibling marks without confirmation. Other collections and nested child marks are unchanged.
 
-Marked rows do not undergo leaf validation or count toward the saved collection's limits, so they free space for replacements. Undo may require correcting `maxItems` before Save. Hidden unmarked rows still count. PHP `removeRow()` changes the in-memory collection directly and also requires a field save to persist.
+Marked rows contribute no blocking leaf-validation errors and do not count toward the saved collection's limits, so they free space for replacements. Loaded inputs are still processed for undo; unopened lazy bodies are skipped. Undo may require correcting `maxItems` before Save. Hidden unmarked rows still count. PHP `removeRow()` changes the in-memory collection directly and also requires a field save to persist.
 
 ### `FlexRows`: add, find, filter, and reorder
 
@@ -366,6 +381,8 @@ $page->save('content');
 | `moveRow(string $id, ?string $before = null): self` | Move before another sibling ID, or to the end; same ID is a no-op |
 | `removeRow(string $id): self` | Remove a row by ID; unknown ID is a no-op |
 | `rawArray(): array` | Canonical rows envelope, including hidden rows |
+
+Native [[WireArray]] operations such as `add()`, `set()`, `prepend()` and removal methods retain Flex's formatting, ownership and identity checks; create new rows with `addRow()`. `of(?bool $formatted = null): bool` reads/changes collection formatting and returns the previous state; the owning Page must also be unformatted for writes.
 
 ```php
 $images = $page->content->blocks->rowsOfType('image');
@@ -658,7 +675,7 @@ Definitions reuse settings from the selected **native Inputfield**. The `textfor
 | `required` | `true` | Required during native form processing |
 | `columnWidth` | `50` | Input width in Page Edit |
 | `value` | `'DE'` | Default when the stored key is absent |
-| `options` | `['DE' => __('Germany')]` | Choice keys and labels |
+| `options` | `['DE' => __('Germany')]` | Keys/labels for choice inputs; Toggle requires integer keys (-128..127). Page references use native selection settings instead. |
 | `showIf`, `requiredIf` | `'enabled=1'`, `'parent.enabled=1'` | Native conditions on current, ancestor or Page editor inputs |
 | `useLanguages` | `false`, `true`, `'auto'` | Multilingual mode for supported text inputs |
 | `derefAsPage` | `0`, `1`, `2` | Page-reference return type |
@@ -734,7 +751,7 @@ Formatters run in configured order on formatted reads, after native language res
 
 The formatter receives the owning Page and a transient Field named `<flex_field>_<property>`, with no database ID, including inside Rows. Formatters requiring a stored Field or `$page->{$field->name}` need Flex-aware integration.
 
-Native URL `addRoot` and Textarea output options apply even without formatters. Storage-time markup QA/link abstraction remains unsupported. Choice keys stay raw; [label helpers](#property-and-option-labels) encode display labels separately.
+Native URL `addRoot` and Textarea output options apply even without formatters. Storage-time markup QA/link abstraction remains unsupported. Choice keys stay raw except for Toggle `formatType`; [label helpers](#property-and-option-labels) encode display labels separately.
 
 ### Language modes
 
@@ -825,7 +842,7 @@ $result = $type->cleanupProperties($field, $paths, $cleanup, true); // Explicit 
 
 **Authorize PHP maintenance callers yourself.** Operations scan stored owner IDs in bounded batches (including hidden Pages and Repeater items). Apply locks and revalidates data/schema. Missing definitions, unknown row types and rename conflicts are reported, not silently pruned. Rename conflict checks distinguish JSON objects from lists, including unknown values inside Rows. Cleanup only removes explicitly selected unknown paths; ownership and selector projections update atomically.
 
-Results contain `fieldId`, `operation`, `paths`, `checked`, `changed`, `unchanged`, `wouldChange`, `pages` (opaque preview tokens), `properties` (counts/locations), `renames`, `conflicts`, `errors`, `retryPageIds`, `resumeAfterPageId`, `afterPageId`, `lastPageId`, `complete`, `success` and `finished`. Type-qualified paths select schema properties; concrete row addresses use row IDs.
+Results contain `fieldId`, `operation`, `paths`, `checked`, `changed`, `unchanged`, `wouldChange`, `pages` (opaque preview tokens), `properties` (counts/locations), `renames`, `conflicts`, `errors`, `findings`, `skippedChecks`, `retryPageIds`, `resumeAfterPageId`, `afterPageId`, `lastPageId`, `complete`, `success` and `finished`. `findings`/`skippedChecks` are empty for these PHP operations; [CLI check](#consistency-checks) populates them. Errors/conflicts identify `pageId`, `path` and `message`; renames identify `pageId`, `from`, `to` and a concrete `address`. Type-qualified paths select schema properties; concrete row addresses use row IDs.
 
 Continue successful incomplete batches with `lastPageId`; after errors repair and resume from `resumeAfterPageId`. A scan is not a global snapshot. Before removing `renamedFrom`, complete every batch and repeat a full preview from zero to confirm no pending renames. Apply rejects stale previews and respects existing transactions.
 
@@ -915,11 +932,12 @@ Superusers have **Field → Details → Data maintenance** for batched previews,
 
 - Requires ProcessWire 3.0.259+, PHP 8.1+, MySQL 8.0+ or MariaDB 10.11+ with InnoDB. SQLite/PostgreSQL are unsupported.
 - Native Page-version save/restore does not include Flex values.
-- Public runtime methods are documented above; services such as `storage()`, `media()`, owner/address helpers and editor hooks remain internal even where PHP visibility is public.
+- Fieldtype conversion is limited to Flex; remove saved Flex fields before uninstalling the module.
+- Use the documented Flex APIs and referenced native collection APIs. Schema metadata/transformers, view factories, services such as `storage()`/`media()`, owner/address helpers and editor hooks are internal even where PHP visibility is public.
 - Retrieve this reference through native `php index.php docs get FieldtypeFlex` or WireApiDocs; runtime signatures are also available through PHPDoc.
 
 Shared APIs: [[WireData]], [[WireArray]], [[Inputfield]], [[InputfieldForm]], [[Pagefiles]], [Pagefile](https://processwire.com/api/ref/pagefile/), [[Pageimage]].
 
 Related: [README.md](README.md) · [Configuration examples](examples/README.md) · [Architecture](docs/architecture.md) · [ProcessWire API reference](https://processwire.com/api/ref/).
 
-**Source files:** `FieldtypeFlex.module.php`, `src/FlexField.php`, `src/FlexValue.php`, `src/FlexRows.php`, `src/FlexFieldDefs.php`, `src/FlexMedia.php`, `src/FlexQuery.php`, `src/FlexStorage.php`, `InputfieldFlexRows.module.php`.
+**Module source:** [FieldtypeFlex.module.php](FieldtypeFlex.module.php).

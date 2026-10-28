@@ -18,6 +18,7 @@ class WireTest_FieldtypeFlex extends WireTest {
 	public function execute() {
 		$sections = [
 			'values'      => 'testValues',
+			'references'  => 'testReferences',
 			'definitions' => 'testDefinitions',
 			'formatting'  => 'testFormatting',
 			'rows'        => 'testRows',
@@ -124,6 +125,7 @@ class WireTest_FieldtypeFlex extends WireTest {
 			'number' => ['type' => 'integer'],
 			'price'  => ['type' => 'float'],
 			'flag'   => ['type' => 'checkbox'],
+			'state'  => ['type' => 'Toggle', 'value' => 5, 'options' => [0 => 'Draft', 5 => 'Approved', 2 => 'Deferred']],
 			'choices' => [
 				'type'    => 'checkboxes',
 				'options' => ['a' => 'Alpha', 'b' => 'Beta'],
@@ -135,6 +137,7 @@ class WireTest_FieldtypeFlex extends WireTest {
 		]);
 		$page = $this->createPage();
 		$name = $field->name;
+		$this->expect('custom Toggle default', 5, $page->getUnformatted($name)->state);
 		$page->$name = [
 			'number'  => '42',
 			'price'   => '3.25',
@@ -147,6 +150,13 @@ class WireTest_FieldtypeFlex extends WireTest {
 		$this->expect('integer roundtrip', 42, $value->number);
 		$this->expect('float roundtrip', 3.25, $value->price);
 		$this->expect('checkbox checked', 1, $value->flag);
+		$this->expect('custom Toggle persisted default', 5, $value->state);
+		$value->state = 2;
+		$this->expect('custom Toggle option label', 'Deferred', $value->optionLabel('state'));
+		$page = $this->reload($page);
+		$page->getUnformatted($name)->state = 0;
+		$page->save($name);
+		$this->expect('custom Toggle zero roundtrip', 0, $this->reload($page)->getUnformatted($name)->state);
 		$this->expect('multiple choices', ['a', 'b'], $value->choices);
 		$this->expect('runtime date timestamp', strtotime('2026-10-15'), $value->date);
 		foreach(['', 0] as $number) {
@@ -174,6 +184,34 @@ class WireTest_FieldtypeFlex extends WireTest {
 		$this->expect('property mutation marks owner', true, $page->isChanged($name));
 		$page->save();
 		$this->expect('full page save persists mutation', 17, $this->reload($page)->getUnformatted($name)->number);
+	}
+
+	private function testReferences(): void {
+		$field = $this->createField(['references' => ['type' => 'page', 'derefAsPage' => 0, 'inputfield' => 'InputfieldAsmSelect']]);
+		$page = $this->createPage();
+		$first = $this->createPage();
+		$second = $this->createPage();
+		$name = $field->name;
+		$page->getUnformatted($name)->references = [$first->id, $second->id];
+		$page->save($name);
+		$page = $this->reload($page);
+		$page->resetTrackChanges();
+		$value = $page->getUnformatted($name);
+		$previous = $value->references;
+		$value->references = '-' . $first->id;
+		$this->expect('negative ID removes selected reference', [$second->id], array_values($value->references->explode('id')));
+		$this->expect('reference removal marks owner changed', true, $page->isChanged($name));
+		$this->expect('reference removal isolates prior container', [$first->id, $second->id], array_values($previous->explode('id')));
+		$value->references = '-' . $first->id;
+		$this->expect('repeated removal is a no-op', [$second->id], array_values($value->references->explode('id')));
+		$value->references = '-1';
+		$this->expect('unselected ID is not an index', [$second->id], array_values($value->references->explode('id')));
+		$page->save($name);
+		$page = $this->reload($page);
+		$this->expect('reference removal persists', [$second->id], array_values($page->getUnformatted($name)->references->explode('id')));
+		$page->getUnformatted($name)->references = '-' . $second->id;
+		$page->save();
+		$this->expect('last reference removal persists empty selection', 0, count($this->reload($page)->getUnformatted($name)->references));
 	}
 
 	private function testDefinitions(): void {
@@ -220,10 +258,12 @@ class WireTest_FieldtypeFlex extends WireTest {
 				'dateOutputFormat' => 'd.m.Y',
 			],
 			'choice' => ['type' => 'select', 'options' => ['a' => 'A & B']],
+			'toggle' => ['type' => 'Toggle', 'formatType' => 3, 'options' => [5 => 'Ready & approved']],
+			'flag' => ['type' => 'Toggle', 'formatType' => 1],
 		]);
 		$page = $this->createPage();
 		$name = $field->name;
-		$page->$name = ['text' => '<b>A & B</b>', 'encoded' => '<b>A & B</b>', 'date' => '2026-10-15', 'choice' => 'a'];
+		$page->$name = ['text' => '<b>A & B</b>', 'encoded' => '<b>A & B</b>', 'date' => '2026-10-15', 'choice' => 'a', 'toggle' => 5, 'flag' => 1];
 		$page->save($name);
 		$raw = $page->getUnformatted($name)->rawArray();
 		$page->of(true);
@@ -232,6 +272,9 @@ class WireTest_FieldtypeFlex extends WireTest {
 		$this->expect('explicit TextformatterEntities encoding', '&lt;b&gt;A &amp; B&lt;/b&gt;', $value->encoded);
 		$this->expect('date output format', '15.10.2026', $value->date);
 		$this->expect('formatted option label', 'A &amp; B', $value->optionLabel('choice', 'a'));
+		$this->expect('Toggle entity output', 'Ready &amp; approved', $value->toggle);
+		$this->expect('Toggle boolean output', true, $value->flag);
+		$this->expect('Toggle explicit raw read', 5, $value->getUnformatted('toggle'));
 		$this->expect('raw values preserved', $raw, $value->rawArray());
 		$this->expect('JSON uses canonical values', $raw, json_decode(json_encode($value), true));
 		$this->rejects('formatted writes rejected', fn() => $value->set('text', 'Bad'));
@@ -318,6 +361,29 @@ class WireTest_FieldtypeFlex extends WireTest {
 		$value = $this->reload($page)->getUnformatted($nestedName);
 		$this->expect('nested copies persist', 2, count($value->items));
 
+		$page = $this->createPage();
+		$value = $page->getUnformatted($name);
+		$row = $value->items->addRow('text', ['future' => 'Retained']);
+		$row->setHidden(true);
+		$this->expect('unknown row leaf counts as collection content', true, $value->hasValue('items'));
+		$this->expect('unknown row leaf keeps field populated', false, $field->type->isEmptyValue($field, $value));
+		$formatted = clone $value;
+		$formatted->of(true);
+		$this->expect('hidden unknown content counts when formatted', true, $formatted->hasValue('items'));
+		$this->expect('unknown row leaf remains undeclared', false, $row->hasValue('future'));
+		$page->save($name);
+		$raw = $this->reload($page)->getUnformatted($name)->rawArray();
+		$this->expect('unknown row leaf survives save', 'Retained', $raw['items']['items'][0]['values']['future']);
+		$visible = $value->items->addRow('text', ['heading' => 'A & B']);
+		$formatted = clone $value;
+		$formatted->of(true);
+		$read = $formatted->getUnformatted('items');
+		$this->expect('raw row read includes hidden rows', 2, count($read));
+		$this->expect('raw row read retains native leaves', 'A & B', $read->getById($visible->rowId())->heading);
+		$this->expect('raw row read preserves visible source membership', 1, count($formatted->items));
+		$this->rejects('raw row read retains setter guard', fn() => $read->first()->set('heading', 'Bad'));
+		$this->rejects('raw row read retains visibility guard', fn() => $read->first()->setHidden(false));
+		$this->rejects('raw row read retains collection guard', fn() => $read->addRow('text'));
 	}
 
 	private function testSelectors(): void {

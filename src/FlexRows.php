@@ -163,7 +163,7 @@ class FlexRows extends WireArray implements \JsonSerializable {
 		$this->hydrating = false;
 		$this->resetTrackChanges();
 		if(isset($copy)) {
-			$sources = array_values($copy->allRows ?? $copy->data);
+			$sources = array_values($copy->backingRows());
 			foreach(array_values($this->data) as $n => $row) {
 				$source = $sources[$n];
 				$row->copyValuesFrom($source);
@@ -417,7 +417,9 @@ class FlexRows extends WireArray implements \JsonSerializable {
 		if($property === '_type') return $item->rowType();
 		$parts = explode('.', $property);
 		if(!$item->hasProperty($parts[0])) return count($parts) > 1 ? 0 : '';
-		$value = $item->getUnformatted($parts[0]);
+		// Row counts/blank checks describe the current view; scalar comparisons use raw leaves.
+		$value = $item->definitions()->property($parts[0])['kind'] === 'rows'
+			? $item->get($parts[0]) : $item->getUnformatted($parts[0]);
 		if(count($parts) > 1) return count($value);
 		if($value instanceof Pagefiles || $value instanceof self) return count($value) ? '1' : '';
 		return $value;
@@ -526,6 +528,24 @@ class FlexRows extends WireArray implements \JsonSerializable {
 	}
 
 	/**
+	 * Read all backing rows with raw native values and independent mutable containers.
+	 * Formatting-based write guards remain in force; find() membership stays bounded.
+	 *
+	 * @return self
+	 * #pw-internal
+	 * @internal
+	 */
+	public function unformattedCollection(): self {
+		$view = $this->makeNew();
+		foreach($this->backingRows() as $key => $row) {
+			$view->data[$key] = $row->unformattedView();
+		}
+		$view->formatted = $this->formatted;
+		if($view->formatted) $view->allRows = $view->data;
+		return $view;
+	}
+
+	/**
 	 * Track a nested change on the owning Flex field as well as this collection.
 	 *
 	 * @param string $what
@@ -550,7 +570,7 @@ class FlexRows extends WireArray implements \JsonSerializable {
 		if(parent::isChanged($what)) {
 			return true;
 		}
-		foreach($this->allRows ?? $this->data as $row) {
+		foreach($this->backingRows() as $row) {
 			if($row->isChanged()) {
 				return true;
 			}
@@ -565,7 +585,7 @@ class FlexRows extends WireArray implements \JsonSerializable {
 	 * @return $this
 	 */
 	public function resetTrackChanges($trackChanges = true) {
-		foreach($this->allRows ?? $this->data as $row) {
+		foreach($this->backingRows() as $row) {
 			$row->resetTrackChanges($trackChanges);
 		}
 		return parent::resetTrackChanges($trackChanges);
@@ -577,7 +597,7 @@ class FlexRows extends WireArray implements \JsonSerializable {
 	 * @return void
 	 */
 	public function __clone() {
-		$all = $this->allRows ?? $this->data;
+		$all = $this->backingRows();
 		foreach($all as $key => $row) $all[$key] = clone $row;
 		$this->data = array_intersect_key($all, $this->data);
 		if($this->allRows !== null) $this->allRows = $all;
@@ -590,7 +610,7 @@ class FlexRows extends WireArray implements \JsonSerializable {
 	 */
 	public function rawArray(): array {
 		$items = [];
-		foreach($this->allRows ?? $this->data as $row) $items[] = $row->envelope();
+		foreach($this->backingRows() as $row) $items[] = $row->envelope();
 		return [
 			'_flex' => FlexStorage::ROWS_FORMAT,
 			'items' => $items,
@@ -618,9 +638,15 @@ class FlexRows extends WireArray implements \JsonSerializable {
 	public function checkLimit(bool $minimum = false): void {
 		$min = (int) ($this->definition['settings']['minItems'] ?? 0);
 		$max = (int) ($this->definition['settings']['maxItems'] ?? 0);
-		if(($minimum && count($this->allRows ?? $this->data) < $min) || ($max && count($this->allRows ?? $this->data) > $max)) {
+		$count = count($this->backingRows());
+		if(($minimum && $count < $min) || ($max && $count > $max)) {
 			throw new WireException(sprintf($this->_("Repeatable '%s' item count is outside its limits"), $this->set));
 		}
+	}
+
+	/** Full ordered membership, including hidden rows retained by a formatted view. */
+	private function backingRows(): array {
+		return $this->allRows ?? $this->data;
 	}
 
 	private function rowSchema(string $type): FlexFieldDefs {

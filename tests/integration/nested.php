@@ -71,7 +71,9 @@ if(!isset($same, $assert, $throws)) {
 		$parent = $value;
 		$addresses = [];
 		for($level = 1; $level <= 5; ++$level) {
+			$set = $parent->address() === '' ? 'nodes' : $parent->address() . '.nodes';
 			$parent = $parent->nodes->addRow('item', ['heading' => 'Level ' . $level, 'number' => $level]);
+			$same($set, FlexPath::rowSet($parent), 'owning collection address retains ancestor scopes at level ' . $level);
 			$addresses[] = $parent->address();
 			$same((float) $level, substr_count($parent->address(), '.') / 2 + 0.5, 'row address includes every ancestor at level ' . $level);
 		}

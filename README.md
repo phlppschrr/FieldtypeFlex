@@ -160,7 +160,7 @@ Access Flex properties directly in a ProcessWire template:
 </article>
 ```
 
-Flex follows the Page's output-formatting state. Plain text is **not HTML-encoded automatically**; configure `TextformatterEntities` for text rendered in HTML or escape it in the template. Explicit or inherited [native Textformatters](API.md#textformatters) control text output, while TinyMCE content retains its HTML markup. File/Image descriptions use their explicitly configured or inherited formatter list; without one they remain unescaped. The examples select `TextformatterEntities` explicitly. Choice values are raw keys; label helpers encode display labels when formatted.
+Flex follows the Page's output-formatting state. Plain text is **not HTML-encoded automatically**; configure `TextformatterEntities` for text rendered in HTML or escape it in the template. Explicit or inherited [native Textformatters](API.md#textformatters) control text output, while TinyMCE content retains its HTML markup. File/Image descriptions use their explicitly configured or inherited formatter list; without one they remain unescaped. The examples select `TextformatterEntities` explicitly. Choice values are raw keys, except Toggle can opt into native `formatType` output modes; label helpers encode display labels when formatted.
 
 ### Query with ProcessWire selectors
 

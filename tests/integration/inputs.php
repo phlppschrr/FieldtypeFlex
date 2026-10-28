@@ -40,12 +40,13 @@ foreach($allTypes as $index => $inputType) {
 		'type'  => $inputType,
 		'label' => $inputType,
 	];
-	if(in_array($inputType, ['AsmSelect', 'Checkboxes', 'Radios', 'Select', 'SelectMultiple', 'Toggle'], true)) {
+	if(in_array($inputType, ['AsmSelect', 'Checkboxes', 'Radios', 'Select', 'SelectMultiple'], true)) {
 		$definition['options'] = [
 			'a' => 'Alpha',
 			'b' => 'Beta',
 		];
 	}
+	if($inputType === 'Toggle') $definition['options'] = [0 => 'Draft', 1 => 'Approved', 2 => 'Deferred'];
 	if($inputType === 'Page') {
 		$definition += [
 			'inputfield'     => 'InputfieldSelect',

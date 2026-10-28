@@ -128,6 +128,8 @@ class FlexFieldDefs extends Wire {
 	 * @param Field $field Owning Flex field.
 	 * @param ProcessWire|null $wire
 	 * @return array
+	 * #pw-internal
+	 * @internal
 	 */
 	public static function inspectSource(Field $field, ?ProcessWire $wire = null): array {
 		$wire = $wire ?: $field->wire();
@@ -219,6 +221,8 @@ class FlexFieldDefs extends Wire {
 	 * Return the resolved definition source and provenance metadata.
 	 *
 	 * @return array
+	 * #pw-internal
+	 * @internal
 	 */
 	public function sourceInfo(): array {
 		return $this->sourceInfo;
@@ -372,6 +376,9 @@ class FlexFieldDefs extends Wire {
 				if($input->className() !== $class) {
 					throw new WireException(sprintf($this->_('inheritField must use %s'), $class));
 				}
+				if($input instanceof InputfieldToggle && !array_key_exists('formatType', $settings)) {
+					$settings['formatType'] = $inherit->get('formatType') ?? 0;
+				}
 				// Textformatters belong to the Fieldtype, not the source Inputfield.
 				if(($inherit->type instanceof FieldtypeText || $inherit->type instanceof FieldtypeFile) && !array_key_exists('textformatters', $settings)) {
 					$settings['textformatters'] = $inherit->get('textformatters') ?? [];
@@ -379,11 +386,17 @@ class FlexFieldDefs extends Wire {
 			}
 			$this->assertSupported($input);
 			if(array_key_exists('customFields', $settings) && !$input instanceof InputfieldFile) throw new WireException($this->_('customFields requires a File or Image property'));
+			if($input instanceof InputfieldToggle && array_key_exists('options', $settings)) {
+				// Custom Toggle options are an Inputfield API; configure before value sanitization.
+				FlexDependencies::setToggleOptions($input, $settings['options']);
+			}
 			foreach($settings as $key => $value) {
 				if(in_array($key, ['type', 'children', 'types', 'renamedFrom', 'inheritField', 'name', 'id', 'customFields'], true)) {
 					continue;
 				}
-				if($key === 'options' && method_exists($input, 'addOptions')) {
+				if($key === 'options' && $input instanceof InputfieldToggle) {
+					continue;
+				} else if($key === 'options' && method_exists($input, 'addOptions')) {
 					$input->addOptions($value);
 				} else {
 					$input->set($key, $value);
@@ -596,6 +609,13 @@ class FlexFieldDefs extends Wire {
 				throw new WireException(sprintf($this->_("Invalid renamedFrom for '%s'"), $name));
 			}
 		}
+		if($input instanceof InputfieldToggle) {
+			$format = array_key_exists('formatType', $settings) ? $settings['formatType'] : 0;
+			if(!in_array($format, [0, 1, 2, 3, '0', '1', '2', '3'], true)) {
+				throw new WireException('Toggle formatType must be 0 (integer), 1 (boolean), 2 (label) or 3 (HTML label)');
+			}
+			$settings['formatType'] = $input->formatType = (int) $format;
+		}
 		$kind = 'text';
 		if($input instanceof InputfieldImage) {
 			$kind = 'image';
@@ -696,6 +716,8 @@ class FlexFieldDefs extends Wire {
 	 * Read-only structural summary for field configuration; it never opens editor state.
 	 *
 	 * @return array
+	 * #pw-internal
+	 * @internal
 	 */
 	public function structure(): array {
 		return $this->structureFor($this->tree);
@@ -916,6 +938,8 @@ class FlexFieldDefs extends Wire {
 	 *
 	 * @param array $raw Unformatted persisted values.
 	 * @return array
+	 * #pw-internal
+	 * @internal
 	 */
 	public function migrate(array $raw): array {
 		$claimed = [];

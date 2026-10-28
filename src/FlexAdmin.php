@@ -186,7 +186,7 @@ class FlexAdmin extends Wire {
 			foreach($row as $item) {
 				if($item instanceof FlexRows) {
 					foreach($item as $child) {
-						$this->registerRow($token, substr($child->address(), 0, -33), $child);
+						$this->registerRow($token, FlexPath::rowSet($child), $child);
 					}
 				}
 			}
@@ -281,7 +281,7 @@ class FlexAdmin extends Wire {
 		};
 		$raw = $walk($value->rawArray(), $value->definitions(), $value->address() === '' ? '' : $value->address() . '.');
 		if($value instanceof FlexRow) {
-			return new FlexRow($value->ownerPage(), $value->ownerField(), $value->definitions(), substr($value->address(), 0, -33), $value->rowId(), $value->rowType(), $raw, $value->isHidden());
+			return new FlexRow($value->ownerPage(), $value->ownerField(), $value->definitions(), FlexPath::rowSet($value), $value->rowId(), $value->rowType(), $raw, $value->isHidden());
 		}
 		return new FlexValue($value->ownerPage(), $value->ownerField(), $value->definitions(), $raw);
 	}
@@ -338,7 +338,7 @@ class FlexAdmin extends Wire {
 			$this->wire()->config->demo
 			|| $page->hasStatus(Page::statusLocked)
 			|| !$page->editable($field->name)
-			|| in_array((int) $field->collapsed, [4, 6, 7, 8, 22], true)
+			|| $this->hiddenOrLocked((int) $field->collapsed)
 		) {
 			throw new WirePermissionException($this->_('This Flex field is not editable'));
 		}
@@ -346,10 +346,21 @@ class FlexAdmin extends Wire {
 
 	private function editableInput(Inputfield $input): void {
 		for($item = $input; $item instanceof Inputfield; $item = $item->parent) {
-			if(!$item->editable() || in_array((int) $item->collapsed, [4, 6, 7, 8, 22], true) || $item->disabled) {
+			if(!$item->editable() || $this->hiddenOrLocked((int) $item->collapsed) || $item->disabled) {
 				throw new WirePermissionException($this->_('This Flex property is not editable'));
 			}
 		}
+	}
+
+	/** Native hidden/locked states block both outer fields and nested editor targets. */
+	private function hiddenOrLocked(int $collapsed): bool {
+		return in_array($collapsed, [
+			Inputfield::collapsedHidden,
+			Inputfield::collapsedNoLocked,
+			Inputfield::collapsedBlankLocked,
+			Inputfield::collapsedYesLocked,
+			Inputfield::collapsedTabLocked,
+		], true);
 	}
 
 	/** Resolve only an actual owned original/variation; a filename grants no authority. */

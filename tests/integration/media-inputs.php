@@ -38,6 +38,17 @@ foreach(['image', 'file'] as $kind) {
 	$assert($file->isChanged() && $value->isChanged(), "$kind PageArray mutation propagates change tracking");
 	$file->save();
 	$same([$referenceId, (int) $second->id], array_values($wire->pages->getFresh($id)->getUnformatted($f->name)->asset->first()->contributors->explode('id')), "$kind file save persists PageArray mutation");
+	$previousContributors = $file->contributors;
+	$assetId = $file->assetId();
+	$file->contributors = '-' . $second->id;
+	$same([$referenceId], array_values($file->contributors->explode('id')), "$kind negative ID removes only selected metadata reference");
+	$same([$referenceId, (int) $second->id], array_values($previousContributors->explode('id')), "$kind negative ID leaves prior metadata container intact");
+	$file->save();
+	$read = $wire->pages->getFresh($id)->getUnformatted($f->name)->asset->first();
+	$same([$referenceId], array_values($read->contributors->explode('id')), "$kind negative reference removal persists through selective file save");
+	$same($assetId, $read->assetId(), "$kind reference removal retains asset identity");
+	$file->contributors = $second;
+	$file->save();
 	$copy = $value->asset->clone($file); $copy->contributors->remove($second);
 	$same(2, count($file->contributors), "$kind file duplication isolates reference containers");
 	$cloned = clone $value; $cloned->asset->first()->contributors->remove($second);

@@ -48,6 +48,23 @@ final class FlexDependencies {
 			? $wire->wire(new InputfieldWrapper())
 			: $wire->modules->getModule($source->className(), ['noCache' => true]);
 		foreach($source->getArray() as $key => $value) $copy->set($key, $value);
+		// Toggle has no public custom-options flag: only built-in mode accepts "yes".
+		// Restore its numeric-only option map before copying the sanitized value.
+		if($source instanceof InputfieldToggle && $source->sanitizeValue('yes') !== 1) {
+			self::setToggleOptions($copy, $source->getOptions());
+			// Core's custom-options branch ignores rendered empty selections.
+			// Run only when the native form actually processes this input, so
+			// hidden/locked inputs and unmet dependencies retain native guards.
+			$copy->addHookAfter('processInput', static function(HookEvent $event): void {
+				$toggle = $event->object;
+				$post = $event->arguments(0);
+				$value = $post[$toggle->name];
+				if($value !== '' && !($value === null && $post['_' . $toggle->name . '_'] !== null)) return;
+				$previous = $toggle->value;
+				$toggle->value = '';
+				if($previous !== '') $toggle->trackChange('value', $previous, '');
+			});
+		}
 		foreach($source->getAttributes() as $key => $value) $copy->attr($key, $value);
 		// Text exports minlength as data-minlength and omits maxlength=0 for HTML.
 		// A processing copy needs the original semantic limits, not those defaults.
@@ -61,6 +78,22 @@ final class FlexDependencies {
 		foreach($source->flexDependencyConditions ?: [] as $key => $expression) $copy->set($key, $expression);
 		$copy->flexDependencyConditions = [];
 		return $copy;
+	}
+
+	/** Enforce the custom Toggle contract also on older supported native cores. */
+	public static function setToggleOptions(InputfieldToggle $input, array $options): void {
+		$normalized = [];
+		foreach($options as $key => $label) {
+			if(!is_int($key) && !(is_string($key) && preg_match('/^-?\d+$/D', $key))) {
+				throw new WireException('InputfieldToggle custom option values must be integers');
+			}
+			if((int) $key < -128 || (int) $key > 127) {
+				throw new WireException('InputfieldToggle custom option values must be between -128 and 127');
+			}
+			$normalized[(int) $key] = $label;
+		}
+		$input->hasFieldtype = false;
+		$input->setOptions($normalized);
 	}
 
 	/**
@@ -174,6 +207,8 @@ final class FlexDependencies {
 		if($aliases) {
 			$data = $input->getArray();
 			foreach($aliases as $source => $alias) {
+				// Toggle uses a leading/trailing underscore presence helper.
+				if(array_key_exists('_' . $source . '_', $data)) $data['_' . $alias . '_'] = $data['_' . $source . '_'];
 				foreach($data as $name => $value) {
 					if($name === $source || str_starts_with($name, $source . '__')) $data[$alias . substr($name, strlen($source))] = $value;
 				}

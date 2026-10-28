@@ -34,6 +34,14 @@ single/collection output, language changes and fallback, raw exports, read-only
 unformatted views, nested images, variations and unchanged canonical metadata.
 Run suites sequentially against one fixture; their owned baseline field name is shared.
 
+The admin suite executes the production PHP and JavaScript Row-title parsers
+against `tests/fixtures/row-titles.json`, including final renderer/fallback cases.
+Node.js must be available on PATH (already present in DDEV and used by CI's JS
+syntax checks). Run the JS cases alone with
+`node tests/js/row-title-parts.cjs`; no package install is needed. The test loads
+the actual private functions from FieldtypeFlex.js and fails if their boundaries
+change; it does not maintain a second parser or add production test exports.
+
 The admin context regression loads a Flex value before assigning its owner's
 concrete type, then exercises preload, rendering and authenticated processing.
 It checks revisions, unsaved rows/unknown data, owned media and draft overlays.

@@ -170,13 +170,20 @@ $pictureCopy = $pictures->clone($original);
 $same(2, count($pictures), 'native collection clone appends an independent file');
 $same($originalId, $pictures->first()->assetId(), 'collection clone retains original identity and object');
 $assert($pictureCopy->assetId() !== $originalId && is_file($original->filename()), 'collection clone allocates independent bytes before inserting a basename key');
-$locked = clone $media;
-$lockedDefinition = json_decode($locked->flexDefinition, true);
-$lockedDefinition['slides']['collapsed'] = Inputfield::collapsedNoLocked;
-$locked->flexDefinition = json_encode($lockedDefinition);
-$lockedValue = new FlexValue($page, $locked, $type->getDefinitions($locked, $page), $value->rawArray());
-$lockedToken = $type->admin()->open($lockedValue, $mediaName);
-$throws(fn() => $type->admin()->target($lockedToken, 'slides.' . $lockedValue->slides->first()->rowId() . '.photo', $lockedValue), 'scoped media target rejects a locked repeatable ancestor');
+foreach([Inputfield::collapsedHidden, Inputfield::collapsedNoLocked, Inputfield::collapsedBlankLocked, Inputfield::collapsedYesLocked, Inputfield::collapsedTabLocked] as $collapsed) {
+	$locked = clone $media;
+	$lockedDefinition = json_decode($locked->flexDefinition, true);
+	$lockedDefinition['slides']['collapsed'] = $collapsed;
+	$locked->flexDefinition = json_encode($lockedDefinition);
+	$lockedValue = new FlexValue($page, $locked, $type->getDefinitions($locked, $page), $value->rawArray());
+	$lockedToken = $type->admin()->open($lockedValue, $mediaName);
+	$throws(fn() => $type->admin()->target($lockedToken, 'slides.' . $lockedValue->slides->first()->rowId() . '.photo', $lockedValue), 'scoped media target rejects hidden/locked ancestor state ' . $collapsed);
+	$type->admin()->forget($lockedToken);
+	$locked->collapsed = $collapsed;
+	// AJAX/image actions check the outer field before resolving a scoped target.
+	$guard = new \ReflectionMethod(FlexAdmin::class, 'editable');
+	$throws(fn() => $guard->invoke($type->admin(), $page, $locked), 'admin action guard rejects hidden/locked outer field state ' . $collapsed);
+}
 // Replay the native upload handoff: reserve, normalize, write bytes, add basename.
 foreach(['Äpfel & Öl.png', 'photo.__detail.png', str_repeat('a', 150) . '.png'] as $uploadName) {
 	$uploadValue = new FlexValue($page, $media, $value->definitions(), []);

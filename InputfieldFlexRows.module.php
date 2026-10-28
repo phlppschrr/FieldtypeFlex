@@ -282,7 +282,6 @@ class InputfieldFlexRows extends Inputfield {
 				}
 			}
 		}
-		$entities = fn($value) => $this->wire()->sanitizer->entities((string) $value);
 		$bodyId = 'flex_row_' . $this->name . '__' . $id;
 		$hideLabel = $this->_('Hide item');
 		$showLabel = $this->_('Show item');
