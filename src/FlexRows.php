@@ -45,6 +45,25 @@ class FlexRow extends FlexValue {
 	public function rowType(): string {
 		return $this->flexRowType;
 	}
+
+	/**
+	 * Get the type label resolved when this row's definition was evaluated.
+	 *
+	 * @return string
+	 */
+	public function rowTypeLabel(): string {
+		return $this->definitions()->rowTypeLabel();
+	}
+
+	/**
+	 * Whether a property is defined in this row's own flat schema, even when empty.
+	 *
+	 * @param string $name Direct property name, not a nested schema path.
+	 * @return bool
+	 */
+	public function hasProperty(string $name): bool {
+		return array_key_exists($name, $this->definitions()->properties());
+	}
 }
 
 /** Ordered, owned rows. Reading/formatting never allocates row identities. */
@@ -134,6 +153,7 @@ class FlexRows extends WireArray implements \JsonSerializable {
 	 * @param Field $field Owning Flex field.
 	 * @param string $set Repeatable property name.
 	 * @return bool
+	 * #pw-internal
 	 * @internal
 	 */
 	public function belongsTo(Page $page, Field $field, string $set): bool {
@@ -281,6 +301,39 @@ class FlexRows extends WireArray implements \JsonSerializable {
 	 */
 	public function getById(string $id): ?FlexRow {
 		return $this->data[$id] ?? null;
+	}
+
+	/**
+	 * Get direct rows of a type in collection order, retaining object identity.
+	 * Unknown types return an empty list. Validate explicitly to avoid PHP scalar
+	 * coercion for callers that do not enable strict_types.
+	 *
+	 * @param string $type Stable row type name.
+	 * @return FlexRow[] Numerically indexed existing rows, not a new collection.
+	 * @throws \TypeError When the type is not a string.
+	 */
+	public function rowsOfType($type): array {
+		if(!is_string($type)) {
+			throw new \TypeError('FlexRows::rowsOfType(): $type must be a string');
+		}
+		$rows = [];
+		foreach($this as $row) {
+			if($row->rowType() === $type) {
+				$rows[] = $row;
+			}
+		}
+		return $rows;
+	}
+
+	/**
+	 * Count direct rows of a type in memory, including unsaved changes.
+	 *
+	 * @param string $type Stable row type name; unknown types return zero.
+	 * @return int
+	 * @throws \TypeError When the type is not a string.
+	 */
+	public function countOfType($type): int {
+		return count($this->rowsOfType($type));
 	}
 
 	/**
@@ -440,6 +493,7 @@ class FlexRows extends WireArray implements \JsonSerializable {
 	 * @param bool $minimum Also enforce the minimum row count.
 	 * @return void
 	 * @throws WireException
+	 * #pw-internal
 	 * @internal
 	 */
 	public function checkLimit(bool $minimum = false): void {

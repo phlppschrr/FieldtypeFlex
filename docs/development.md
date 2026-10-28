@@ -23,8 +23,13 @@ scripts/setup.sh prepares the disposable fixture, starts DDEV, installs ProcessW
 
 `ddev flex-test` runs all integration suites in separate PHP processes.
 Use `ddev exec php tests/run.php --list` to list suites, or select a subset with
-`ddev flex-test definitions rows public-api`. Each suite owns its fixture and cleanup;
-there are no ordering dependencies between suites.
+`ddev flex-test definitions rows admin nested media repeaters translations`. Each suite owns its fixture and cleanup;
+there are no ordering dependencies between suites. `ddev flex-test compatibility`
+compares actual saved native Fields with Flex properties, including Page dereferencing,
+access/unpublished states, languages, scalar values, option objects and media output modes.
+`ddev flex-test formatting` also compares native text formatter chains with Flex, including
+explicit/inherited/empty lists, HTML output, multilingual values and nested rows.
+Run suites sequentially against one fixture; their owned baseline field name is shared.
 
 AgentTools is optional. Set `FLEX_INSTALL_AGENTTOOLS=1` when running setup to install
 the pinned inspection module. It is not required by the test runner.
@@ -37,7 +42,10 @@ The CI workflow runs the integration suite and the available WireTests contract 
 
 ## Browser checks
 
-Changes to Page Edit inputs need a real browser save in the fixture. Verify the submitted values after reload and check the browser console for application errors. For repeatable or media changes, include nested rows, TinyMCE, sorting or duplication and media lifecycle cases that exercise the changed behavior.
+Changes to Page Edit inputs need a real browser save in the fixture. Verify the submitted values after reload and check the browser console for application errors. For `rows` or media changes, include nested rows, TinyMCE, sorting or duplication
+and media lifecycle cases that exercise the changed behavior. Verify both array/JSON
+`type => 'rows'` and native `InputfieldFlexRows` definitions, including AJAX-loaded
+inputs inside native ProcessWire Repeaters.
 
 The reusable demo seed is ddev flex-seed. The nested demo has a separate guarded seed:
 

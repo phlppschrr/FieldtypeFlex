@@ -62,6 +62,16 @@ try {
 	$translatedOptions = require $translationRoot . '/examples/options.php';
 	$same('Deutschland', $translatedOptions['DE'], 'included definition helper discovers its own textdomain without __FILE__');
 
+	$setTranslation($translationRoot . '/examples/typed-objects.php', 'Text', 'Textbaustein');
+	$translatedRowsField = $createField('flex_translated_rows', []);
+	$translatedRowsDefs = new FlexFieldDefs($translatedRowsField, $page, require $translationRoot . '/examples/typed-objects.php');
+	$translatedRowsValue = new FlexValue($page, $translatedRowsField, $translatedRowsDefs);
+	$translatedRow = $translatedRowsValue->blocks->addRow('text');
+	$same('Textbaustein', $translatedRow->rowTypeLabel(), 'runtime type label uses the translation resolved by the native PHP definition');
+	$wire->user->language = $previousLanguage;
+	$same('Textbaustein', $translatedRow->rowTypeLabel(), 'runtime type label retains its evaluated definition instead of translating independently');
+	$wire->user->language = $translationLanguage;
+
 	$setTranslation($translationRoot . '/src/FlexMedia.php', 'Invalid Flex file metadata', 'Ungültige Dateimetadaten');
 	try {
 		FlexMedia::validateMeta(null);

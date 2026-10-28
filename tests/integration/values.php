@@ -17,7 +17,7 @@ $same('Berlin', $value->city, 'fieldset data stays flat');
 $same(null, $value->group, 'fieldset is not a stored property');
 $same('', $value->default_text, 'explicit blank does not restore default');
 $same('Default', $type->getBlankValue($page, $field)->default_text, 'default for absent key');
-$same('2026-10-14', $value->date, 'canonical date');
+$same(strtotime('2026-10-14'), $value->date, 'canonical date');
 $assert($value->category instanceof Page && $value->category->id === 1, 'single Page hydration');
 $assert($value->categories instanceof PageArray && count($value->categories) === 2, 'PageArray hydration');
 $same('Full name', $value->label('name'), 'property label');

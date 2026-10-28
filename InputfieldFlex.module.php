@@ -290,7 +290,11 @@ class InputfieldFlex extends Inputfield {
 				$languageValue->setFromInputfield($child);
 				$value->set($name, $languageValue);
 			} else {
-				$value->set($name, $child->value);
+				$selection = $child->value;
+				if($def['kind'] === 'page' && !$selection instanceof Page && !$selection instanceof PageArray) {
+					$selection = $value->wire()->pages->getById(array_map('intval', (array) $selection));
+				}
+				$value->set($name, $selection);
 			}
 		}
 	}

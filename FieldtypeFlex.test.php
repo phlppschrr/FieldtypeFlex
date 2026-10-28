@@ -148,7 +148,7 @@ class WireTest_FieldtypeFlex extends WireTest {
 		$this->expect('float roundtrip', 3.25, $value->price);
 		$this->expect('checkbox checked', 1, $value->flag);
 		$this->expect('multiple choices', ['a', 'b'], $value->choices);
-		$this->expect('canonical date', '2026-10-15', $value->date);
+		$this->expect('runtime date timestamp', strtotime('2026-10-15'), $value->date);
 		foreach(['', 0] as $number) {
 			$page = $this->reload($page);
 			$page->$name = [
@@ -163,7 +163,7 @@ class WireTest_FieldtypeFlex extends WireTest {
 			$this->expect('integer blank/zero ' . var_export($number, true), $number, $value->number);
 			$this->expect('float blank/zero ' . var_export($number, true), $number === '' ? '' : 0.0, $value->price);
 			$this->expect('content distinguishes zero', $number === 0, $value->hasValue('number'));
-			$this->expect('unchecked checkbox', '', $value->flag);
+			$this->expect('unchecked checkbox', 0, $value->flag);
 			$this->expect('empty choices', [], $value->choices);
 			$this->expect('empty date', '', $value->date);
 		}
@@ -240,8 +240,7 @@ class WireTest_FieldtypeFlex extends WireTest {
 	private function rowSchema(): array {
 		return [
 			'items' => [
-				'type'       => 'fieldset',
-				'repeatable' => true,
+				'type'       => 'rows',
 				'types'      => [
 					'text' => [
 						'children' => [
@@ -471,7 +470,7 @@ class WireTest_FieldtypeFlex extends WireTest {
 			$this->expect('translation ' . $id, $text, $value->text->getLanguageValue($id));
 		}
 		$page->of(true);
-		$this->expect('formatted language object', true, $page->get($name)->text instanceof LanguagesPageFieldValue);
+		$this->expect('formatted language string', true, is_string($page->get($name)->text));
 		$this->expect('language raw values preserved', $value->rawArray(), $page->get($name)->rawArray());
 	}
 

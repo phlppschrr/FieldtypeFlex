@@ -15,17 +15,16 @@ $wire->user->language = $wire->languages->getDefault();
 
 $rowUiSchema = [
 	'slides' => [
-		'type'             => 'fieldset',
-		'repeatable'       => true,
-		'label'            => 'Slides',
-		'repeaterCollapse' => 0,
-		'repeaterAddLabel' => 'Add slide',
-		'maxItems'         => 3,
-		'types'            => [
+		'type'        => 'rows',
+		'label'       => 'Slides',
+		'rowCollapse' => 0,
+		'addRowLabel' => 'Add slide',
+		'maxItems'    => 3,
+		'types'       => [
 			'item' => [
-				'label'         => 'Item',
-				'repeaterTitle' => '#n: {heading} ({price})',
-				'children'      => [
+				'label'    => 'Item',
+				'rowTitle' => '#n: {heading} ({price})',
+				'children' => [
 					'heading' => [
 						'type'     => 'text',
 						'required' => true,
@@ -79,26 +78,26 @@ $assert(str_contains($rowUiExisting, 'aria-expanded="false"') && str_contains($r
 $renderRowSetting = static function(array $settings) use ($rowUiInput, $rowUiFirst): string {
 	$input = clone $rowUiInput;
 	$definition = $input->definition;
-	if(isset($settings['repeaterTitle'])) {
+	if(isset($settings['rowTitle'])) {
 		$definition['types']['item']['settings'] = $settings + $definition['types']['item']['settings'];
-		unset($settings['repeaterTitle']);
+		unset($settings['rowTitle']);
 	}
 	$definition['settings'] = $settings + $definition['settings'];
 	$input->definition = $definition;
 	return $input->renderRow($rowUiFirst, 1, true);
 };
-$assert(str_contains($renderRowSetting(['repeaterCollapse' => 1]), 'flex-row InputfieldStateCollapsed'), 'collapse mode one also closes new rows');
-$assert(!str_contains($renderRowSetting(['repeaterCollapse' => 3]), 'flex-row InputfieldStateCollapsed'), 'collapse mode three leaves rows open');
-$assert(str_contains($renderRowSetting(['repeaterTitle' => 'heading']), '>Fish &amp; Chips</span>'), 'a bare property name supplies the row label');
-$assert(str_contains($renderRowSetting(['repeaterTitle' => 'price']), '>0</span>'), 'a bare numeric property retains zero in its row label');
-$assert(str_contains($renderRowSetting(['repeaterTitle' => '{mode}']), '>Beta</span>'), 'row labels use native selection labels');
-$rowUiChoiceHtml = $renderRowSetting(['repeaterTitle' => '{mode}']);
+$assert(str_contains($renderRowSetting(['rowCollapse' => 1]), 'flex-row InputfieldStateCollapsed'), 'collapse mode one also closes new rows');
+$assert(!str_contains($renderRowSetting(['rowCollapse' => 3]), 'flex-row InputfieldStateCollapsed'), 'collapse mode three leaves rows open');
+$assert(str_contains($renderRowSetting(['rowTitle' => 'heading']), '>Fish &amp; Chips</span>'), 'a bare property name supplies the row label');
+$assert(str_contains($renderRowSetting(['rowTitle' => 'price']), '>0</span>'), 'a bare numeric property retains zero in its row label');
+$assert(str_contains($renderRowSetting(['rowTitle' => '{mode}']), '>Beta</span>'), 'row labels use native selection labels');
+$rowUiChoiceHtml = $renderRowSetting(['rowTitle' => '{mode}']);
 preg_match('/data-flex-label-options=([\'"])(.*?)\1/', $rowUiChoiceHtml, $rowUiChoiceOptions);
 $same(['a' => 'Alpha', 'b' => 'Beta'], json_decode(html_entity_decode($rowUiChoiceOptions[2], ENT_QUOTES, 'UTF-8'), true, 512, JSON_THROW_ON_ERROR), 'live choice labels receive escaped native option names');
-$assert(str_contains($renderRowSetting(['repeaterTitle' => '{unknown}']), '>Item #1</span>'), 'an empty label falls back to the row type label and index');
-$assert(str_contains($renderRowSetting(['repeaterTitle' => '{summary}']), '>Default label</span>'), 'row labels resolve native language values');
+$assert(str_contains($renderRowSetting(['rowTitle' => '{unknown}']), '>Item #1</span>'), 'an empty label falls back to the row type label and index');
+$assert(str_contains($renderRowSetting(['rowTitle' => '{summary}']), '>Default label</span>'), 'row labels resolve native language values');
 $wire->user->language = $wire->languages->get('de');
-$assert(str_contains($renderRowSetting(['repeaterTitle' => '{summary}']), '>Deutsches Label</span>'), 'row labels follow the current editor language');
+$assert(str_contains($renderRowSetting(['rowTitle' => '{summary}']), '>Deutsches Label</span>'), 'row labels follow the current editor language');
 $wire->user->language = $wire->languages->getDefault();
 
 $rowUiFirst->heading = '<img src=x onerror=alert(1)>Safe #n {price}';
@@ -110,14 +109,14 @@ $rowUiFirst->heading = 'Fish & Chips';
 // Presentation mistakes must not make existing content uneditable.
 foreach(['0' => 0, '1' => 1, '3' => 3, '2' => 0, 'invalid' => 0] as $collapse => $expectedCollapse) {
 	$fallbackSchema = $rowUiSchema;
-	$fallbackSchema['slides']['repeaterCollapse'] = (string) $collapse;
-	$fallbackSchema['slides']['repeaterAddLabel'] = ['invalid'];
+	$fallbackSchema['slides']['rowCollapse'] = (string) $collapse;
+	$fallbackSchema['slides']['addRowLabel'] = ['invalid'];
 	$fallbackSchema['slides']['types']['item']['label'] = ['invalid'];
-	$fallbackSchema['slides']['types']['item']['repeaterTitle'] = ['invalid'];
+	$fallbackSchema['slides']['types']['item']['rowTitle'] = ['invalid'];
 	$fallbackField = clone $rowUiField;
 	$fallbackField->flexDefinition = json_encode($fallbackSchema, JSON_THROW_ON_ERROR);
 	$nativeSource = $wire->wire(new InputfieldWrapper());
-	$nativeSet = $wire->modules->get('InputfieldFieldset');
+	$nativeSet = $wire->modules->get('InputfieldFlexRows');
 	$nativeSet->name = 'slides';
 	foreach($fallbackSchema['slides'] as $key => $setting) {
 		if($key !== 'type') $nativeSet->set($key, $setting);
@@ -126,11 +125,11 @@ foreach(['0' => 0, '1' => 1, '3' => 3, '2' => 0, 'invalid' => 0] as $collapse =>
 	foreach(['array' => $fallbackSchema, 'JSON' => null, 'native' => $nativeSource] as $format => $source) {
 		$defs = new FlexFieldDefs($fallbackField, $page, $source);
 		$settings = $defs->property('slides')['settings'];
-		$same($expectedCollapse, $settings['repeaterCollapse'], "$format normalizes collapse setting $collapse");
-		$assert(!isset($settings['repeaterAddLabel']), "$format uses the default add label for an invalid setting");
+		$same($expectedCollapse, $settings['rowCollapse'], "$format normalizes collapse setting $collapse");
+		$assert(!isset($settings['addRowLabel']), "$format uses the default add label for an invalid setting");
 		$typeSettings = $defs->rowType('slides', 'item');
 		$same('Item', $typeSettings['label'], "$format uses the default row type label");
-		$assert(!isset($typeSettings['settings']['repeaterTitle']), "$format uses the default title for an invalid setting");
+		$assert(!isset($typeSettings['settings']['rowTitle']), "$format uses the default title for an invalid setting");
 	}
 }
 $fallbackField = $createField('flex_row_fallback', $fallbackSchema);

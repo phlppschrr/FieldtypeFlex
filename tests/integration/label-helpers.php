@@ -14,15 +14,13 @@ $labelField = $createField('flex_label_helpers', [
 	'unit' => $choice,
 	'multiple' => ['type' => 'selectMultiple', 'options' => ['a' => 'Alpha', 'b' => 'Beta']],
 	'rows' => [
-		'type' => 'fieldset',
-		'repeatable' => true,
+		'type' => 'rows',
 		'types' => [
 			'item' => [
 				'children' => [
 					'unit' => $choice,
 					'notes' => [
-						'type' => 'fieldset',
-						'repeatable' => true,
+						'type' => 'rows',
 						'types' => ['note' => ['children' => ['unit' => $choice]]],
 					],
 				],

@@ -85,8 +85,7 @@ $media->flexDefinition = json_encode([
 		'maxFiles' => 1,
 	],
 	'slides' => [
-		'type'       => 'fieldset',
-		'repeatable' => true,
+		'type'       => 'rows',
 		'types'      => [
 			'item' => [
 				'label'    => 'Item',
@@ -178,6 +177,27 @@ $locked->flexDefinition = json_encode($lockedDefinition);
 $lockedValue = new FlexValue($page, $locked, $type->getDefinitions($locked, $page), $value->rawArray());
 $lockedToken = $type->admin()->open($lockedValue, $mediaName);
 $throws(fn() => $type->admin()->target($lockedToken, 'slides.' . $lockedValue->slides->first()->rowId() . '.photo', $lockedValue), 'scoped media target rejects a locked repeatable ancestor');
+// Replay the native upload handoff: reserve, normalize, write bytes, add basename.
+foreach(['Äpfel & Öl.png', 'photo.__detail.png', str_repeat('a', 150) . '.png'] as $uploadName) {
+	$uploadValue = new FlexValue($page, $media, $value->definitions(), []);
+	$uploadFiles = $uploadValue->hero;
+	$uploadFiles->draft($type->admin()->open($uploadValue, $mediaName));
+	$uploadId = bin2hex(random_bytes(16));
+	$reservedName = $type->media()->uniqueName($page, $uploadName, $uploadId);
+	$type->media()->reserve($uploadFiles, $uploadId, $reservedName, 'uploading');
+	$nativeUpload = $wire->wire(new WireUpload('flex_upload_test'));
+	$nativeName = $nativeUpload->validateFilename($reservedName, ['png']);
+	$nativePath = $trackFile($page->filesManager()->path() . $nativeName);
+	try {
+		copy($imageFixture, $nativePath);
+		$uploadFiles->add($nativeName);
+		$type->media()->finishUpload($uploadFiles->first());
+		$same($uploadId, $uploadFiles->first()->assetId(), 'native upload filename retains its reserved Flex identity');
+		$same($reservedName, $nativeName, 'reserved filename survives native upload normalization');
+	} finally {
+		$type->media()->abandon($uploadId, $page, $media, $uploadFiles->draft());
+	}
+}
 $nativeTree = $value->definitions()->getInputfields($value, $mediaName . '__');
 $uploadInput = $nativeTree->getChildByName($mediaName . '__hero');
 $savedUploads = $_FILES;

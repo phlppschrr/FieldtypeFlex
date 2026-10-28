@@ -75,6 +75,7 @@ class FieldtypeFlex extends Fieldtype implements FieldtypeHasFiles, FieldtypeHas
 		$this->addHookAfter('ProcessPageEditImageSelect::executeEdit', $this, 'decorateImage');
 		$this->addHookBefore('ProcessPageEditImageSelect::executeResize', $this, 'dispatchImage');
 		$this->addHookBefore('ProcessPageEditImageSelect::executeVariations', $this, 'dispatchImage');
+		$this->addHookAfter('ProcessPageEditImageSelect::executeVariations', $this, 'decorateImage');
 		$this->addHookAfter('Pages::cloned', function(HookEvent $event) {
 			$this->media()->cloned($event->arguments(0), $event->arguments(1));
 		});
@@ -190,6 +191,7 @@ class FieldtypeFlex extends Fieldtype implements FieldtypeHasFiles, FieldtypeHas
 	 * Create the editor draft and request service.
 	 *
 	 * @return FlexAdmin
+	 * #pw-internal
 	 * @internal
 	 */
 	public function admin(): FlexAdmin {
@@ -200,6 +202,7 @@ class FieldtypeFlex extends Fieldtype implements FieldtypeHasFiles, FieldtypeHas
 	 * Get the request-local media ownership service.
 	 *
 	 * @return FlexMedia
+	 * #pw-internal
 	 * @internal
 	 */
 	public function media(): FlexMedia {
@@ -454,6 +457,7 @@ class FieldtypeFlex extends Fieldtype implements FieldtypeHasFiles, FieldtypeHas
 	 * Create the canonical persistence and row projection service.
 	 *
 	 * @return FlexStorage
+	 * #pw-internal
 	 * @internal
 	 */
 	public function storage(): FlexStorage {

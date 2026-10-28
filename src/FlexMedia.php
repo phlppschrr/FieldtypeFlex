@@ -41,7 +41,7 @@ trait FlexOwnedFile {
 	}
 
 	/**
-	 * Stage an independent original under a new basename.
+	 * Stage a new basename while retaining the logical asset identity.
 	 *
 	 * @param string $basename
 	 * @return string
@@ -411,14 +411,36 @@ trait FlexMediaCollection {
 	}
 
 	/**
-	 * Stage an independent original under a new basename.
+	 * Stage a new basename while retaining the logical asset identity.
 	 *
 	 * @param Pagefile $file
 	 * @param string $basename
 	 * @return string
 	 */
 	public function rename(Pagefile $file, $basename) {
-		return $this->replaceOwned($file, $file->filename(), (string) $basename);
+		$this->assertWritable();
+		if($file->pagefiles !== $this || $this->get($file->basename()) !== $file) {
+			throw new WireException($this->_('Unknown media original'));
+		}
+		$basename = $this->cleanBasename((string) $basename, false, true, true);
+		if($basename === $file->basename()) {
+			return $file->basename();
+		}
+		$record = $this->field->type->media()->stageRename($file, $basename);
+		$oldKey = $file->basename();
+		$this->flexHydrating = true;
+		try {
+			$file->setFilename($record['basename']);
+		} finally {
+			$this->flexHydrating = false;
+		}
+		$data = [];
+		foreach($this->data as $key => $item) {
+			$data[$key === $oldKey ? $file->basename() : $key] = $item;
+		}
+		$this->data = $data;
+		$this->trackChange('file');
+		return $file->basename();
 	}
 
 	/**
@@ -931,11 +953,14 @@ class FlexMedia extends Wire {
 	 * @return string
 	 */
 	public function uniqueName(Page $page, string $requested, string $id): string {
+		// Match WireUpload before reserving: its translated filename sanitizer
+		// also collapses repeated underscores and preserves long-name extensions.
+		$requested = $this->wire()->sanitizer->filename($requested, Sanitizer::translate);
 		$ext = strtolower(pathinfo($requested, PATHINFO_EXTENSION));
 		if(!preg_match('/^[a-z0-9]{1,10}$/D', $ext)) {
 			throw new WireException($this->_('Invalid file extension'));
 		}
-		$stem = strtolower($this->wire()->sanitizer->filename(pathinfo($requested, PATHINFO_FILENAME)));
+		$stem = strtolower(pathinfo($requested, PATHINFO_FILENAME));
 		$stem = substr(preg_replace('/[^a-z0-9_-]/', '-', $stem), 0, 80) ?: 'file';
 		$stem = trim($stem, '-_') ?: 'file';
 		$name = $stem . '-' . substr($id, 0, 12) . '.' . $ext;
@@ -952,9 +977,10 @@ class FlexMedia extends Wire {
 	 * @param string $source
 	 * @param string $id Stable row or asset identity.
 	 * @param string $requested
+	 * @param bool $exactName Use an already selected rename target.
 	 * @return array
 	 */
-	public function copy(Pagefiles $files, string $source, string $id, string $requested): array {
+	public function copy(Pagefiles $files, string $source, string $id, string $requested, bool $exactName = false): array {
 		if(str_contains($source, '://') || !is_file($source) || !is_readable($source)) {
 			throw new WireException($this->_('Media copy source is not a readable local file'));
 		}
@@ -969,13 +995,103 @@ class FlexMedia extends Wire {
 		if($max && filesize($source) > $max) {
 			throw new WireException($this->_('File exceeds maxFilesize'));
 		}
-		$name = $this->uniqueName($files->page, $requested, $id);
+		$name = $exactName ? $requested : $this->uniqueName($files->page, $requested, $id);
 		$record = $this->reserve($files, $id, $name);
-		if(!copy($source, $files->page->filesManager()->path() . $name)) {
+		if($exactName) {
+			try {
+				$this->copyExclusive($source, $files->path() . $name);
+			} catch(\Throwable $error) {
+				$this->journal()->prepare('DELETE FROM fieldtype_flex_assets WHERE asset_id=:id')->execute(['id' => $id]);
+				unset($this->manifest[$id]);
+				throw $error;
+			}
+		} else if(!copy($source, $files->page->filesManager()->path() . $name)) {
 			throw new WireException($this->_('Unable to stage media copy'));
 		}
 		$this->wire()->files->chmod($files->page->filesManager()->path() . $name);
 		return $record;
+	}
+
+	/** Stage a rename under separate physical ownership until the field commits. */
+	public function stageRename(Pagefile $file, string $requested): array {
+		$files = $file->pagefiles;
+		$owner = $this->asset($file->assetId());
+		if(!$owner || (int) $owner['pages_id'] !== (int) $files->page->id || (int) $owner['fields_id'] !== (int) $files->field->id) {
+			throw new WireException($this->_('Unknown media original'));
+		}
+		$requested = $files->cleanBasename($requested, false, true, true);
+		$oldStem = pathinfo($file->basename(), PATHINFO_FILENAME);
+		// Use fresh native variation discovery rather than a retained image cache.
+		$native = $this->wire(new ($file instanceof Pageimage ? Pageimage::class : Pagefile::class)($files, $file->basename()));
+		$sources = array_filter($native->getFiles(), 'is_file');
+		$stageId = bin2hex(random_bytes(16));
+		$stem = pathinfo($requested, PATHINFO_FILENAME);
+		$ext = pathinfo($requested, PATHINFO_EXTENSION);
+		$name = $requested;
+		for($n = 0; ; ++$n) {
+			$targets = [];
+			$newStem = pathinfo($name, PATHINFO_FILENAME);
+			foreach($sources as $source) {
+				$targets[$source] = $source === $file->filename() ? $name : $newStem . substr(basename($source), strlen($oldStem));
+			}
+			$conflict = false;
+			if($file instanceof Pageimage) {
+				$candidate = $this->wire(new Pageimage($files, $name));
+				// An existing derivative of any size makes this stem unsafe: later
+				// native cleanup would otherwise mistake it for our own variation.
+				$conflict = (bool) array_filter($candidate->getFiles(), 'file_exists');
+			}
+			foreach(array_unique([$name, ...array_values($targets)]) as $target) {
+				if(file_exists($files->path() . $target) || $this->assetByName($files->page, $target)) {
+					$conflict = true;
+					break;
+				}
+			}
+			if(!$conflict) break;
+			$name = $stem . '-' . substr($stageId, 0, 12) . ($n ? "-$n" : '') . '.' . $ext;
+		}
+		$record = $this->copy($files, $file->filename(), $stageId, $name, true);
+		$copied = [$files->path() . $name];
+		try {
+			foreach($targets as $source => $target) {
+				if($source === $file->filename()) continue;
+				$this->copyExclusive($source, $files->path() . $target);
+				$copied[] = $files->path() . $target;
+			}
+		} catch(\Throwable $error) {
+			// Only discard paths we created exclusively. A racing native file is
+			// not ours and must never become eligible for the staged collector.
+			foreach($copied as $path) unlink($path);
+			$this->journal()->prepare('DELETE FROM fieldtype_flex_assets WHERE asset_id=:id')->execute(['id' => $stageId]);
+			unset($this->manifest[$stageId]);
+			throw $error;
+		}
+		$data = json_decode($record['data'], true, 64, JSON_THROW_ON_ERROR);
+		$data['renameFrom'] = ['id' => $file->assetId(), 'basename' => $owner['basename']];
+		$this->journal()->prepare('UPDATE fieldtype_flex_assets SET data=:data WHERE asset_id=:id')->execute([
+			'data' => json_encode($data, JSON_THROW_ON_ERROR),
+			'id' => $stageId,
+		]);
+		unset($this->manifest[$stageId]);
+		return $record;
+	}
+
+	/** Never overwrite a native original or derivative that appeared after reservation. */
+	private function copyExclusive(string $source, string $target): void {
+		$input = @fopen($source, 'rb');
+		$output = $input ? @fopen($target, 'xb') : false;
+		try {
+			if(!$input || !$output || stream_copy_to_stream($input, $output) !== filesize($source)) {
+				throw new WireException($this->_('Unable to stage media copy'));
+			}
+		} catch(\Throwable $error) {
+			if($output) unlink($target);
+			throw $error;
+		} finally {
+			if($input) fclose($input);
+			if($output) fclose($output);
+		}
+		$this->wire()->files->chmod($target);
 	}
 
 	/**
@@ -1244,6 +1360,9 @@ class FlexMedia extends Wire {
 			}
 			$seen[$id] = true;
 			$owner = $this->asset($id, true);
+			if($owner && $owner['basename'] !== $meta['basename']) {
+				$owner = $this->commitRename($page, $field, $record, $owner);
+			}
 			if(
 				!$owner
 				|| (int) $owner['pages_id'] !== (int) $page->id
@@ -1288,6 +1407,38 @@ class FlexMedia extends Wire {
 				unset($this->manifest[$id]);
 			}
 		}
+	}
+
+	/** Transfer physical staging ownership to the stable ID inside the field transaction. */
+	private function commitRename(Page $page, Field $field, array $record, array $owner): array {
+		$db = $this->wire()->database;
+		$q = $db->prepare('SELECT * FROM fieldtype_flex_assets WHERE pages_id=:page AND basename=:name FOR UPDATE');
+		$q->execute(['page' => $page->id, 'name' => $record['meta']['basename']]);
+		$stage = $q->fetch(\PDO::FETCH_ASSOC);
+		$data = $stage ? json_decode($stage['data'], true, 64, JSON_THROW_ON_ERROR) : [];
+		if(!$stage || $stage['state'] !== 'staged'
+			|| (int) $owner['pages_id'] !== (int) $page->id || (int) $owner['fields_id'] !== (int) $field->id
+			|| (int) $stage['fields_id'] !== (int) $field->id || $stage['address'] !== $record['address']
+			|| ($data['renameFrom'] ?? null) !== ['id' => $owner['asset_id'], 'basename' => $owner['basename']]
+		) {
+			throw new WireException($this->_('Flex asset ownership does not match canonical value'));
+		}
+		$id = $owner['asset_id'];
+		$discardId = bin2hex(random_bytes(16));
+		// Keep the former original/variations registered for conservative post-commit cleanup.
+		$discardData = json_decode($owner['data'], true, 64, JSON_THROW_ON_ERROR);
+		$discardData['meta']['id'] = $discardId;
+		$db->prepare("UPDATE fieldtype_flex_assets SET asset_id=:discard,state='pending_delete',data=:data WHERE asset_id=:id")->execute([
+			'discard' => $discardId, 'id' => $id, 'data' => json_encode($discardData, JSON_THROW_ON_ERROR),
+		]);
+		unset($data['renameFrom']);
+		$db->prepare('UPDATE fieldtype_flex_assets SET asset_id=:id,data=:data WHERE asset_id=:stage')->execute([
+			'id' => $id, 'stage' => $stage['asset_id'], 'data' => json_encode($data, JSON_THROW_ON_ERROR),
+		]);
+		unset($this->manifest[$id], $this->manifest[$stage['asset_id']], $this->manifest[$discardId]);
+		$stage['asset_id'] = $id;
+		$stage['data'] = json_encode($data, JSON_THROW_ON_ERROR);
+		return $stage;
 	}
 
 	/**

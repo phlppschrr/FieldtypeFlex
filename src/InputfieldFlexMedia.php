@@ -136,9 +136,7 @@ class InputfieldFlexImage extends InputfieldImage {
 		return $changed;
 	}
 
-	protected function ___getImageEditButtons($file, $id, $n, $buttonClass) {
-		$buttons = parent::___getImageEditButtons($file, $id, $n, $buttonClass);
-		unset($buttons['variations']);
-		return $buttons;
+	protected function getVariationUrl($pagefile, $id) {
+		return parent::getVariationUrl($pagefile, $id) . '&flex_draft=' . rawurlencode($this->flexDraft);
 	}
 }

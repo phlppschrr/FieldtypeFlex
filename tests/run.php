@@ -6,20 +6,21 @@ if(PHP_SAPI !== 'cli') {
 }
 
 $suites = [
+	'compatibility' => ['native-compatibility.php'],
 	'values' => ['values.php'],
 	'definitions' => ['definitions.php', 'definition-sources.php', 'examples.php'],
-	'formatting' => ['formatting.php'],
+	'formatting' => ['formatting.php', 'textformatters.php'],
 	'languages' => ['language-auto.php'],
 	'selectors' => ['selectors.php'],
 	'schema' => ['schema-evolution.php'],
 	'inputs' => ['inputs.php'],
 	'admin' => ['admin.php', 'admin-errors.php', 'row-editor.php'],
-	'rows' => ['rows.php', 'row-types.php'],
-	'media' => ['media.php', 'media-output.php'],
+	'rows' => ['rows.php', 'row-types.php', 'row-helpers.php'],
+	'media' => ['media.php', 'media-output.php', 'media-variations.php', 'media-rename.php'],
 	'repeaters' => ['repeaters.php'],
 	'nested' => ['nested.php'],
 	'translations' => ['translations.php', 'bundled-translations.php'],
-	'public-api' => ['public-api.php', 'label-helpers.php', 'array-views.php'],
+	'public-api' => ['public-api.php', 'label-helpers.php', 'array-views.php', 'api-examples.php'],
 ];
 
 $usage = static function() use ($suites): void {

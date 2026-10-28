@@ -66,6 +66,8 @@ class FlexFieldDefs extends Wire {
 	private array $names = [];
 	private int $depth;
 	private array $sourceInfo = [];
+	// Shared by rows of this type; labels do not require an owning collection link.
+	private string $rowTypeLabel = '';
 
 	/**
 	 * Load and validate trusted definitions in the owning page’s API context.
@@ -224,6 +226,7 @@ class FlexFieldDefs extends Wire {
 	 *
 	 * @param array $raw Existing or assigned unformatted values.
 	 * @return void
+	 * #pw-internal
 	 * @internal
 	 */
 	public function assertSourceForValues(array $raw): void {
@@ -309,7 +312,6 @@ class FlexFieldDefs extends Wire {
 	private function assertSupported(Inputfield $input): void {
 		if(
 			$input instanceof InputfieldFlex
-			|| $input instanceof InputfieldFlexRows
 			|| preg_match('/(Repeater|PageTable|Password|FlexFile|FlexImage)/i', $input->className())
 		) {
 			throw new WireException(sprintf($this->_('%s is not a supported Flex definition input'), $input->className()));
@@ -342,7 +344,12 @@ class FlexFieldDefs extends Wire {
 			if(!is_array($settings)) {
 				throw new WireException(sprintf($this->_("Flex property '%s' must be an array"), $name));
 			}
-			$class = $this->resolveType((string) ($settings['type'] ?? 'text'));
+			$isRows = ($settings['type'] ?? '') === 'rows';
+			$this->validateStructureSettings($settings, $isRows);
+			$class = $isRows ? 'InputfieldFlexRows' : $this->resolveType((string) ($settings['type'] ?? 'text'));
+			if(!$isRows && $class === 'InputfieldFlexRows') {
+				throw new WireException($this->_('Declare a Rows collection with type rows'));
+			}
 			$input = $this->wire()->modules->get($class);
 			if(!$input instanceof Inputfield) {
 				throw new WireException(sprintf($this->_('Unable to load %s'), $class));
@@ -355,6 +362,10 @@ class FlexFieldDefs extends Wire {
 				$input = $inherit->getInputfield($this->flexPage);
 				if($input->className() !== $class) {
 					throw new WireException(sprintf($this->_('inheritField must use %s'), $class));
+				}
+				// Textformatters belong to the Fieldtype, not the source Inputfield.
+				if($inherit->type instanceof FieldtypeText && !array_key_exists('textformatters', $settings)) {
+					$settings['textformatters'] = $inherit->get('textformatters') ?? [];
 				}
 			}
 			$this->assertSupported($input);
@@ -375,10 +386,8 @@ class FlexFieldDefs extends Wire {
 			$input->hasFieldtype = false;
 			$input->_flex_property = $name;
 			$this->resolveLanguages($input);
-			if(empty($settings['repeatable']) && array_key_exists('types', $settings)) {
-				throw new WireException($this->_('types requires a repeatable fieldset'));
-			}
-			if(!empty($settings['repeatable'])) {
+			$this->validateTextformatters($input, $settings);
+			if($isRows) {
 				$this->registerRows($name, $input, $settings);
 			} else if($input instanceof InputfieldWrapper) {
 				$children = $settings['children'] ?? [];
@@ -405,15 +414,10 @@ class FlexFieldDefs extends Wire {
 			$input->hasPage = $this->flexPage;
 			$input->_flex_property = $name;
 			$this->resolveLanguages($input);
-			if(!$input->repeatable && $input->types !== null) {
-				throw new WireException($this->_('types requires a repeatable fieldset'));
-			}
-			if($input->repeatable) {
-				$settings = $input->getArray();
-				if(count($original->children())) {
-					$settings['children'] = $original;
-				}
-				$this->registerRows($name, $input, $settings);
+			$this->validateTextformatters($input, $input->getArray());
+			$this->validateStructureSettings($input->getArray(), $input instanceof InputfieldFlexRows);
+			if($input instanceof InputfieldFlexRows) {
+				$this->registerRows($name, $input, $input->getArray());
 			} else if($input instanceof InputfieldWrapper) {
 				$this->importWrapper($original, $input, $nesting + 1);
 			} else {
@@ -423,10 +427,26 @@ class FlexFieldDefs extends Wire {
 		}
 	}
 
-	private function registerRows(string $name, Inputfield $input, array $settings): void {
-		if(!$input instanceof InputfieldFieldset) {
-			throw new WireException($this->_('repeatable requires a fieldset'));
+	private function validateStructureSettings(array $settings, bool $isRows): void {
+		foreach(['repeatable', 'repeaterAddLabel', 'repeaterCollapse', 'repeaterTitle'] as $key) {
+			if(array_key_exists($key, $settings)) {
+				throw new WireException(sprintf($this->_('Unsupported Flex definition setting: %s'), $key));
+			}
 		}
+		foreach(['types', 'minItems', 'maxItems', 'addRowLabel', 'rowCollapse'] as $key) {
+			if(!$isRows && array_key_exists($key, $settings)) {
+				throw new WireException(sprintf($this->_('%s requires type rows'), $key));
+			}
+		}
+		if(!$isRows && array_key_exists('rowTitle', $settings)) {
+			throw new WireException($this->_('rowTitle belongs to a row type'));
+		}
+		if($isRows && !empty($settings['inheritField'])) {
+			throw new WireException($this->_('inheritField requires a native Inputfield type'));
+		}
+	}
+
+	private function registerRows(string $name, Inputfield $input, array $settings): void {
 		foreach(['minItems', 'maxItems'] as $limit) {
 			if(isset($settings[$limit]) && (!is_int($settings[$limit]) || $settings[$limit] < 0)) {
 				throw new WireException(sprintf($this->_('%s must be a non-negative integer'), $limit));
@@ -437,20 +457,20 @@ class FlexFieldDefs extends Wire {
 		if($max && $min > $max) {
 			throw new WireException($this->_('minItems must not exceed maxItems'));
 		}
-		foreach(['children', 'repeaterTitle'] as $setting) {
+		foreach(['children', 'rowTitle'] as $setting) {
 			if(array_key_exists($setting, $settings)) {
-				throw new WireException(sprintf($this->_('%s belongs to a repeatable type, not the set'), $setting));
+				throw new WireException(sprintf($this->_('%s belongs to a row type, not the collection'), $setting));
 			}
 		}
 		// Presentation settings can fall back without changing stored values or row limits.
-		if(isset($settings['repeaterAddLabel']) && !is_string($settings['repeaterAddLabel'])) {
-			unset($settings['repeaterAddLabel']);
+		if(isset($settings['addRowLabel']) && !is_string($settings['addRowLabel'])) {
+			unset($settings['addRowLabel']);
 		}
-		$collapse = $settings['repeaterCollapse'] ?? 0;
-		$settings['repeaterCollapse'] = in_array($collapse, [0, 1, 3, '0', '1', '3'], true) ? (int) $collapse : 0;
+		$collapse = $settings['rowCollapse'] ?? 0;
+		$settings['rowCollapse'] = in_array($collapse, [0, 1, 3, '0', '1', '3'], true) ? (int) $collapse : 0;
 		$types = $settings['types'] ?? null;
 		if(!is_array($types) || !$types || array_is_list($types)) {
-			throw new WireException($this->_('Repeatable types must be a non-empty map'));
+			throw new WireException($this->_('Rows types must be a non-empty map'));
 		}
 		$this->register($name, $input, $settings);
 		$this->properties[$name]['kind'] = 'rows';
@@ -464,24 +484,45 @@ class FlexFieldDefs extends Wire {
 				throw new WireException(sprintf($this->_('Settings for row type %s must be an array'), $type));
 			}
 			foreach($typeSettings as $key => $_) {
-				if(!in_array($key, ['label', 'repeaterTitle', 'children'], true)) {
+				if(!in_array($key, ['label', 'rowTitle', 'children'], true)) {
 					throw new WireException(sprintf($this->_('Unsupported row type setting: %s'), $key));
 				}
 			}
-			foreach(['label', 'repeaterTitle'] as $key) {
+			foreach(['label', 'rowTitle'] as $key) {
 				if(array_key_exists($key, $typeSettings) && !is_string($typeSettings[$key])) {
 					unset($typeSettings[$key]);
 				}
 			}
 			$children = $typeSettings['children'] ?? null;
 			if(!is_array($children) && !$children instanceof InputfieldWrapper) {
-				throw new WireException($this->_('Repeatable children must be definitions or a wrapper'));
+				throw new WireException($this->_('Row type children must be definitions or a wrapper'));
 			}
+			$schema = new self($this->flexField, $this->flexPage, $children, $this->depth + 1);
+			$schema->rowTypeLabel = $typeSettings['label'] ?? ucwords(str_replace('_', ' ', $type));
 			$this->properties[$name]['types'][$type] = [
-				'label'    => $typeSettings['label'] ?? ucwords(str_replace('_', ' ', $type)),
+				'label'    => $schema->rowTypeLabel(),
 				'settings' => $typeSettings,
-				'schema'   => new self($this->flexField, $this->flexPage, $children, $this->depth + 1),
+				'schema'   => $schema,
 			];
+		}
+	}
+
+	/** Validate the native ordered module list before exposing a schema or editor. */
+	private function validateTextformatters(Inputfield $input, array $settings): void {
+		if(!array_key_exists('textformatters', $settings)) return;
+		if(!($input instanceof InputfieldText || $input instanceof InputfieldHidden || $input instanceof InputfieldIcon)) {
+			throw new WireException(sprintf($this->_('textformatters on "%s" requires a text-valued input'), $input->name));
+		}
+		$names = $settings['textformatters'];
+		if(!is_array($names) || !array_is_list($names)) {
+			throw new WireException(sprintf($this->_('textformatters on "%s" must be a list of module names'), $input->name));
+		}
+		foreach($names as $name) {
+			if(!is_string($name) || !preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/D', $name)
+				|| !$this->wire()->modules->isInstalled($name)
+				|| !$this->wire()->modules->get($name) instanceof Textformatter) {
+				throw new WireException(sprintf($this->_('Invalid Textformatter module on "%s": %s'), $input->name, is_scalar($name) ? (string) $name : get_debug_type($name)));
+			}
 		}
 	}
 
@@ -565,10 +606,22 @@ class FlexFieldDefs extends Wire {
 	 * Get the flat property metadata, keyed by stored property name.
 	 *
 	 * @return array
+	 * #pw-internal
 	 * @internal
 	 */
 	public function properties(): array {
 		return $this->properties;
+	}
+
+	/**
+	 * Get the resolved label of this row-type schema, or blank for a root schema.
+	 *
+	 * @return string
+	 * #pw-internal
+	 * @internal
+	 */
+	public function rowTypeLabel(): string {
+		return $this->rowTypeLabel;
 	}
 
 	/**
@@ -585,19 +638,19 @@ class FlexFieldDefs extends Wire {
 		foreach($wrapper->children() as $input) {
 			$name = (string) $input->_flex_property;
 			$definition = $this->properties[$name] ?? null;
-			$repeatable = $definition && $definition['kind'] === 'rows';
+			$isRows = $definition && $definition['kind'] === 'rows';
 			$node = [
 				'name'         => $name,
 				'label'        => (string) $input->label,
 				'type'         => $input->className(),
-				'kind'         => $repeatable ? 'rows' : ($input instanceof InputfieldWrapper ? 'fieldset' : ($definition['kind'] ?? 'markup')),
+				'kind'         => $isRows ? 'rows' : ($input instanceof InputfieldWrapper ? 'fieldset' : ($definition['kind'] ?? 'markup')),
 				'required'     => (bool) $input->required,
 				'showIf'       => (string) $input->showIf,
 				'requiredIf'   => (string) $input->requiredIf,
 				'useLanguages' => (bool) ($definition['languages'] ?? false),
 				'children'     => [],
 			];
-			if($repeatable) {
+			if($isRows) {
 				$node['minItems'] = (int) ($definition['settings']['minItems'] ?? 0);
 				$node['maxItems'] = (int) ($definition['settings']['maxItems'] ?? 0);
 				foreach($definition['types'] as $type => $typeDefinition) {
@@ -626,6 +679,7 @@ class FlexFieldDefs extends Wire {
 	 *
 	 * @param string $name Property name.
 	 * @return array|null
+	 * #pw-internal
 	 * @internal
 	 */
 	public function property(string $name): ?array {
@@ -645,6 +699,7 @@ class FlexFieldDefs extends Wire {
 	 * @param string $type Stable row type name.
 	 * @return array
 	 * @throws FlexDefinitionException
+	 * #pw-internal
 	 * @internal
 	 */
 	public function rowType(string $set, string $type): array {
@@ -708,12 +763,6 @@ class FlexFieldDefs extends Wire {
 				$name = (string) $original->_flex_property;
 				$definition = $this->properties[$name] ?? null;
 				if($definition && $definition['kind'] === 'rows') {
-					$input = $this->wire(new InputfieldFlexRows());
-					foreach($original->getArray() as $key => $setting) {
-						$input->set($key, $setting);
-					}
-					$input->label = $original->label;
-					$input->editable($original->editable());
 					$input->definition = $definition;
 					$input->setName = $value && $value->address() !== '' ? $value->address() . '.' . $name : $name;
 					$input->flexRoot = $root ?: $value;
@@ -775,8 +824,6 @@ class FlexFieldDefs extends Wire {
 					$v = $value->getUnformatted($name);
 					if($v instanceof LanguagesPageFieldValue) {
 						$v->setToInputfield($input);
-					} else if($this->properties[$name]['kind'] === 'date') {
-						$input->value = $v === '' ? '' : strtotime($v);
 					} else {
 						$input->value = $v;
 					}

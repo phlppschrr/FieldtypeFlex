@@ -117,8 +117,7 @@ $helperField = $createField('flex_output_helpers', [
 		'parent_id'   => 1,
 	],
 	'rows' => [
-		'type'       => 'fieldset',
-		'repeatable' => true,
+		'type'       => 'rows',
 		'types'      => [
 			'item' => [
 				'label'    => 'Item',

@@ -85,7 +85,7 @@ class InputfieldFlexRows extends Inputfield {
 
 	/** Resolve a bare property name or the core-style label format for one row type. */
 	private function labelFormat(FlexRow $row): string {
-		$format = trim($this->typeDefinition($row)['settings']['repeaterTitle'] ?? '');
+		$format = trim($this->typeDefinition($row)['settings']['rowTitle'] ?? '');
 		if($row->definitions()->property($format)) {
 			$format = '{' . $format . '}';
 		}
@@ -156,7 +156,7 @@ class InputfieldFlexRows extends Inputfield {
 				}
 			}
 		}
-		$mode = $this->definition['settings']['repeaterCollapse'] ?? 0;
+		$mode = $this->definition['settings']['rowCollapse'] ?? 0;
 		$collapsed = ($mode === 1 || ($mode === 0 && !$isNew)) && !$inputs->getErrors();
 		$entities = fn($value) => $this->wire()->sanitizer->entities((string) $value);
 		$bodyId = 'flex_row_' . $this->name . '__' . $id;
@@ -195,7 +195,7 @@ class InputfieldFlexRows extends Inputfield {
 		}
 		$entities = fn($v) => $this->wire()->sanitizer->entities((string) $v);
 		$settings = $this->definition['settings'];
-		$addLabel = $settings['repeaterAddLabel'] ?? $this->_('Add item');
+		$addLabel = $settings['addRowLabel'] ?? $this->_('Add item');
 		$types = $this->definition['types'];
 		$attributes = '';
 		$typeControl = '';

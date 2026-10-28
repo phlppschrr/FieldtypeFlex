@@ -94,16 +94,15 @@ if(!$extra) {
 			'maxFiles'   => 1,
 		],
 		'facts' => [
-			'type'             => 'fieldset',
-			'repeatable'       => true,
-			'label'            => 'Facts',
-			'repeaterCollapse' => 0,
-			'repeaterAddLabel' => 'Add fact',
-			'types'            => [
+			'type'        => 'rows',
+			'label'       => 'Facts',
+			'rowCollapse' => 0,
+			'addRowLabel' => 'Add fact',
+			'types'       => [
 				'item' => [
-					'label'         => 'Fact',
-					'repeaterTitle' => '{heading}',
-					'children'      => ['heading' => ['type' => 'text']],
+					'label'    => 'Fact',
+					'rowTitle' => '{heading}',
+					'children' => ['heading' => ['type' => 'text']],
 				],
 			],
 		],

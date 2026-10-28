@@ -30,9 +30,9 @@ $postData = [
 $post = $wire->wire(new WireInputData($postData));
 $input->processInput($post);
 $same('New name', $input->value->name, 'editor processes text');
-$same('2026-10-15', $input->value->date, 'editor processes namespaced date');
+$same(strtotime('2026-10-15'), $input->value->date, 'editor processes namespaced date');
 $same(2, $input->value->category->id, 'editor validates selectable Page references');
-$same('', $input->value->enabled, 'unchecked checkbox clears');
+$same(0, $input->value->enabled, 'unchecked checkbox clears');
 $same('Keep', $input->value->conditional, 'hidden showIf ignores submitted value');
 $same([], $input->getErrors(), 'requiredIf false is not required');
 $page->flex_test = $input->value;

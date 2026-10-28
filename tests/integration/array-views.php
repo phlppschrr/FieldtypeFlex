@@ -10,20 +10,18 @@ $arrayField = $createField('flex_array_views', [
 	'starts_on' => ['type' => 'datetime', 'dateInputFormat' => 'd.m.Y', 'dateOutputFormat' => 'd.m.Y'],
 	'address' => ['type' => 'fieldset', 'children' => ['city' => ['type' => 'text']]],
 	'translation' => ['type' => 'text', 'useLanguages' => true],
-	'reference' => ['type' => 'page', 'inputfield' => 'InputfieldSelect', 'derefAsPage' => 2, 'parent_id' => 1],
+	'reference' => ['type' => 'page', 'inputfield' => 'InputfieldSelect', 'derefAsPage' => 2],
 	'download' => ['type' => 'file', 'extensions' => 'txt', 'maxFiles' => 1],
 	'hero' => ['type' => 'image', 'maxFiles' => 1],
 	'rows' => [
-		'type' => 'fieldset',
-		'repeatable' => true,
+		'type' => 'rows',
 		'maxItems' => 1,
 		'types' => [
 			'item' => [
 				'children' => [
 					'heading' => ['type' => 'text'],
 					'notes' => [
-						'type' => 'fieldset',
-						'repeatable' => true,
+						'type' => 'rows',
 						'types' => ['note' => ['children' => ['text' => ['type' => 'text']]]],
 					],
 				],
@@ -59,7 +57,7 @@ $array = $value->getArray();
 $same('Berlin', $array['city'], 'ordinary fieldset leaves stay flat in getArray');
 $assert(!array_key_exists('address', $array), 'ordinary fieldset adds no stored array key');
 $same('A & B', $array['heading'], 'unformatted getArray uses raw text');
-$same('2026-10-18', $array['starts_on'], 'unformatted getArray uses canonical date');
+$same(strtotime('2026-10-18'), $array['starts_on'], 'unformatted getArray uses native timestamp');
 $assert($array['rows'] instanceof FlexRows, 'getArray retains FlexRows even with maxItems one');
 $same([$row->rowId()], array_keys($array['rows']->getArray()), 'collection getArray is keyed by stable row IDs');
 $assert($array['reference'] instanceof Page, 'getArray retains Page object');

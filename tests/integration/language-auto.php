@@ -67,8 +67,7 @@ $schema = [
 	'body' => ['type' => 'TinyMCE', 'useLanguages' => 'auto'],
 	'plain' => ['type' => 'text', 'useLanguages' => false],
 	'rows' => [
-		'type' => 'fieldset',
-		'repeatable' => true,
+		'type' => 'rows',
 		'types' => ['item' => ['children' => ['text' => ['type' => 'text', 'useLanguages' => 'auto']]]],
 	],
 ];

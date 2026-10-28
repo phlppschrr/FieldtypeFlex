@@ -64,8 +64,7 @@ $assert($configPreview instanceof InputfieldMarkup && str_contains($configPrevie
 
 $pageSelectorSchema = [
 	'items' => [
-		'type'       => 'fieldset',
-		'repeatable' => true,
+		'type'       => 'rows',
 		'types'      => [
 			'item' => [
 				'label'    => 'Item',

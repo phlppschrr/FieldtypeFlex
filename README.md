@@ -1,355 +1,223 @@
 # FieldtypeFlex
 
-**Status: 0.3.0 pre-release.**
+**Structured content in one ProcessWire field.**
 
-FieldtypeFlex is a structured fieldtype for ProcessWire. Define related properties with native ProcessWire Inputfields, edit them together in Page Edit, and read or query them through the ProcessWire API.
+FieldtypeFlex is an open-source fieldtype for [ProcessWire](https://processwire.com/) that combines JSON storage, native Inputfields, ProcessWire selectors, File/Image support and typed repeatable content.
 
-A Flex field can contain scalar properties, native File and Image properties, and typed repeatable fieldsets. Repeatable fieldsets can be nested and can also be used inside native ProcessWire Repeater items.
+Define your field structure in PHP or JSON, edit everything together in Page Edit, and work with individual properties through the familiar ProcessWire API.
 
-[Quick start](#quick-start) · [Examples](#examples) · [API reference](API.md) · [Inputfield settings](API.md#inputfield-settings-and-references) · [Development](docs/development.md)
+**Status:** 0.3.0 pre-release · **License:** MIT
+
+![FieldtypeFlex in the ProcessWire page editor](docs/images/editor.jpg)
 
 ## Features
 
-- Define fields in PHP or JSON with native Inputfield settings.
-- Use native ProcessWire validation, dependencies and output-formatting state.
-- Store related properties in one JSON field while exposing them as named values.
-- Add typed, sortable repeatable rows and nest repeatable fieldsets.
-- Use Flex-managed files and images through ProcessWire-compatible Pagefile and Pageimage objects.
-- Query scalar properties, row values and collection counts with ProcessWire selectors.
-- Use native text, choice, date, Page and media inputs, with optional TinyMCE and multilingual support.
-- Add no Composer runtime dependencies.
+- **One field, one JSON value.** Store related properties together without creating a separate ProcessWire field for every value.
+- **ProcessWire selectors.** Query individual properties, typed rows and collection counts with `$pages->find()`.
+- **Files and images.** Manage media directly in Flex and use ProcessWire-compatible `Pagefile` and `Pageimage` objects, including image resizing and variations.
+- **Typed, nested rows.** Build sortable content blocks with different schemas, similar in concept to RepeaterMatrix. Nest row collections to create more complex structures.
 
-## Requirements
-
-- ProcessWire 3.0.259 or newer
-- PHP 8.1 or newer
-- MySQL 8.0 or MariaDB 10.11 or newer
-- InnoDB for Flex field tables
-
-SQLite and PostgreSQL are not supported. An optional ProcessWire module is needed only when a definition uses it. For example, required multilingual properties need LanguageSupport and LanguageSupportFields, while a TinyMCE input requires InputfieldTinyMCE. ProcessWire also includes [CKEditor](https://processwire.com/docs/fields/ckeditor/) as `InputfieldCKEditor`; Flex has no CKEditor-specific integration or browser-save coverage yet. Inputfields that depend on their own Fieldtype storage need an explicit Flex integration and are not supported generically.
+Flex uses native ProcessWire Inputfields for editing, including validation, conditional dependencies, Page references, TinyMCE and multilingual text. Flex fields can also be used inside native ProcessWire Repeater items.
 
 ## Installation
 
-1. Copy or clone the FieldtypeFlex directory into /site/modules/FieldtypeFlex/.
-2. In ProcessWire Admin, choose **Modules → Refresh**, then install **FieldtypeFlex**. Its companion Inputfield modules are installed with it.
-3. Create a field using the **Flex** fieldtype and add it to the required template.
-4. Create a definition in site/templates/flex-fields/.
+Requires **ProcessWire 3.0.259+**, **PHP 8.1+**, **MySQL 8.0+ or MariaDB 10.11+**, and **InnoDB**.
 
-For a field named `contact`, automatic lookup uses exactly one of these files:
-
-- `site/templates/flex-fields/contact.php`
-- `site/templates/flex-fields/contact.json`
-
-If both exist, Flex reports a configuration error. There is no automatic fallback directory. You can instead set an explicit PHP or JSON file path relative to site/templates, or define the schema with inline JSON. An explicit file and inline JSON cannot be active together.
-
-PHP definitions are trusted developer code. JSON definitions are declarative. When no automatic definition exists, a new field can remain unconfigured. If a field already contains values and its automatic definition disappears, Flex blocks saves until the definition is restored, protecting the stored data from being replaced by an empty schema.
-
-See [API.md](API.md#definitions) for all definition options.
-
-## Admin translations
-
-German (`de`), French (`fr`) and Spanish (`es`) translations are bundled in
-`languages/`, including editor messages, field settings and the example catalog.
-Install ProcessWire’s **LanguageSupport** module and add the desired site languages
-under **Setup → Languages**. Then open **Modules → FieldtypeFlex → Module
-Information → Languages → install translations**, match each CSV to a site
-language and submit. The current user’s language controls the translated UI.
-
-When a module update changes translations, repeat **install translations** to
-import the updated text. Translation updates are listed in [CHANGELOG.md](CHANGELOG.md).
-The CSV files use ProcessWire’s [native module translation format](https://processwire.com/docs/modules/development/multi-language-translations/).
-
-These files translate the module UI and the bundled PHP examples at their original
-paths. Labels in definitions copied into `site/templates/` belong to those files’
-textdomains; translate them under **Setup → Languages → Site files**. Translating
-stored content is configured separately with [`useLanguages`](API.md#optional-and-required-language-support).
+Place the module in `/site/modules/FieldtypeFlex/`, then go to **Modules → Refresh** in ProcessWire Admin and install **FieldtypeFlex**.
 
 ## Quick start
 
-Create a Flex field named `contact`, add it to a template, and save this as
-`site/templates/flex-fields/contact.php`:
+Create a Flex field named `content` and add it to a page template.
+
+For the rich-text example below, also create a regular ProcessWire Textarea field named `rich_text_source`, configured to use TinyMCE. Flex will inherit its editor settings and textformatters; the source field does not need to be added to the page template.
+
+Create `site/templates/flex-fields/content.php`:
 
 ```php
 <?php namespace ProcessWire;
 
 return [
-	'name' => [
-		'type'     => 'text',
-		'label'    => __('Name'),
-		'required' => true,
-	],
-	'email' => [
-		'type'  => 'email',
-		'label' => __('Email'),
-	],
+    'heading' => [
+        'type'  => 'text',
+        'label' => __('Heading'),
+    ],
+    'hero' => [
+        'type'     => 'image',
+        'label'    => __('Hero image'),
+        'maxFiles' => 1,
+    ],
+    'downloads' => [
+        'type'       => 'file',
+        'label'      => __('Downloads'),
+        'extensions' => 'pdf txt zip',
+        'maxFiles'   => 5,
+    ],
+    'blocks' => [
+        'type'        => 'rows',
+        'label'       => __('Content blocks'),
+        'addRowLabel' => __('Add block'),
+        'types'       => [
+            'text' => [
+                'label'    => __('Text'),
+                'rowTitle' => '{heading}',
+                'children' => [
+                    'heading' => [
+                        'type'  => 'text',
+                        'label' => __('Heading'),
+                    ],
+                    'body' => [
+                        'type'         => 'TinyMCE',
+                        'inheritField' => 'rich_text_source',
+                        'label'        => __('Body'),
+                    ],
+                ],
+            ],
+            'image' => [
+                'label'    => __('Image'),
+                'rowTitle' => '{caption}',
+                'children' => [
+                    'photo' => [
+                        'type'     => 'image',
+                        'maxFiles' => 1,
+                    ],
+                    'caption' => [
+                        'type' => 'text',
+                    ],
+                ],
+            ],
+        ],
+    ],
 ];
 ```
 
-Edit and save a page using that template. Read its values in a site template:
+This creates one field with a heading, a hero image, file downloads and two types of content blocks: **Text** and **Image**.
+
+Editors can add, duplicate, reorder and remove blocks directly in Page Edit. Each row has a stable identity and retains its own type.
+
+### Render the content
+
+Access Flex properties directly in a ProcessWire template:
 
 ```php
-<?php namespace ProcessWire;
+<?php namespace ProcessWire; ?>
 
-$page->of(true);
-echo '<p>' . $page->contact->name . '</p>';
-echo '<p>' . $page->contact->email . '</p>';
+<article>
+    <h1><?= $page->content->heading ?></h1>
+
+    <?php if($image = $page->content->hero): ?>
+        <img
+            src="<?= $image->size(1200, 700)->url ?>"
+            alt=""
+        >
+    <?php endif; ?>
+
+    <?php foreach($page->content->blocks as $block): ?>
+
+        <?php if($block->rowType() === 'text'): ?>
+            <section>
+                <h2><?= $block->heading ?></h2>
+                <?= $block->body ?>
+            </section>
+
+        <?php elseif($block->rowType() === 'image'): ?>
+            <?php if($image = $block->photo): ?>
+                <figure>
+                    <img src="<?= $image->url ?>" alt="">
+
+                    <?php if($block->caption): ?>
+                        <figcaption>
+                            <?= $block->caption ?>
+                        </figcaption>
+                    <?php endif; ?>
+                </figure>
+            <?php endif; ?>
+        <?php endif; ?>
+
+    <?php endforeach; ?>
+
+    <?php if(count($page->content->downloads)): ?>
+        <h2>Downloads</h2>
+        <ul>
+            <?php foreach($page->content->downloads as $file): ?>
+                <li>
+                    <a href="<?= $file->url ?>">
+                        <?= $file->name ?>
+                    </a>
+                </li>
+            <?php endforeach; ?>
+        </ul>
+    <?php endif; ?>
+</article>
 ```
 
-To assign values through the API, turn output formatting off and save the field:
+Flex follows the Page's output-formatting state. Ordinary text is entity-encoded by default when output formatting is enabled, while TinyMCE content retains its HTML markup. Explicit or inherited [native Textformatters](API.md#textformatters) control text output without additional Flex encoding.
+
+### Query with ProcessWire selectors
+
+Flex properties are searchable through ProcessWire's selector API:
 
 ```php
-<?php namespace ProcessWire;
+// Match a regular property
+$pages->find('content.heading*=Welcome');
 
-$page->of(false);
-$page->contact->name = 'Ada';
-$page->contact->email = 'ada@example.org';
-$page->save('contact');
+// Match a property inside a specific row type
+$pages->find('content.blocks.text.heading*=Introduction');
+
+// Find pages containing image blocks
+$pages->find('content.blocks._type=image');
+
+// Find pages with at least three blocks
+$pages->find('content.blocks.count>=3');
 ```
 
-Definitions configure the editor and value types; saving a definition does not
-create regular ProcessWire fields for its properties. Text, number and choice
-values live together in the Flex field. See [reading and exporting values](API.md#array-views-and-json)
-for the difference between runtime objects and plain persistence data.
-
-## Examples
-
-Start with the small contact definition above, then choose an example for the
-capability you need. The module's field configuration also provides a read-only
-example catalog with the files to copy and their requirements.
-
-| Example | Demonstrates |
-| --- | --- |
-| [Contact](examples/contact.php), [JSON](examples/contact.json), [native objects](examples/objects.php) | Text, email, choices and an ordinary fieldset; PHP versions also need [options.php](examples/options.php) |
-| [Choices](examples/choices.php) and [dependencies](examples/dependencies.php) | Selection keys, checkboxes, `showIf` and `requiredIf` |
-| [Dates](examples/dates.php) | Datepicker, input formats and formatted date output |
-| [Rich text](examples/rich-text.php), [inherited settings](examples/inherit-field.php), [native settingsField](examples/settings-field.php) | Direct TinyMCE settings and two ways to reuse existing configuration |
-| [Required languages](examples/languages.php), [optional languages](examples/languages-auto.php) and [Page references](examples/pages.php) | Native language values, portable definitions, single Pages and PageArrays |
-| [Combined inputs](examples/advanced.php) | A compact combination of choices, TinyMCE, languages, references and dependencies |
-| [Rows and media](examples/structured.php), [nested rows](examples/nested.php) | Typed repeatable fieldsets, files/images and recursive child rows |
-| [Native Repeater](examples/repeater.php) | A Flex field inside a ProcessWire Repeater item |
-
-The following example combines common content properties with typed rows.
-Install InputfieldTinyMCE, create a Flex field named `content`, add it to a
-template, and save the definition below as `site/templates/flex-fields/content.php`.
-
-<details>
-<summary>Combined example: text, dates, choices, images and repeatable sections</summary>
+You can also work directly with specific row types:
 
 ```php
-<?php namespace ProcessWire;
+// Existing image rows, in their current order
+$images = $page->content->blocks->rowsOfType('image');
 
-return [
-	'heading' => [
-		'type'     => 'text',
-		'label'    => __('Heading'),
-		'required' => true,
-	],
-	'body' => [
-		'type'    => 'TinyMCE',
-		'label'   => __('Body'),
-		'toolbar' => 'bold italic | bullist numlist | link',
-	],
-	'starts_on' => [
-		'type'             => 'datetime',
-		'label'            => __('Start date'),
-		'datepicker'       => InputfieldDatetime::datepickerFocus,
-		'dateInputFormat'  => 'd.m.Y',
-		'dateOutputFormat' => 'd.m.Y',
-	],
-	'appearance' => [
-		'type'    => 'select',
-		'label'   => __('Appearance'),
-		'options' => ['standard' => __('Standard'), 'featured' => __('Featured')],
-	],
-	'hero' => [
-		'type'     => 'image',
-		'label'    => __('Hero image'),
-		'maxFiles' => 1,
-	],
-	'sections' => [
-		'type'             => 'fieldset',
-		'label'            => __('Sections'),
-		'repeatable'       => true,
-		'maxItems'         => 20,
-		'repeaterAddLabel' => __('Add section'),
-		'types'            => [
-			'text' => [
-				'label'         => __('Text section'),
-				'repeaterTitle' => '{heading}',
-				'children'      => [
-					'heading' => ['type' => 'text', 'label' => __('Heading')],
-					'body' => ['type' => 'TinyMCE', 'label' => __('Body')],
-				],
-			],
-		],
-	],
-];
+// Number of text rows
+$count = $page->content->blocks->countOfType('text');
 ```
 
-After editing and saving values in Page Edit, render them in the site template:
+See [API.md](API.md#selectors) for supported operators, same-row conditions and nested selectors.
 
-```php
-<?php namespace ProcessWire;
+## Nested rows
 
-$page->of(true);
-$content = $page->content;
-echo '<h1>' . $content->heading . '</h1>';
-echo $content->body;
-echo '<p>' . $content->optionLabel('appearance') . '</p>';
-if($content->hasValue('starts_on')) {
-	echo '<p>' . $content->starts_on . '</p>';
-}
-if($image = $content->hero) {
-	echo '<img src="' . $image->size(1200, 700)->url . '" alt="">';
-}
-foreach($content->sections as $section) {
-	echo '<section><h2>' . $section->heading . '</h2>' . $section->body . '</section>';
-}
-```
+A `rows` collection can contain other `rows` collections. Each collection defines its own named row types and child properties.
 
-Ordinary text and labels are entity encoded when output formatting is enabled;
-TinyMCE HTML stays markup. The image uses the native Pageimage API, and each
-section is a FlexRow with its own values. A repeatable fieldset always has a
-`types` map, even with just the single `text` type used here.
+For example, sections can contain content blocks, and individual blocks can contain further collections.
 
-For labels, `$content->label('appearance')` returns the property label,
-`$content->optionLabel('appearance')` returns the current selection's label,
-and `$content->getOptions('appearance')` returns all available keys and labels.
-See [label helpers](API.md#property-and-option-labels) for explicit option keys
-and multiple selections.
+There is no fixed two-level nesting limit. The effective depth depends on database JSON limits and configurable resource budgets.
 
-</details>
+See the [nested rows example](examples/nested.php) and [API reference](API.md#nested-repeatables-and-resource-limits).
 
-## Configure native inputs
+## More examples
 
-A definition's `type` selects a native Inputfield; `text` is shorthand for
-`InputfieldText`. Settings such as `label`, `required`, `columnWidth`, `options`
-and `toolbar` belong to those Inputfields. Flex adds settings for structured
-values, such as `repeatable`, `types` and `renamedFrom`.
+- [Structured content](examples/structured.php) — typed rows, files and images
+- [Nested rows](examples/nested.php) — multiple levels of row collections
+- [Contact](examples/contact.php) — text, choices and ordinary fieldsets
+- [Multilingual fields](examples/languages.php) — language-aware properties
+- [Native Inputfield objects](examples/typed-objects.php) — programmatic row definitions
+- [Native Repeater](examples/repeater.php) — Flex within ProcessWire Repeater items
+- [Inputfield configuration reuse](examples/inherit-field.php) — inherit settings from existing fields
 
-Use the [Inputfield settings guide](API.md#inputfield-settings-and-references)
-for common settings, links to native documentation and direct date/TinyMCE
-examples. The [tested Inputfields](API.md#tested-inputfields) section states the
-verification available for each group.
+For the complete definition syntax, value types, settings and runtime methods, see **[API.md](API.md)**.
 
-### Portable multilingual text
+## Current limitations
 
-Set `useLanguages => 'auto'` on a text or textarea property to enable
-multilingual values when LanguageSupport and LanguageSupportFields are
-available, and use ordinary strings otherwise. This also works with TinyMCE.
-Use `true` when multilingual support is mandatory, or `false` to keep a
-property single-language in every project. Existing language maps then expose
-the default-language text. Reads preserve translations in storage; saving the
-Flex field replaces them with plain strings. Flex remembers the default-language
-ID centrally during field saves, so save once before removing LanguageSupport.
+FieldtypeFlex is a pre-release. Some ProcessWire features and integrations are not supported:
 
-See the [portable definition](examples/languages-auto.php) and [language modes](API.md#optional-and-required-language-support)
-for the resolved value types in single-language and multilingual projects.
+- SQLite and PostgreSQL databases.
+- Native ProcessWire page-version save/restore.
+- Selector traversal through Page references.
+- Certain media options, including overwrite mode and custom metadata templates. TinyMCE drag-and-drop uploads require a regular ProcessWire Image field as their destination.
 
-### Reuse native field configuration
-
-Set `inheritField` to an existing ProcessWire field name when a property should
-reuse that field's configured native Inputfield. The source and Flex property
-must use the same Inputfield type. Settings declared on the Flex property are
-applied after the inherited settings, so local values can override them. The
-source field's stored value, Fieldtype storage and output formatting are not
-inherited. This is useful for richer Datetime setup and TinyMCE toolbar/editor
-configuration; see the complete [inheritField example](examples/inherit-field.php).
-
-```php
-<?php namespace ProcessWire;
-
-return [
-	'starts_at' => [
-		'type'         => 'datetime',
-		'inheritField' => 'date_input_source',
-		'label'        => __('Start date and time'),
-	],
-	'body' => [
-		'type'         => 'TinyMCE',
-		'inheritField' => 'rich_text_source',
-		'label'        => __('Body'),
-		'rows'         => 12,
-	],
-];
-```
-
-The example expects a Datetime field named `date_input_source` and a Textarea
-field named `rich_text_source` configured to use TinyMCE. Install InputfieldTinyMCE
-before using the rich-text property.
-
-## Repeatable fieldsets
-
-Every repeatable fieldset has a types map, even if all rows use one type. Each
-type has its own child schema, and a row's type stays fixed. The combined example
-above uses one row type; [examples/nested.php](examples/nested.php) shows nested rows
-and multiple typed children. Typed properties use paths such as
-`sections.section.blocks.text.heading`. The same FlexRows API works at every
-nesting level. Nesting is limited by database JSON depth, schema size and
-configured resource budgets; see [API.md](API.md#nested-repeatables-and-resource-limits).
-
-## File and Image properties
-
-Flex manages File and Image storage and exposes compatible ProcessWire objects.
-For a single image on a Flex field named `content`:
-
-```php
-<?php namespace ProcessWire;
-
-return [
-	'hero' => [
-		'type'     => 'image',
-		'label'    => __('Hero image'),
-		'maxFiles' => 1,
-	],
-];
-```
-
-With output formatting enabled and the default Auto media format, a single-image property returns a FlexPageimage (Pageimage subclass) or null:
-
-```php
-<?php namespace ProcessWire;
-
-$image = $page->content->hero;
-if($image) {
-	echo $image->size(1200, 700)->url;
-}
-```
-
-The ProcessWire image API remains available. See [API.md](API.md#file-and-image-properties) for value formats, upload lifecycle and limits.
-
-Without an explicit `extensions` setting, Flex follows ProcessWire's default
-image upload formats: JPG/JPEG, GIF and PNG. WebP is not a permitted ProcessWire
-image upload extension.
-
-## Selectors
-
-Scalar and typed repeatable properties can be queried through ProcessWire:
-
-```php
-<?php namespace ProcessWire;
-
-$pages->find('content.appearance=featured');
-$pages->find('content.sections.text.heading*=Introduction');
-$pages->find('content.sections.count>=3');
-```
-
-See [API.md](API.md#selectors) for operators, same-row expressions, blank-value behavior and nested selector examples.
-
-## Current boundaries
-
-- Flex field data uses MySQL/MariaDB JSON and InnoDB tables.
-- Flex values are not included in native ProcessWire page-version save/restore.
-- Page-reference traversal, arbitrary JSON paths and sorting repeated values are not supported.
-- The native image-variation management dialog is unavailable for Flex media; use the Pageimage API.
-- TinyMCE drag-and-drop uploads need a regular ProcessWire Image field as the upload destination.
-- Native media overwrite mode, custom metadata templates and string output formats are not supported.
-
-See [API.md](API.md) for the complete contract and [docs/architecture.md](docs/architecture.md) for persistence and integration decisions.
+See [API.md](API.md) for the complete supported contract.
 
 ## Development
 
-The repository includes a disposable DDEV ProcessWire fixture:
+The repository includes a disposable DDEV environment for development and integration testing.
 
 ```sh
 bash scripts/setup.sh
@@ -357,7 +225,7 @@ ddev flex-test
 ddev composer lint
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/development.md](docs/development.md) for the contributor workflow.
+See [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/development.md](docs/development.md) for development instructions.
 
 ## License
 

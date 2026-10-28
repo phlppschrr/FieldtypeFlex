@@ -2,32 +2,30 @@
 
 return [
 	'sections' => [
-		'type'             => 'fieldset',
-		'repeatable'       => true,
-		'label'            => __('Sections'),
-		'repeaterAddLabel' => __('Add section'),
-		'repeaterCollapse' => 3,
-		'types'            => [
+		'type'        => 'rows',
+		'label'       => __('Sections'),
+		'addRowLabel' => __('Add section'),
+		'rowCollapse' => 3,
+		'types'       => [
 			'section' => [
-				'label'         => __('Section'),
-				'repeaterTitle' => '{heading}',
-				'children'      => [
+				'label'    => __('Section'),
+				'rowTitle' => '{heading}',
+				'children' => [
 					'heading' => [
 						'type'     => 'text',
 						'label'    => __('Section heading'),
 						'required' => true,
 					],
 					'blocks'  => [
-						'type'             => 'fieldset',
-						'repeatable'       => true,
-						'label'            => __('Blocks'),
-						'repeaterAddLabel' => __('Add block'),
-						'repeaterCollapse' => 3,
-						'types'            => [
+						'type'        => 'rows',
+						'label'       => __('Blocks'),
+						'addRowLabel' => __('Add block'),
+						'rowCollapse' => 3,
+						'types'       => [
 							'text'  => [
-								'label'         => __('Text'),
-								'repeaterTitle' => '{heading}',
-								'children'      => [
+								'label'    => __('Text'),
+								'rowTitle' => '{heading}',
+								'children' => [
 									'heading' => [
 										'type'  => 'text',
 										'label' => __('Block heading'),
@@ -37,16 +35,15 @@ return [
 										'label' => __('Body'),
 									],
 									'notes'   => [
-										'type'             => 'fieldset',
-										'repeatable'       => true,
-										'label'            => __('Notes'),
-										'repeaterAddLabel' => __('Add note'),
-										'repeaterCollapse' => 3,
-										'types'            => [
+										'type'        => 'rows',
+										'label'       => __('Notes'),
+										'addRowLabel' => __('Add note'),
+										'rowCollapse' => 3,
+										'types'       => [
 											'note' => [
-												'label'         => __('Note'),
-												'repeaterTitle' => '{text}',
-												'children'      => [
+												'label'    => __('Note'),
+												'rowTitle' => '{text}',
+												'children' => [
 													'text' => [
 														'type'  => 'text',
 														'label' => __('Note text'),
@@ -58,9 +55,9 @@ return [
 								],
 							],
 							'image' => [
-								'label'         => __('Image'),
-								'repeaterTitle' => '{caption}',
-								'children'      => [
+								'label'    => __('Image'),
+								'rowTitle' => '{caption}',
+								'children' => [
 									'caption' => [
 										'type'  => 'text',
 										'label' => __('Caption'),

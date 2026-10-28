@@ -13,8 +13,7 @@ if(PHP_SAPI !== 'cli' || !isset($same, $createField, $temporaryFields)) {
 $structured = $createField('flex_structured', [
 	'heading' => ['type' => 'text'],
 	'slides'  => [
-		'type'       => 'fieldset',
-		'repeatable' => true,
+		'type'       => 'rows',
 		'maxItems'   => 20,
 		'types'      => [
 			'item' => [
@@ -105,8 +104,7 @@ $same(1, $type->rebuildRowIndex($structured)['count'], 'row query projection can
 $same([$id], $wire->pages->findIDs("id=$id, $name.slides.item.heading=Other"), 'row index rebuild preserves query results');
 $rowOnly = $createField('flex_row_only', [
 	'items' => [
-		'type'       => 'fieldset',
-		'repeatable' => true,
+		'type'       => 'rows',
 		'maxItems'   => 1,
 		'types'      => [
 			'item' => [
@@ -130,15 +128,13 @@ $throws(fn() => $type->sanitizeValue($page, $rowOnly, [
 $badRows = clone $rowOnly;
 $badRows->flexDefinition = json_encode([
 	'outer' => [
-		'type'       => 'fieldset',
-		'repeatable' => true,
+		'type'       => 'rows',
 		'types'      => [
 			'item' => [
 				'label'    => 'Item',
 				'children' => [
 					'inner' => [
-						'type'       => 'fieldset',
-						'repeatable' => true,
+						'type'       => 'rows',
 						'types'      => [
 							'item' => [
 								'label'    => 'Item',
@@ -229,8 +225,7 @@ $second->save($name);
 $same([$second->id], $wire->pages->findIDs("id={$second->id}, $name.slides.item=\"price!=20\""), 'same-row numeric inequality includes a blank leaf');
 $minField = $createField('flex_row_min', [
 	'items' => [
-		'type'       => 'fieldset',
-		'repeatable' => true,
+		'type'       => 'rows',
 		'minItems'   => 2,
 		'types'      => [
 			'item' => [

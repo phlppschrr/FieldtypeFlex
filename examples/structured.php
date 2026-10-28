@@ -1,6 +1,6 @@
 <?php namespace ProcessWire;
 
-// Flex extensions: repeatable fieldsets, scoped row values and stable row identity.
+// Flex extensions: typed rows collections, scoped row values and stable row identity.
 return [
 	'heading'   => [
 		'type'  => 'text',
@@ -18,17 +18,16 @@ return [
 		'maxFiles'   => 5,
 	],
 	'slides'    => [
-		'type'             => 'fieldset',
-		'repeatable'       => true,
-		'label'            => __('Slides'),
-		'maxItems'         => 20,
-		'repeaterCollapse' => 0,
-		'repeaterAddLabel' => __('Add slide'),
-		'types'            => [
+		'type'        => 'rows',
+		'label'       => __('Slides'),
+		'maxItems'    => 20,
+		'rowCollapse' => 0,
+		'addRowLabel' => __('Add slide'),
+		'types'       => [
 			'item' => [
-				'label'         => __('Slide'),
-				'repeaterTitle' => '#n: {heading}',
-				'children'      => [
+				'label'    => __('Slide'),
+				'rowTitle' => '#n: {heading}',
+				'children' => [
 					'heading' => [
 						'type'     => 'text',
 						'label'    => __('Slide heading'),
@@ -67,16 +66,15 @@ return [
 		],
 	],
 	'facts'     => [
-		'type'             => 'fieldset',
-		'repeatable'       => true,
-		'label'            => __('Facts'),
-		'repeaterCollapse' => 0,
-		'repeaterAddLabel' => __('Add fact'),
-		'types'            => [
+		'type'        => 'rows',
+		'label'       => __('Facts'),
+		'rowCollapse' => 0,
+		'addRowLabel' => __('Add fact'),
+		'types'       => [
 			'item' => [
-				'label'         => __('Fact'),
-				'repeaterTitle' => '{heading}',
-				'children'      => [
+				'label'    => __('Fact'),
+				'rowTitle' => '{heading}',
+				'children' => [
 					'heading' => [
 						'type'  => 'text',
 						'label' => __('Fact'),
@@ -90,17 +88,16 @@ return [
 		],
 	],
 	'blocks'    => [
-		'type'             => 'fieldset',
-		'repeatable'       => true,
-		'label'            => __('Content blocks'),
-		'maxItems'         => 20,
-		'repeaterCollapse' => 0,
-		'repeaterAddLabel' => __('Add block'),
-		'types'            => [
+		'type'        => 'rows',
+		'label'       => __('Content blocks'),
+		'maxItems'    => 20,
+		'rowCollapse' => 0,
+		'addRowLabel' => __('Add block'),
+		'types'       => [
 			'text'  => [
-				'label'         => __('Text'),
-				'repeaterTitle' => '#n: {heading}',
-				'children'      => [
+				'label'    => __('Text'),
+				'rowTitle' => '#n: {heading}',
+				'children' => [
 					'heading' => [
 						'type'     => 'text',
 						'label'    => __('Heading'),
@@ -114,9 +111,9 @@ return [
 				],
 			],
 			'image' => [
-				'label'         => __('Image'),
-				'repeaterTitle' => '#n: {caption}',
-				'children'      => [
+				'label'    => __('Image'),
+				'rowTitle' => '#n: {caption}',
+				'children' => [
 					'image'   => [
 						'type'     => 'image',
 						'label'    => __('Image'),
@@ -129,9 +126,9 @@ return [
 				],
 			],
 			'quote' => [
-				'label'         => __('Quote'),
-				'repeaterTitle' => '#n: {quote}',
-				'children'      => [
+				'label'    => __('Quote'),
+				'rowTitle' => '#n: {quote}',
+				'children' => [
 					'quote'  => [
 						'type'  => 'textarea',
 						'label' => __('Quote'),

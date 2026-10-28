@@ -28,6 +28,7 @@ final class FlexInvalidValue {
 	 * @param Page $page Owning page.
 	 * @param Field $field Owning Flex field.
 	 * @return bool
+	 * #pw-internal
 	 * @internal
 	 */
 	public function belongsTo(Page $page, Field $field): bool {
@@ -69,6 +70,7 @@ class FlexValue extends WireData implements \JsonSerializable {
 	 *
 	 * @param string|null $hash Expected revision, or null to read it.
 	 * @return string
+	 * #pw-internal
 	 * @internal
 	 */
 	public function expectedRevision(?string $hash = null): string {
@@ -120,6 +122,7 @@ class FlexValue extends WireData implements \JsonSerializable {
 	 * Get the page owning this typed value.
 	 *
 	 * @return Page
+	 * #pw-internal
 	 * @internal
 	 */
 	public function ownerPage(): Page {
@@ -130,6 +133,7 @@ class FlexValue extends WireData implements \JsonSerializable {
 	 * Get the Flex field owning this typed value.
 	 *
 	 * @return Field
+	 * #pw-internal
 	 * @internal
 	 */
 	public function ownerField(): Field {
@@ -140,6 +144,7 @@ class FlexValue extends WireData implements \JsonSerializable {
 	 * Get the property address within the owning Flex field.
 	 *
 	 * @return string
+	 * #pw-internal
 	 * @internal
 	 */
 	public function address(): string {
@@ -150,6 +155,7 @@ class FlexValue extends WireData implements \JsonSerializable {
 	 * Retained media also participates in owner reassignment, even without a schema leaf.
 	 *
 	 * @return void
+	 * #pw-internal
 	 * @internal
 	 */
 	public function prepareUnknownMedia(): void {
@@ -187,6 +193,7 @@ class FlexValue extends WireData implements \JsonSerializable {
 	 *
 	 * @param bool $minimum Also require collection minima; false for incomplete drafts.
 	 * @return void
+	 * #pw-internal
 	 * @internal
 	 */
 	public function validateTree(bool $minimum = true): void {
@@ -208,6 +215,7 @@ class FlexValue extends WireData implements \JsonSerializable {
 	 *
 	 * @param FlexValue $source Unformatted source subtree.
 	 * @return void
+	 * #pw-internal
 	 * @internal
 	 */
 	public function copyValuesFrom(FlexValue $source): void {
@@ -253,6 +261,8 @@ class FlexValue extends WireData implements \JsonSerializable {
 	 * @param Page $page Owning page.
 	 * @param Field $field Owning Flex field.
 	 * @return bool
+	 * #pw-internal
+	 * @internal
 	 */
 	public function belongsTo(Page $page, Field $field): bool {
 		return $this->flexPage === $page && $this->flexField->name === $field->name;
@@ -286,7 +296,8 @@ class FlexValue extends WireData implements \JsonSerializable {
 	 * @return mixed
 	 */
 	public function getUnformatted(string $name) {
-		return parent::get($name);
+		$value = parent::get($name);
+		return ($this->definitions->property($name)['kind'] ?? '') === 'date' && $value !== '' ? strtotime($value) : $value;
 	}
 
 	/**
@@ -299,7 +310,13 @@ class FlexValue extends WireData implements \JsonSerializable {
 		if(!array_key_exists($name, $this->definitions->properties())) {
 			return false;
 		}
-		return $this->containsContent(parent::get($name));
+		$value = parent::get($name);
+		$def = $this->definitions->property($name);
+		if($def['kind'] === 'checkbox') {
+			$unchecked = $def['input']->uncheckedValue === '' ? 0 : $def['input']->uncheckedValue;
+			return $value !== $unchecked;
+		}
+		return $this->containsContent($value);
 	}
 
 	/**
@@ -474,28 +491,28 @@ class FlexValue extends WireData implements \JsonSerializable {
 		$value = parent::get($key);
 		$def = $this->definitions->property((string) $key);
 		if($def && $def['kind'] === 'page') {
-			if($this->formatted && $value instanceof Page && $value->hasStatus(Page::statusUnpublished)) {
-				return (int) $def['input']->derefAsPage === 1 ? false : $this->wire()->pages->newNullPage();
-			}
-			if($this->formatted && $value instanceof PageArray) {
-				$published = $this->wire()->pages->newPageArray();
-				foreach($value as $item) {
-					if(!$item->hasStatus(Page::statusUnpublished)) {
-						$published->add($item);
-					}
-				}
-				$published->resetTrackChanges();
-				$value = $published;
-			}
-			if($value instanceof Page) {
-				$value->of($this->formatted);
-			} else if($value instanceof PageArray) {
-				foreach($value as $item) {
-					$item->of($this->formatted);
-				}
-			}
-			return $value;
+			return $this->formatted
+				? $this->wire()->modules->get('FieldtypePage')->formatValue($this->flexPage, $this->pageReferenceField((string) $key), $value)
+				: $value;
 		}
+		if($def && $def['kind'] === 'date') {
+			$timestamp = $value === '' ? '' : strtotime($value);
+			if(!$this->formatted) return $timestamp;
+			$language = $this->wire()->user->language;
+			$format = $language && !$language->isDefault() ? $def['input']->get('dateOutputFormat' . $language->id) : '';
+			return $this->wire()->datetime->formatDate($timestamp, $format ?: $def['input']->dateOutputFormat);
+		}
+		if($this->formatted && $def && array_key_exists('textformatters', $def['settings'])) {
+			$field = $this->textformatterField((string) $key, $def);
+			return $field->type->formatValue($this->flexPage, $field, (string) $value);
+		}
+		if($this->formatted && $def && $def['input'] instanceof InputfieldURL && $def['input']->addRoot && !$def['input']->noRelative && str_starts_with((string) $value, '/')) {
+			$value = rtrim($this->wire()->config->urls->root, '/') . $value;
+		}
+		if($this->formatted && $value instanceof LanguagesPageFieldValue) {
+			$value = (string) $value;
+		}
+
 		if(!$this->formatted || !$def) {
 			return $value;
 		}
@@ -507,10 +524,7 @@ class FlexValue extends WireData implements \JsonSerializable {
 			}
 			return $value->outputCollection($limit);
 		}
-		if($def['kind'] === 'date' && $value !== '') {
-			$format = $def['input']->dateOutputFormat ?: $def['input']->dateInputFormat;
-			return $this->wire()->datetime->date($format ?: 'Y-m-d', strtotime($value));
-		}
+
 		if($this->shouldEntityEncode($def)) {
 			$encode = function($v) use (&$encode) {
 				if(is_string($v)) {
@@ -521,13 +535,7 @@ class FlexValue extends WireData implements \JsonSerializable {
 				}
 				return $v;
 			};
-			if($value instanceof LanguagesPageFieldValue) {
-				$copy = clone $value;
-				foreach($this->wire()->languages as $language) {
-					$copy->setLanguageValue($language, $encode($value->getLanguageValue($language)));
-				}
-				return $copy;
-			}
+
 			if(is_array($value)) {
 				return array_map($encode, $value);
 			}
@@ -550,7 +558,7 @@ class FlexValue extends WireData implements \JsonSerializable {
 		if($this->formatted || $this->flexPage->of()) {
 			throw new WireException($this->_('Disable page output formatting before changing Flex values'));
 		}
-		$value = $this->hydrate((string) $key, $value);
+		$value = $this->hydrate((string) $key, $value, true);
 		$before = $this->encodeProperty((string) $key, parent::get($key));
 		parent::set($key, $value);
 		if($before !== $this->encodeProperty((string) $key, $value)) {
@@ -691,9 +699,18 @@ class FlexValue extends WireData implements \JsonSerializable {
 	 * @param string $name Property name.
 	 * @param mixed $value
 	 * @return mixed
+	 * #pw-internal
 	 * @internal
 	 */
 	public function encodeProperty(string $name, $value) {
+		$definition = $this->definitions->property($name);
+		if($definition['kind'] === 'page' && $this->flexPage->template) {
+			$field = $this->pageReferenceField($name);
+			$ids = $this->wire()->modules->get('FieldtypePage')->sleepValue($this->flexPage, $field, $value);
+			if($definition['multiple']) return array_values(array_map('intval', $ids));
+			if($ids) return (int) reset($ids);
+			return (int) $field->derefAsPage === 1 ? false : 0;
+		}
 		if($value instanceof FlexRows) {
 			return $value->rawArray();
 		}
@@ -716,7 +733,33 @@ class FlexValue extends WireData implements \JsonSerializable {
 		return $value;
 	}
 
-	private function hydrate(string $name, $value) {
+	/** Supply native output formatting with property settings, never a storage field. */
+	private function textformatterField(string $name, array $definition): Field {
+		$input = $definition['input'];
+		$type = $input instanceof InputfieldTextarea ? 'FieldtypeTextarea'
+			: ($input instanceof InputfieldURL ? 'FieldtypeURL'
+				: ($input instanceof InputfieldEmail ? 'FieldtypeEmail' : 'FieldtypeText'));
+		$field = $this->wire(new Field());
+		$field->type = $this->wire()->modules->get($type);
+		$field->name = $this->flexField->name . '_' . $name;
+		foreach($definition['settings'] + $input->getArray() as $key => $setting) {
+			if(!in_array($key, ['id', 'name', 'type', 'value', 'inheritField'], true)) $field->set($key, $setting);
+		}
+		return $field;
+	}
+
+	/** Build native Page field settings without binding a second storage field. */
+	private function pageReferenceField(string $name): Field {
+		$field = $this->wire(new Field());
+		$field->type = $this->wire()->modules->get('FieldtypePage');
+		$field->name = $this->flexField->name . '_' . $name;
+		foreach($this->definitions->property($name)['input']->getArray() as $key => $setting) {
+			if(!in_array($key, ['id', 'name', 'type', 'value'], true)) $field->set($key, $setting);
+		}
+		return $field;
+	}
+
+	private function hydrate(string $name, $value, bool $assignment = false) {
 		$def = $this->definitions->property($name);
 		$input = $def['input'];
 		if(in_array($def['kind'], ['file', 'image'], true)) {
@@ -730,37 +773,58 @@ class FlexValue extends WireData implements \JsonSerializable {
 			return new FlexRows($this->flexPage, $this->flexField, $this->flexAddress === '' ? $name : "$this->flexAddress.$name", $def, $value);
 		}
 		if($def['languages']) {
-			if($value instanceof LanguagesPageFieldValue) {
-				return clone $value;
-			}
 			$synthetic = clone $this->flexField;
 			$synthetic->langBlankInherit = $input->langBlankInherit;
+			if($value instanceof LanguagesPageFieldValue) {
+				$copy = clone $value;
+				$copy->setPage($this->flexPage);
+				$copy->setField($synthetic);
+				return $copy;
+			}
+			if($assignment && !is_array($value)) {
+				$current = parent::get($name);
+				$copy = $current instanceof LanguagesPageFieldValue ? clone $current : new LanguagesPageFieldValue($this->flexPage, $synthetic);
+				$languages = $this->wire()->languages;
+				// Match the installed core: older versions use the Page's own template.
+				$template = method_exists($languages, 'getPageTemplate')
+					? $languages->getPageTemplate($this->flexPage) : $this->flexPage->template;
+				$language = $template && $template->noLang ? $languages->getDefault() : $this->wire()->user->language;
+				$copy->setLanguageValue($language, (string) $value);
+				return $copy;
+			}
 			return new LanguagesPageFieldValue($this->flexPage, $synthetic, $value);
 		}
 		if($def['kind'] === 'page') {
-			$pages = $this->wire()->pages;
+			$type = $this->wire()->modules->get('FieldtypePage');
+			$field = $this->pageReferenceField($name);
+			if(!$assignment && $value instanceof PageArray) $value = clone $value;
+			// Native field context requires a template; query discovery has only a NullPage.
+			if(!$assignment) return $this->flexPage->template
+				? $type->wakeupValue($this->flexPage, $field, $value) : $type->getBlankValue($this->flexPage, $field);
+			if(!$def['multiple']) return $type->sanitizeValue($this->flexPage, $field, $value);
 			if($value instanceof PageArray) {
-				$ids = $value->explode('id');
-			} else if($value instanceof Page) {
-				$ids = [$value->id];
-			} else if(is_array($value)) {
-				$ids = $value;
+				$result = clone $value;
+				$result->remove($this->flexPage);
+				return $result;
+			}
+			$result = parent::get($name);
+			$result = $result instanceof PageArray ? clone $result : $this->wire()->pages->newPageArray();
+			if(!$value) return $result;
+			$field->derefAsPage = 2;
+			if(is_string($value) && Selectors::stringHasOperator($value)) {
+				$items = $field->getInputfield($this->flexPage)->getSelectablePages($this->flexPage)->filter($value);
 			} else {
-				$ids = $value === '' || $value === false || $value === null ? [] : preg_split('/[|, ]+/', (string) $value);
+				$split = is_string($value) && (strpbrk($value, "|\r\n") !== false || preg_match('/^\d+(?:[, ]+\d+)+$/D', $value));
+				$items = is_array($value) ? $value : ($split ? preg_split('/[|,\r\n ]+/', $value, -1, PREG_SPLIT_NO_EMPTY) : [$value]);
 			}
-			$ids = array_values(array_unique(array_filter(array_map('intval', $ids), fn($id) => $id > 0)));
-			if(!$def['multiple']) {
-				$page = $ids ? $pages->get($ids[0]) : $pages->newNullPage();
-				return !$page->id && (int) $input->derefAsPage === 1 ? false : $page;
-			}
-			$result = $pages->newPageArray();
-			foreach($ids as $id) {
-				$item = $pages->get($id);
-				if($item->id) {
-					$result->add($item);
+			foreach($items as $item) {
+				if(is_string($item) && preg_match('/^-\d+$/D', $item)) {
+					$result->remove((int) substr($item, 1));
+				} else {
+					$target = $type->sanitizeValue($this->flexPage, $field, $item);
+					if($target instanceof Page && $target->id) $result->add($target);
 				}
 			}
-			$result->resetTrackChanges();
 			return $result;
 		}
 		if($def['multiple']) {
@@ -769,6 +833,7 @@ class FlexValue extends WireData implements \JsonSerializable {
 			}
 			return array_values(array_map('strval', is_array($value) ? $value : [$value]));
 		}
+		if($input instanceof InputfieldToggle) return $input->sanitizeValue($value);
 		if($def['kind'] === 'tags' && is_array($value)) {
 			return implode(' ', array_map('strval', $value));
 		}
@@ -785,16 +850,18 @@ class FlexValue extends WireData implements \JsonSerializable {
 					? $value->getLanguageValue($defaultId) : ($value[$defaultId] ?? '');
 			}
 		}
+		if($def['kind'] === 'date' && $value instanceof \DateTime) $value = $value->getTimestamp();
 		if(is_array($value) || (is_object($value) && !$value instanceof \Stringable)) {
 			throw new WireException(sprintf($this->_("Flex '%s' requires a scalar value"), $name));
 		}
 		if($def['kind'] === 'date') {
-			if($value === '' || $value === null || $value === 0) {
+			if($value === '' || $value === null || $value === false || $value === 0 || $value === '0') {
 				return '';
 			}
 			// Persisted ISO values must not be reinterpreted using the editor format.
 			$canonical = is_string($value) && preg_match('/^\d{4}-\d{2}-\d{2}(?: \d{2}:\d{2}(?::\d{2})?)?$/D', $value);
-			$timestamp = is_int($value) ? $value : ($canonical
+			$isTimestamp = is_int($value) || (is_string($value) && ctype_digit(ltrim($value, '-')));
+			$timestamp = $isTimestamp ? (int) $value : ($canonical
 				? strtotime($value)
 				: $this->wire()->datetime->stringToTimestamp((string) $value, $input->dateInputFormat));
 			if(!$timestamp) {
@@ -803,21 +870,35 @@ class FlexValue extends WireData implements \JsonSerializable {
 			if($timestamp === false || !$timestamp) {
 				throw new WireException(sprintf($this->_("Invalid date for Flex '%s'"), $name));
 			}
-			$time = $input->timeInputFormat || in_array($input->htmlType, ['datetime', 'time'], true)
+			$time = ($isTimestamp && date('His', $timestamp) !== '000000') || $input->timeInputFormat || in_array($input->htmlType, ['datetime', 'time'], true)
 							|| preg_match('/[HGhis]/', (string) $input->dateInputFormat) || preg_match('/\d{2}:\d{2}/', (string) $value);
 			return date($time ? 'Y-m-d H:i:s' : 'Y-m-d', $timestamp);
 		}
 		if($def['kind'] === 'checkbox') {
-			return $value === '' || $value === null || $value === false || $value === 0 || $value === '0' ? $input->uncheckedValue : $input->checkedValue;
+			return $value === '' || $value === null || $value === false || $value === 0 || $value === '0' ? ($input->uncheckedValue === '' ? 0 : $input->uncheckedValue) : $input->checkedValue;
 		}
 		if($value === '' || $value === null) {
 			return '';
 		}
 		if($def['kind'] === 'integer' || $def['kind'] === 'float') {
+			if(is_bool($value)) $value = $value ? 1 : '';
+			if($value === '') return '';
 			if(!is_numeric($value)) {
 				throw new WireException(sprintf($this->_("Flex '%s' requires a number"), $name));
 			}
-			return $def['kind'] === 'integer' ? (int) $value : (float) $value;
+			if($def['kind'] === 'integer') return (int) $value;
+			$precision = $input->precision;
+			return $precision === null || $precision === '' || $precision < 0 ? (float) $value : round((float) $value, (int) $precision);
+		}
+		if($input instanceof InputfieldEmail) {
+			$max = $this->wire()->database->getMaxIndexLength();
+			if(strlen((string) $value) > $max && $this->wire()->sanitizer->getTextTools()->strlen((string) $value) > $max) return '';
+			return $this->wire()->sanitizer->email((string) $value, ['allowIDN' => (int) $input->allowIDN]);
+		}
+		if($input instanceof InputfieldURL) {
+			return $this->wire()->sanitizer->url((string) $value, [
+				'allowRelative' => !$input->noRelative, 'allowIDN' => (bool) $input->allowIDN, 'stripQuotes' => !$input->allowQuotes,
+			]);
 		}
 		return (string) $value;
 	}

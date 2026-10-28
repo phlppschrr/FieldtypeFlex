@@ -12,11 +12,10 @@ if(PHP_SAPI !== 'cli' || !isset($same, $createField, $temporaryFields, $pages)) 
 
 $typedField = $createField('flex_typed_rows', [
 	'blocks' => [
-		'type'             => 'fieldset',
-		'repeatable'       => true,
-		'maxItems'         => 12,
-		'repeaterCollapse' => 0,
-		'types'            => [
+		'type'        => 'rows',
+		'maxItems'    => 12,
+		'rowCollapse' => 0,
+		'types'       => [
 			'text' => [
 				'label'    => 'Text',
 				'children' => [
@@ -285,8 +284,7 @@ $nativeTypeValue->label = 'Native wrapper value';
 $nativeTypeChildren->add($nativeTypeValue);
 $nativeWrapperDefs = new FlexFieldDefs($typedField, $typedFreshPage, [
 	'blocks' => [
-		'type'       => 'fieldset',
-		'repeatable' => true,
+		'type'       => 'rows',
 		'types'      => [
 			'native' => [
 				'label'    => 'Native',
@@ -468,23 +466,19 @@ try {
 
 $invalidDefinitions = [
 	[
-		'type'       => 'fieldset',
-		'repeatable' => true,
+		'type'       => 'rows',
 		'types'      => ['text' => ['children' => null]],
 	],
 	[
-		'type'       => 'fieldset',
-		'repeatable' => true,
+		'type'       => 'rows',
 		'children'   => ['value' => ['type' => 'text']],
 	],
 	[
-		'type'       => 'fieldset',
-		'repeatable' => true,
+		'type'       => 'rows',
 		'types'      => [],
 	],
 	[
-		'type'       => 'fieldset',
-		'repeatable' => true,
+		'type'       => 'rows',
 		'types'      => [
 			'Invalid' => [
 				'label'    => 'Invalid',
@@ -493,8 +487,7 @@ $invalidDefinitions = [
 		],
 	],
 	[
-		'type'       => 'fieldset',
-		'repeatable' => true,
+		'type'       => 'rows',
 		'types'      => [
 			'count' => [
 				'label'    => 'Reserved',
@@ -503,10 +496,9 @@ $invalidDefinitions = [
 		],
 	],
 	[
-		'type'             => 'fieldset',
-		'repeatable'       => true,
-		'repeaterTitle'    => '{value}',
-		'types'            => [
+		'type'     => 'rows',
+		'rowTitle' => '{value}',
+		'types'    => [
 			'text' => [
 				'label'    => 'Text',
 				'children' => ['value' => ['type' => 'text']],

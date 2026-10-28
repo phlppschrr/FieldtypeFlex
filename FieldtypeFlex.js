@@ -297,12 +297,16 @@
         if(!event.target.matches('input[type="file"]') || !event.target.closest('[data-flex-upload="1"]')) return;
         event.stopImmediatePropagation(); upload(event.target, Array.from(event.target.files || []));
     }, true);
-    ['dragover','drop'].forEach(function(name) { document.addEventListener(name, function(event) {
+    ['dragenter','dragover','dragleave','drop'].forEach(function(name) { document.addEventListener(name, function(event) {
         var field = event.target.closest('.Inputfield');
         if(!field || !event.dataTransfer || !Array.from(event.dataTransfer.types || []).includes('Files')) return;
         var input = $(field).find('[data-flex-upload="1"] input[type="file"]')[0];
         if(!input || $(input).closest('.Inputfield')[0] !== field) return;
         event.preventDefault(); event.stopImmediatePropagation();
+        if(name === 'dragleave' && event.relatedTarget && field.contains(event.relatedTarget)) return;
+        var active = name === 'dragenter' || name === 'dragover';
+        $(field).toggleClass('pw-drag-in-file', active);
+        $(field).children('.InputfieldContent').toggleClass('ui-state-hover', active);
         if(name === 'drop') upload(input, Array.from(event.dataTransfer.files));
     }, true); });
     $(document).on('flexMediaRefresh', async function(event, draft, path) {

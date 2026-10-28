@@ -402,9 +402,6 @@ class FlexAdmin extends Wire {
 		}
 		[$page, $field, $original] = $context;
 		$input = $this->wire()->input;
-		if($event->method === 'executeVariations') {
-			throw new WireException($this->_('Manage Flex image variations through the Pageimage API'));
-		}
 		$token = (string) $input->get('flex_draft');
 		$master = $page;
 		while($master instanceof RepeaterPage) {
@@ -412,6 +409,33 @@ class FlexAdmin extends Wire {
 		}
 		if(!$this->wire()->user->hasPermission('page-edit-images', $master)) {
 			throw new WirePermissionException($this->_('Image editing is not permitted'));
+		}
+		if($event->method === 'executeVariations') {
+			if($token === '') {
+				$token = $this->open($page->getUnformatted($field->name), $field->name);
+				$input->get->flex_draft = $token;
+			}
+			$draft = $this->draft($token);
+			if($draft['page'] !== (int) $page->id || $draft['field'] !== (int) $field->id) {
+				throw new WirePermissionException($this->_('Invalid Flex editor context'));
+			}
+			$this->assertFresh($token, $page, $field);
+			[, , $native] = $this->target($token, $original->pagefiles->address(), $page->getUnformatted($field->name));
+			$this->editableInput($native);
+			if(count($input->post)) {
+				$this->wire()->session->CSRF->validate();
+				// Native deletion is immediate. Preserve discovery of draft-only
+				// images and the parent counter across its post/redirect/get cycle.
+				$varcnt = (string) $input->get('varcnt');
+				$this->wire()->session->addHookBefore('redirect', function(HookEvent $redirect) use ($page, $original, $token, $varcnt) {
+					$url = (string) $redirect->arguments(0);
+					parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
+					if(str_starts_with($url, './?') && (int) ($query['id'] ?? 0) === (int) $page->id && ($query['file'] ?? '') === $original->basename()) {
+						$redirect->arguments(0, $url . '&' . http_build_query(['flex_draft' => $token, 'varcnt' => $varcnt]));
+					}
+				});
+			}
+			return;
 		}
 		if($event->method === 'executeResize') {
 			// RTE requests have no Flex draft. They may create a derivative of a

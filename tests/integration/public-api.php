@@ -15,8 +15,7 @@ $publicSchema = [
 		'options' => ['a&b' => 'A & B'],
 	],
 	'blocks' => [
-		'type' => 'fieldset',
-		'repeatable' => true,
+		'type' => 'rows',
 		'types' => [
 			'item' => [
 				'children' => [

@@ -94,8 +94,7 @@ foreach(['file', 'image'] as $kind) {
 $rowField = clone $media;
 $rowField->flexDefinition = json_encode([
 	'blocks' => [
-		'type'       => 'fieldset',
-		'repeatable' => true,
+		'type'       => 'rows',
 		'types'      => [
 			'image' => [
 				'children' => [

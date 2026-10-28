@@ -77,6 +77,7 @@ $widgetDefs = [];
 foreach(['PageListSelect', 'PageListSelectMultiple', 'PageAutocomplete'] as $widget) {
 	$widgetDefs[strtolower($widget)] = [
 		'type'           => 'page',
+		'allowUnpub'     => 1,
 		'inputfield'     => 'Inputfield' . $widget,
 		'derefAsPage'    => $widget === 'PageListSelect' ? 2 : 0,
 		'parent_id'      => 1,

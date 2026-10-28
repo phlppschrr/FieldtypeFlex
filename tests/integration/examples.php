@@ -6,7 +6,7 @@ if(PHP_SAPI !== 'cli' || !isset($same, $createField)) {
 }
 
 $sourceField = $wire->wire(new Field());
-$sourceField->name = 'rich_text_source';
+$sourceField->name = 'flex_example_rich_' . bin2hex(random_bytes(4));
 if($wire->fields->get($sourceField->name)) {
 	throw new \RuntimeException('Refusing to replace the example inheritance source field');
 }
@@ -17,7 +17,7 @@ $sourceField->toolbar = 'bold italic';
 $sourceField->save();
 $temporaryFields[] = $sourceField;
 $dateSourceField = $wire->wire(new Field());
-$dateSourceField->name = 'date_input_source';
+$dateSourceField->name = 'flex_example_date_' . bin2hex(random_bytes(4));
 if($wire->fields->get($dateSourceField->name)) {
 	throw new \RuntimeException('Refusing to replace the example Datetime inheritance source field');
 }
@@ -57,6 +57,11 @@ try {
 			if(!is_file($destination) && !copy($examplesRoot . $filename, $destination)) {
 				throw new \RuntimeException("Unable to copy example $filename");
 			}
+			file_put_contents($destination, str_replace(
+				['rich_text_source', 'date_input_source'],
+				[$sourceField->name, $dateSourceField->name],
+				file_get_contents($destination)
+			));
 			$copiedExamples[$filename] = true;
 		}
 	}
@@ -96,10 +101,10 @@ try {
 			$datetimePost = ['flex_example_starts_at' => '2026-10-18 14:30'];
 			$datetimeInput->processInput($wire->wire(new WireInputData($datetimePost)));
 			$dateValue->starts_at = $datetimeInput->value;
-			$same('2026-10-18', $dateValue->starts_on, 'date example stores canonical date');
-			$same('2026-10-18 14:30:00', $dateValue->starts_at, 'date and time example preserves native parsed time');
+			$same(strtotime('2026-10-18'), $dateValue->starts_on, 'date example stores canonical date');
+			$same(strtotime('2026-10-18 14:30:00'), $dateValue->starts_at, 'date and time example preserves native parsed time');
 			$dateValue->starts_at = '2026-10-18 14:30';
-			$same('2026-10-18 14:30:00', $dateValue->starts_at, 'canonical API date and time retains time with separate editor formats');
+			$same(strtotime('2026-10-18 14:30:00'), $dateValue->starts_at, 'canonical API date and time retains time with separate editor formats');
 			$dateValue->of(true);
 			$same('18.10.2026', $dateValue->starts_on, 'date example formats date output');
 			$same('18.10.2026 14:30', $dateValue->starts_at, 'date example formats date and time output');
@@ -122,49 +127,45 @@ try {
 
 	$readme = file_get_contents(dirname(__DIR__, 2) . '/README.md');
 	preg_match_all('/```php\n(.*?)```/s', $readme, $readmeBlocks);
-	$readmeContent = null;
-	$readmeOutput = null;
-	foreach($readmeBlocks[1] as $index => $code) {
-		if(str_contains($code, 'return [')) {
-			$snippet = $trackFile(dirname(__DIR__, 2) . '/.dev/readme-definition-' . bin2hex(random_bytes(4)) . '.php');
-			file_put_contents($snippet, $code);
-			$schema = require $snippet;
-			$readmeField = $createField('flex_readme_' . $index, $schema);
-			$assert(count($type->getDefinitions($readmeField, $page)->properties()) > 0, 'README definition builds: block ' . ($index + 1));
-			if(isset($schema['sections'])) {
-				$readmeContent = $readmeField;
+	$same(4, count($readmeBlocks[1]), 'all README PHP blocks have an execution context');
+	$readmeDefinition = $trackFile(dirname(__DIR__, 2) . '/.dev/readme-definition-' . bin2hex(random_bytes(4)) . '.php');
+	file_put_contents($readmeDefinition, str_replace('rich_text_source', $sourceField->name, ltrim($readmeBlocks[1][0])));
+	$schema = require $readmeDefinition;
+	$readmeField = $createField('flex_readme', $schema);
+	$readmeName = $readmeField->name;
+	$assert($type->getDefinitions($readmeField, $page)->getPropertyInputfield('blocks.text.body') instanceof InputfieldTinyMCE, 'README definition builds with inherited editor settings');
+	$page->of(false);
+	$page->set($readmeName, ['heading' => 'A & B']);
+	$page->get($readmeName)->blocks->addRow('text', ['heading' => 'Introduction & text', 'body' => '<p>Section</p>']);
+	$page->save($readmeName);
+	$readmePage = $wire->pages->getFresh($id);
+	$readmePage->of(true);
+	foreach(array_slice($readmeBlocks[1], 1) as $index => $code) {
+		$path = $trackFile(dirname(__DIR__, 2) . '/.dev/readme-example-' . bin2hex(random_bytes(4)) . '.php');
+		$code = str_replace(['$page->content', 'content.'], ['$page->' . $readmeName, "$readmeName."], $code);
+		if(!str_starts_with(ltrim($code), '<?php')) $code = "<?php namespace ProcessWire;\n" . $code;
+		file_put_contents($path, $code);
+		$renderReadme = static function(Page $page, Pages $pages, string $path): array {
+			ob_start();
+			try {
+				require $path;
+				$output = ob_get_contents();
+				return get_defined_vars();
+			} finally {
+				ob_end_clean();
 			}
-		} else if(str_contains($code, '$content = $page->content;')) {
-			$readmeOutput = $code;
+		};
+		$result = $renderReadme($readmePage, $wire->pages, $path);
+		if($index === 0) {
+			$assert(str_contains($result['output'], '<h1>A &amp; B</h1>') && str_contains($result['output'], '<p>Section</p>'), 'README template renders formatted heading and row HTML');
+		} else if($index === 2) {
+			$same([], $result['images'], 'README row filter returns existing image rows');
+			$same(1, $result['count'], 'README row count example uses saved text rows');
 		}
 	}
-	$assert($readmeContent instanceof Field && is_string($readmeOutput), 'README supplies a combined definition and output example');
-	$readmeName = $readmeContent->name;
-	$page->of(false);
-	$page->set($readmeName, [
-		'heading' => 'A & B',
-		'body' => '<p>Body</p>',
-		'starts_on' => '18.10.2026',
-		'appearance' => 'featured',
-	]);
-	$page->get($readmeName)->sections->addRow('text', ['heading' => 'Introduction & text', 'body' => '<p>Section</p>']);
-	$page->save($readmeName);
-	$readmeSnippet = $trackFile(dirname(__DIR__, 2) . '/.dev/readme-output-' . bin2hex(random_bytes(4)) . '.php');
-	file_put_contents($readmeSnippet, str_replace('$page->content', '$page->' . $readmeName, $readmeOutput));
-	$readmePage = $wire->pages->getFresh($id);
-	$renderReadme = static function(Page $page, string $snippet): string {
-		ob_start();
-		try {
-			require $snippet;
-			return ob_get_contents();
-		} finally {
-			ob_end_clean();
-		}
-	};
-	$same('<h1>A &amp; B</h1><p>Body</p><p>Featured</p><p>18.10.2026</p><section><h2>Introduction &amp; text</h2><p>Section</p></section>', $renderReadme($readmePage, $readmeSnippet), 'README combined output uses formatted values and row content');
-	$same([$id], $wire->pages->findIDs("id=$id, $readmeName.appearance=featured"), 'README appearance selector matches stored key');
-	$same([$id], $wire->pages->findIDs("id=$id, $readmeName.sections.text.heading*=Introduction"), 'README section selector includes set and type');
-	$same([], $wire->pages->findIDs("id=$id, $readmeName.sections.count>=3"), 'README count selector uses collection count');
+	$same([$id], $wire->pages->findIDs("id=$id, $readmeName.blocks.text.heading*=Introduction"), 'README selector matches saved text row');
+	$same([], $wire->pages->findIDs("id=$id, $readmeName.blocks.count>=3"), 'README count selector uses collection count');
+
 } finally {
 	foreach(array_keys($copiedExamples) as $filename) {
 		@unlink($exampleFixturePath . $filename);

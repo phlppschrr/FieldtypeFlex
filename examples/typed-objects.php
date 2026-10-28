@@ -1,20 +1,19 @@
 <?php namespace ProcessWire;
 
-/** A typed repeatable fieldset configured through native Inputfield objects. */
+/** A typed rows collection configured through native Inputfield objects. */
 $inputs = $wire->wire(new InputfieldWrapper());
 
-$fieldset                   = $wire->modules->get('InputfieldFieldset');
-$fieldset->name             = 'blocks';
-$fieldset->label            = __('Content blocks');
-$fieldset->repeatable       = true;
-$fieldset->maxItems         = 20;
-$fieldset->repeaterCollapse = 0;
-$fieldset->repeaterAddLabel = __('Add block');
-$fieldset->types = [
+$rows               = $wire->modules->get('InputfieldFlexRows');
+$rows->name         = 'blocks';
+$rows->label        = __('Content blocks');
+$rows->maxItems     = 20;
+$rows->rowCollapse  = 0;
+$rows->addRowLabel  = __('Add block');
+$rows->types        = [
 	'text'  => [
-		'label'         => __('Text'),
-		'repeaterTitle' => '#n: {heading}',
-		'children'      => [
+		'label'    => __('Text'),
+		'rowTitle' => '#n: {heading}',
+		'children' => [
 			'heading' => [
 				'type'     => 'text',
 				'label'    => __('Heading'),
@@ -28,9 +27,9 @@ $fieldset->types = [
 		],
 	],
 	'image' => [
-		'label'         => __('Image'),
-		'repeaterTitle' => '#n: {caption}',
-		'children'      => [
+		'label'    => __('Image'),
+		'rowTitle' => '#n: {caption}',
+		'children' => [
 			'image'   => [
 				'type'     => 'image',
 				'label'    => __('Image'),
@@ -43,9 +42,9 @@ $fieldset->types = [
 		],
 	],
 	'quote' => [
-		'label'         => __('Quote'),
-		'repeaterTitle' => '#n: {quote}',
-		'children'      => [
+		'label'    => __('Quote'),
+		'rowTitle' => '#n: {quote}',
+		'children' => [
 			'quote'  => [
 				'type'  => 'textarea',
 				'label' => __('Quote'),
@@ -58,6 +57,6 @@ $fieldset->types = [
 	],
 ];
 
-$inputs->add($fieldset);
+$inputs->add($rows);
 
 return $inputs;

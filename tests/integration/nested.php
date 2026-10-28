@@ -41,8 +41,7 @@ if(!isset($same, $assert, $throws)) {
 			$children += $schemaFor($depth - 1);
 		}
 		return ['nodes' => [
-			'type'       => 'fieldset',
-			'repeatable' => true,
+			'type'       => 'rows',
 			'types'      => [
 				'item' => ['label' => 'Item', 'children' => $children],
 				'other' => ['label' => 'Other', 'children' => ['heading' => ['type' => 'text']]],

@@ -81,7 +81,6 @@ Unknown repeatable set,Unbekannte wiederholbare Sammlung,,site/modules/Fieldtype
 Unable to create native media input,Native Medieneingabe konnte nicht erstellt werden,,site/modules/FieldtypeFlex/src/FlexAdmin.php,9552feb83c8bc49e1928f1cea76c5e47
 This Flex field is not editable,Dieses Flex-Feld kann nicht bearbeitet werden,,site/modules/FieldtypeFlex/src/FlexAdmin.php,1a0ef5c7f79376cd53f2d66d78cd61d3
 This Flex property is not editable,Diese Flex-Eigenschaft kann nicht bearbeitet werden,,site/modules/FieldtypeFlex/src/FlexAdmin.php,386a09c75e7480dae842d245396bd08e
-Manage Flex image variations through the Pageimage API,Verwalten Sie Flex-Bildvarianten über die Pageimage-API,,site/modules/FieldtypeFlex/src/FlexAdmin.php,f9df4b847e6cf73a3bd9972b64ab695d
 Image editing is not permitted,Bildbearbeitung ist nicht erlaubt,,site/modules/FieldtypeFlex/src/FlexAdmin.php,cc0c2588e50361855cd62dd933813946
 Only committed images can be selected,Nur gespeicherte Bilder können ausgewählt werden,,site/modules/FieldtypeFlex/src/FlexAdmin.php,b3bcbe494c0d88447a4d7a70c5f4f0ca
 Image no longer belongs to this draft,Das Bild gehört nicht mehr zu diesem Entwurf,,site/modules/FieldtypeFlex/src/FlexAdmin.php,ffa9e2a25fc8114bdce3c4bcbb18e75e
@@ -111,17 +110,12 @@ Flex property '%s' must be an array,Die Flex-Eigenschaft „%s“ muss ein Array
 Unable to load %s,%s konnte nicht geladen werden,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,e440ac52213ba86df69fb025acda3c64
 Unknown inheritField: %s,Unbekanntes inheritField: %s,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,4022ec637ec38699a0d68df17da58a35
 inheritField must use %s,inheritField muss %s verwenden,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,9eea04d63566ef5708c6d42a89e8e9c2
-types requires a repeatable fieldset,types benötigt eine wiederholbare Feldgruppe,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,9b7d38d4802853571cf52a97f955c7f5
 children of '%s' must be an array,children von „%s“ muss ein Array sein,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,5155121b0667edd1d885cad7c04f9f24
-repeatable requires a fieldset,repeatable benötigt eine Feldgruppe,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,ada3a4518db7402600e8cb705f7e0a82
 %s must be a non-negative integer,%s muss eine nicht negative Ganzzahl sein,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,10f8d2a99fdddbc72df8371e69894295
 minItems must not exceed maxItems,minItems darf maxItems nicht überschreiten,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,42635a24cd5f93ea3c9d469692f71f4d
-"%s belongs to a repeatable type, not the set","%s gehört zu einem wiederholbaren Typ, nicht zur Sammlung",,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,dcc2789d387e5a9e931124ae6c19ded1
-Repeatable types must be a non-empty map,Wiederholbare Typen müssen eine nicht leere Zuordnung sein,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,4f014ac84fe52bd776e45cd0d3d23f5b
 Invalid or reserved Flex row type: %s,Ungültiger oder reservierter Flex-Zeilentyp: %s,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,494f1af3974891140e2d2ed60c809be8
 Settings for row type %s must be an array,Einstellungen für Zeilentyp %s müssen ein Array sein,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,a135ec89b74ae4b4f25d0707a601e5c5
 Unsupported row type setting: %s,Nicht unterstützte Zeilentypeinstellung: %s,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,8bef0d4a783784eeb869ff8d4d617ab9
-Repeatable children must be definitions or a wrapper,Wiederholbare children müssen Definitionen oder ein Wrapper sein,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,716d9729cf025c437d6f9a1692a9608c
 Invalid renamedFrom for '%s',Ungültiges renamedFrom für „%s“,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,6f90dccbaf9f861437264d8c9bc84787
 "Flex media outputFormat must be 0 (auto), 1 (collection) or 2 (single)","Flex-Medien-outputFormat muss 0 (automatisch), 1 (Sammlung) oder 2 (einzeln) sein",,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,06ed598bdc8c096a6ac2ff91af21c255
 Flex media uses owned collections and staged replacement; overwrite/custom metadata templates/archive extraction are unsupported,"Flex-Medien verwenden zugeordnete Sammlungen und vorgemerkten Ersatz; Überschreiben, eigene Metadaten-Templates und Archivextraktion werden nicht unterstützt",,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,b4d12c0c1ad3600fee1452fb9f3d9c17
@@ -307,7 +301,7 @@ Common inputs,Gängige Eingaben,,site/modules/FieldtypeFlex/examples/manifest.ph
 Choices and checkboxes,Auswahlfelder und Kontrollkästchen,,site/modules/FieldtypeFlex/examples/manifest.php,de36e033f2d55154f7508cb474b44382
 "Select, checkbox collection and single checkbox examples.","Beispiele für Auswahlfelder, Kontrollkästchengruppen und einzelne Kontrollkästchen.",,site/modules/FieldtypeFlex/examples/manifest.php,bcc2680a16bdb7866f0c99287c724dcf
 Date and time,Datum und Uhrzeit,,site/modules/FieldtypeFlex/examples/manifest.php,2b0b7c9cbd6d6e9fa6b99aa06e828673
-Native date inputs expose canonical strings with output formatting disabled.,Native Datumseingaben liefern bei deaktivierter Ausgabeformatierung kanonische Zeichenketten.,,site/modules/FieldtypeFlex/examples/manifest.php,3f22dd47311115a6ab10c295af05ce4c
+Native date inputs return Unix timestamps with output formatting disabled; JSON stores canonical strings.,Native Datumseingaben liefern bei deaktivierter Ausgabeformatierung Unix-Zeitstempel; JSON speichert kanonische Zeichenketten.,,site/modules/FieldtypeFlex/examples/manifest.php,dabbd98f664f717f03c98d8f35ce9d4a
 Conditional inputs,Bedingte Eingaben,,site/modules/FieldtypeFlex/examples/manifest.php,ce23741afc33b6517f3419388e4d5048
 showIf and requiredIf use native ProcessWire form dependency processing.,showIf und requiredIf verwenden die native Verarbeitung von Formularabhängigkeiten in ProcessWire.,,site/modules/FieldtypeFlex/examples/manifest.php,b4b724099b72d43164798beb7b700142
 Optional modules,Optionale Module,,site/modules/FieldtypeFlex/examples/manifest.php,f90f4ac8085102bf149598c730ddb371
@@ -328,7 +322,7 @@ Combined example,Kombiniertes Beispiel,,site/modules/FieldtypeFlex/examples/mani
 Curated combination,Ausgewählte Kombination,,site/modules/FieldtypeFlex/examples/manifest.php,5a5e56d376fb622bfda8eb7fb70df3c7
 "A compact combination of multilingual text, Page references, TinyMCE, choices, dependencies and the Flex renamedFrom extension.","Eine kompakte Kombination aus mehrsprachigem Text, Seitenreferenzen, TinyMCE, Auswahlfeldern, Abhängigkeiten und der Flex-Erweiterung renamedFrom.",,site/modules/FieldtypeFlex/examples/manifest.php,8c95bd8ea76b1b7eb4d02c4a15efb787
 Flex extensions,Flex-Erweiterungen,,site/modules/FieldtypeFlex/examples/manifest.php,b651d739286816950974e7bfbc8e871c
-Nested repeatable fieldsets,Verschachtelte wiederholbare Feldgruppen,,site/modules/FieldtypeFlex/examples/manifest.php,d1a4ef9f2aba7a673cea5201ecd8a95a
+Nested rows,Verschachtelte Rows,,site/modules/FieldtypeFlex/examples/manifest.php,8db166820ce216cb057779a189154eb2
 Sections contain typed text/image blocks; text blocks contain repeatable notes. Three levels share the same API and media lifecycle.,Abschnitte enthalten typisierte Text-/Bildblöcke; Textblöcke enthalten wiederholbare Notizen. Drei Ebenen teilen dieselbe API und denselben Medienlebenszyklus.,,site/modules/FieldtypeFlex/examples/manifest.php,4251abbee4f1efd613b2351044f51463
 Rows and media,Zeilen und Medien,,site/modules/FieldtypeFlex/examples/manifest.php,e412069b205ea7fdef7922dc28914e9e
 "Typed rows with uniform slides and facts plus mixed text, image and quote blocks; these are Flex extensions.","Typisierte Zeilen mit einheitlichen Folien und Fakten sowie gemischten Text-, Bild- und Zitatblöcken; dies sind Flex-Erweiterungen.",,site/modules/FieldtypeFlex/examples/manifest.php,e4cef3327fdc3e5811367274b9b635fd
@@ -405,3 +399,14 @@ Image,Bild,,site/modules/FieldtypeFlex/examples/typed-objects.php,be53a0541a6d36
 Caption,Bildunterschrift,,site/modules/FieldtypeFlex/examples/typed-objects.php,272ba7d164aa836995be6319a698be84
 Quote,Zitat,,site/modules/FieldtypeFlex/examples/typed-objects.php,c48e929b2b1eabba2ba036884433345e
 Author,Autor,,site/modules/FieldtypeFlex/examples/typed-objects.php,a517747c3d12f99244ae598910d979c5
+Declare a Rows collection with type rows,Deklarieren Sie eine Rows-Sammlung mit type rows,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,213416550923ac2280e8c0040dd4f976
+Unsupported Flex definition setting: %s,Nicht unterstützte Flex-Definitionseinstellung: %s,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,947f40ccd07699df067a868760b2226a
+%s requires type rows,%s erfordert type rows,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,1271da88e70021de795bc583c5287cbf
+rowTitle belongs to a row type,rowTitle gehört zu einem Row-Typ,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,99090441f47d0d3c8225f9245b750265
+inheritField requires a native Inputfield type,inheritField erfordert einen nativen Inputfield-Typ,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,54c47af0e2cd0166d312918b1f3b430d
+"%s belongs to a row type, not the collection","%s gehört zu einem Row-Typ, nicht zur Sammlung",,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,17795d5594850ab0f20cec5fb1d2ca5e
+Rows types must be a non-empty map,Rows-Typen müssen eine nicht leere Zuordnung sein,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,4d8a070f99222a89b6fc38f038c10c51
+Row type children must be definitions or a wrapper,children eines Row-Typs muss Definitionen oder einen Wrapper enthalten,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,c7f305aaac06be3e3db4530c0a9c73d4
+"textformatters on ""%s"" requires a text-valued input","textformatters für ""%s"" erfordert ein Eingabefeld mit Textwert",,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,b6d8d7c0f70393cdeff506e9a9c191b8
+"textformatters on ""%s"" must be a list of module names","textformatters für ""%s"" muss eine Liste von Modulnamen sein",,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,75525c9e291581e109c5301bbe6ab12d
+"Invalid Textformatter module on ""%s"": %s","Ungültiges Textformatter-Modul für ""%s"": %s",,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,08ebbc5c5c0b5b714b58769305f53b30
