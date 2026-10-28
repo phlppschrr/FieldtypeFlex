@@ -14,7 +14,7 @@ class InputfieldFlex extends Inputfield {
 	public static function getModuleInfo() {
 		return [
 			'title'    => __('Flex'),
-			'version'  => '0.3.0',
+			'version'  => '0.4.0',
 			'summary'  => __('Schema-defined compound input'),
 			'requires' => ['ProcessWire>=3.0.259', 'PHP>=8.1.0', 'FieldtypeFlex'],
 		];

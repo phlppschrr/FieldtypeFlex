@@ -73,7 +73,7 @@ class FieldtypeFlex extends Fieldtype implements FieldtypeHasFiles, FieldtypeHas
 	public static function getModuleInfo() {
 		return [
 			'title'    => __('Flex'),
-			'version'  => '0.3.0',
+			'version'  => '0.4.0',
 			'summary'  => __('PHP/JSON-defined compound fields with native inputs and selectors'),
 			'author'   => __('FieldtypeFlex contributors'),
 			'href'     => 'https://github.com/phlppschrr/FieldtypeFlex',

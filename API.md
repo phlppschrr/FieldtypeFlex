@@ -855,6 +855,7 @@ Run from the ProcessWire root on a core with native CLI dispatch. Refresh module
 ```sh
 php index.php flex --help
 php index.php flex schema content --page=1234 --json
+php index.php flex lint content --json
 php index.php flex status --json
 php index.php flex check content --all --limit=100 --json
 php index.php flex rename content --dry-run
@@ -867,6 +868,7 @@ php index.php flex cleanup content --path=old_summary --apply
 | Command | Accepted options |
 | --- | --- |
 | `schema FIELD` | `--page=ID`, `--json` |
+| `lint FIELD` | `--page=ID`, `--json` |
 | `status` | `--json` |
 | `check FIELD` | `--page=ID`, `--all`, `--limit=N`, `--after=ID`, `--json` |
 | `rename FIELD` | Same selection/output options as check; `--dry-run`, `--apply` |
@@ -889,7 +891,11 @@ Before removing `renamedFrom`, complete migration from zero, then repeat a full 
 
 #### Schema inspection
 
-`schema` reports source, native input types, language/multiplicity settings, recursive collections/types, renames and supported selector paths/operators. Without `--page`, it uses discovery/NullPage; with it, that exact Page's schema. Dynamic definitions must still expose queryable paths in discovery. Missing/invalid definitions fail. Inspection never saves or migrates data.
+`schema` reports source, native input types, language/multiplicity settings, recursive collections/types, renames, supported selector paths/operators and non-blocking definition diagnostics. Without `--page`, it uses discovery/NullPage; with it, that exact Page's schema. Dynamic definitions must still expose queryable paths in discovery. Missing/invalid definitions fail. Inspection never saves or migrates data.
+
+`lint` runs the same definition diagnostics and returns them without the full schema tree. Warnings cover unresolved `rowTitle` property tokens, dependency expressions the native selector parser cannot parse, unsupported explicit `root`/`parent` dependency paths, and targets absent from the known Flex scope. External `page`/`forpage` inputs and bare names that may resolve from a surrounding native form are left context-dependent. Dynamic definitions are checked only in the selected context; discovery is not a guarantee for every Page. Warnings do not change the exit status; an invalid or missing definition returns exit 1.
+
+Each diagnostic has `code`, `severity` (`warning`), `path`, `property`, `setting` and a concise `message`. Current codes are `row_title_unresolved`, `dependency_expression_invalid`, `dependency_path_invalid` and `dependency_target_unknown`. Diagnostics identify likely mistakes; they do not replace native Inputfield validation or ProcessWire's runtime dependency resolution.
 
 #### Consistency checks
 
@@ -919,8 +925,8 @@ Progress and adapter diagnostics go to stderr. Failures can terminate a stream b
 
 | Exit | Meaning |
 | --- | --- |
-| 0 | Successful command/check; check warnings alone are allowed |
-| 1 | Known consistency errors, maintenance errors/conflicts, invalid/missing definition in schema, or unhealthy required status storage |
+| 0 | Successful command/check; check and lint warnings alone are allowed |
+| 1 | Known consistency errors, maintenance errors/conflicts, invalid/missing definition in schema/lint, or unhealthy required status storage |
 | 2 | Invalid request, exact owner selection error, or adapter-level failure |
 | 3 | Check incomplete without a known error (explicit skipped checks) |
 

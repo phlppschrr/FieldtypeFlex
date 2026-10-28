@@ -10,6 +10,7 @@ final class FlexMaintenanceCli {
 		return <<<'HELP'
 Flex inspection and data maintenance (one bounded batch by default)
 php index.php flex schema FIELD [--page=ID] [--json]
+php index.php flex lint FIELD [--page=ID] [--json]
 php index.php flex status [--json]
 php index.php flex check FIELD [--page=ID | --all] [--limit=100] [--after=0] [--json]
 php index.php flex rename FIELD [--dry-run | --apply] [--page=ID | --all] [--limit=100] [--after=0] [--json]
@@ -32,7 +33,7 @@ Existing rename/orphans/cleanup output remains JSON. New commands default to rea
 --json produces one JSON object; --all --json produces JSON-Lines batch records and a final summary.
 --all without --json prints batch JSON for existing commands, text for check, then a summary.
 Progress goes to stderr; --details adds orphan page IDs and concrete addresses per batch.
-Exit: 0 success (check warnings allowed), 1 findings/errors/conflicts, 2 invalid request/adapter failure,
+Exit: 0 success (check and lint warnings allowed), 1 findings/errors/conflicts, 2 invalid request/adapter failure,
 3 incomplete check without known errors. Check never repairs; see API.md for inspection boundaries.
 HELP;
 	}
@@ -41,14 +42,14 @@ HELP;
 		try {
 			if(in_array($args, [[], ['help'], ['--help'], ['-h']], true)) { echo self::help(); return 0; }
 			$operation = array_shift($args);
-			if(!in_array($operation, ['rename', 'orphans', 'cleanup', 'check', 'schema', 'status'], true)) throw new WireException('Unknown Flex command');
+			if(!in_array($operation, ['rename', 'orphans', 'cleanup', 'check', 'schema', 'lint', 'status'], true)) throw new WireException('Unknown Flex command');
 			$name = $operation === 'status' ? null : array_shift($args);
 			if($name !== null && (!is_string($name) || !preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/D', $name))) throw new WireException('Specify a Flex field name');
 			if($operation !== 'status' && $name === null) throw new WireException('Specify a Flex field name');
 			$options = []; $paths = [];
 			$allowed = ['json'];
-			if($operation === 'schema') $allowed[] = 'page';
-			if(!in_array($operation, ['schema', 'status'], true)) $allowed = array_merge($allowed, ['page', 'all', 'limit', 'after']);
+			if(in_array($operation, ['schema', 'lint'], true)) $allowed[] = 'page';
+			if(!in_array($operation, ['schema', 'lint', 'status'], true)) $allowed = array_merge($allowed, ['page', 'all', 'limit', 'after']);
 			if(in_array($operation, ['rename', 'cleanup'], true)) $allowed = array_merge($allowed, ['apply', 'dry-run']);
 			if($operation === 'orphans') $allowed[] = 'details';
 			foreach($args as $arg) {
@@ -75,7 +76,14 @@ HELP;
 			if($operation === 'status') { $result = $inspection->status(); $this->output($result, isset($options['json'])); return $result['success'] ? 0 : 1; }
 			$field = $this->type->wire()->fields->get($name);
 			if(!$field || !$field->type instanceof FieldtypeFlex) throw new WireException('Unknown Flex field');
-			if($operation === 'schema') { $result = $inspection->schema($field, $options['page'] ?? null); $this->output($result, isset($options['json'])); return $result['success'] ? 0 : 1; }
+			if(in_array($operation, ['schema', 'lint'], true)) {
+				$result = $inspection->schema($field, $options['page'] ?? null);
+				if($operation === 'lint') {
+					$result = ['operation' => 'lint', 'field' => $result['field'], 'context' => $result['context'], 'pageId' => $result['pageId'],
+						'diagnostics' => $result['diagnostics'] ?? [], 'findings' => $result['findings'], 'success' => $result['success']];
+				}
+				$this->output($result, isset($options['json'])); return $result['success'] ? 0 : 1;
+			}
 			$maintenance = new FlexMaintenance($this->type);
 			$after = $options['after'] ?? 0; $limit = $options['limit'] ?? 100;
 			$all = isset($options['all']); $json = isset($options['json']);

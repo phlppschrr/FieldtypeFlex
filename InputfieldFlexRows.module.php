@@ -22,7 +22,7 @@ class InputfieldFlexRows extends Inputfield {
 	public static function getModuleInfo() {
 		return [
 			'title'    => __('Flex rows'),
-			'version'  => '0.3.0',
+			'version'  => '0.4.0',
 			'summary'  => __('Repeatable native inputs inside Flex'),
 			'requires' => 'FieldtypeFlex',
 		];

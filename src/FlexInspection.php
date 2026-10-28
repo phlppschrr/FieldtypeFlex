@@ -51,6 +51,7 @@ final class FlexInspection {
 			foreach($info['subfields'] as $path => $descriptor) {
 				$result['selectors'][$path] = ['input' => $descriptor['input'], 'operators' => $descriptor['operators']];
 			}
+			$result['diagnostics'] = $this->definitionDiagnostics($defs);
 			$result['limitations'] = ['Selectors use this context; normal query discovery uses NullPage.',
 				'No sorting of repeated values, Page traversal from rows, recursive Page hops or arbitrary JSON paths.',
 				'Page traversal supports only the native target fields exposed here; grouping/negation restrictions still apply.'];
@@ -59,6 +60,70 @@ final class FlexInspection {
 			$result['findings'][] = $this->finding($field, $id ?? 0, 'definition', 'error');
 		}
 		return $result;
+	}
+
+	/** Non-blocking checks for likely definition mistakes; external Page inputs remain context-dependent. @internal */
+	private function definitionDiagnostics(FlexFieldDefs $root): array {
+		$diagnostics = [];
+		$add = static function(string $code, string $path, string $property, string $setting, string $message) use (&$diagnostics): void {
+			$key = "$code\0$path\0$property\0$setting";
+			$diagnostics[$key] = ['code' => $code, 'severity' => 'warning', 'path' => $path,
+				'property' => $property, 'setting' => $setting, 'message' => $message];
+		};
+		$walk = function(FlexFieldDefs $schema, ?FlexFieldDefs $parent = null, string $prefix = '') use (&$walk, $root, $add): void {
+			foreach($schema->properties() as $name => $definition) {
+				$path = $prefix . $name;
+				$input = $definition['input'];
+				foreach(['showIf', 'requiredIf'] as $setting) {
+					$expression = (string) $input->get($setting);
+					if($expression === '') continue;
+					try {
+						$selectors = $this->type->wire()->wire(new Selectors($expression));
+						foreach($selectors as $selector) {
+							foreach($selector->fields() as $reference) {
+								[$scope, $target] = array_pad(explode('.', $reference, 2), 2, '');
+								if(!in_array($scope, ['parent', 'root', 'page', 'forpage'], true) || $target === '') continue;
+								if(!preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*(?:\\.count)?$/D', $target)) {
+									$add('dependency_path_invalid', $path, $reference, $setting, 'Dependency path has unsupported syntax.');
+									continue;
+								}
+								if($scope === 'root' || $scope === 'parent') {
+									$targetSchema = $scope === 'root' ? $root : $parent;
+									$property = explode('.', $target, 2)[0];
+									if(!$targetSchema) {
+										$add('dependency_path_invalid', $path, $reference, $setting, 'Dependency scope is unavailable here.');
+									} else if(!$targetSchema->property($property)) {
+										$add('dependency_target_unknown', $path, $reference, $setting, 'Dependency target is not defined in this Flex scope.');
+									}
+								}
+							}
+						}
+					} catch(\Throwable $e) {
+						$add('dependency_expression_invalid', $path, '', $setting, 'Dependency expression could not be parsed.');
+					}
+				}
+				if(($definition['kind'] ?? '') === 'rows') {
+					foreach($definition['types'] as $type => $typeDefinition) {
+						$rowPath = $path . '.' . $type;
+						$format = (string) ($typeDefinition['settings']['rowTitle'] ?? '');
+						if($format !== '' && preg_match_all('/_?\\{([^{}]+)\\}_?/', $format, $matches)) {
+							$children = $typeDefinition['schema'];
+							foreach($matches[1] as $token) {
+								$known = false;
+								foreach(explode('|', $token) as $candidate) {
+									if(in_array($candidate, ['@type', '@path'], true) || $children->property($candidate)) { $known = true; break; }
+								}
+								if(!$known) $add('row_title_unresolved', $rowPath, $token, 'rowTitle', 'rowTitle token does not resolve to a property or built-in token.');
+							}
+						}
+						$walk($typeDefinition['schema'], $schema, $rowPath . '.');
+					}
+				}
+				if($definition['customFields'] ?? null) $walk($definition['customFields'], $schema, $path . '.');
+			}
+		};
+		$walk($root);
+		return array_values($diagnostics);
 	}
 
 	public function checkDerived(Field $field, Page $page, array $raw, array &$findings, array &$skipped): void {
