@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — HTML URL and link abstraction
+
+- Sleep/wake native HTML URLs and optionally abstract internal page links across
+  target moves/renames, including languages, hidden/nested Rows and File/Image
+  custom HTML. Inherit Textarea `contentType` and `htmlOptions` settings.
+- Preserve sleeping storage on field and selective metadata saves while exposing
+  awakened runtime values. Image markup QA and native inbound-link discovery
+  remain outside this integration.
+
 ## Unreleased — Row type selector layout
 
 - Keep `New item type` on one line beside its select inside native Inputfield

@@ -445,7 +445,10 @@ trait FlexMediaCollection {
 	private function hydrateFile(array $meta): Pagefile {
 		$class = $this instanceof Pageimages ? FlexPageimage::class : FlexPagefile::class;
 		$file = $this->wire(new $class($this, $meta['basename']));
-		$file->description(true, $meta['description'] ?? '');
+		$description = $meta['description'] ?? '';
+		$definition = $this->metadataSchema()->property('description');
+		if($definition) $description = FlexMarkup::value($this->page, $this->field, 'description', $definition, $description, false);
+		$file->description(true, $description);
 		foreach(['tags', 'created', 'modified', 'created_users_id', 'modified_users_id', 'filesize', 'filedata'] as $key) {
 			if(isset($meta[$key])) {
 				$file->set($key, $meta[$key]);

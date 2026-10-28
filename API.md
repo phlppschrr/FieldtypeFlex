@@ -74,6 +74,8 @@ $json = json_encode($page->content);  // Unformatted JSON view
 
 Both array methods describe current memory, including unsaved edits; neither saves, refreshes nor returns a deep copy. Neither accepts a property argument. JSON exports describe logical data rather than exact database bytes: empty PHP maps encode as `[]`; storage keeps the root and Row/media `values` maps as `{}`, while ordinary empty lists remain `[]`. Do not edit storage envelopes or selector projections directly.
 
+Known HTML properties export awakened URLs; storage uses native sleeping URLs and optional `data-pwid` link references. Loading and exporting do not rewrite stored data.
+
 ## Reading and writing values
 
 ### Properties and saving
@@ -162,7 +164,7 @@ Flex reuses native Inputfields and selected Fieldtype behavior, with these bound
 
 | Area | Difference |
 | --- | --- |
-| Text / HTML | Native output options apply, but storage-time Textarea markup QA and link abstraction do not. Configure Textformatters explicitly for HTML text escaping. |
+| Text / HTML | Native URL sleep/wakeup and optional link abstraction apply to HTML text. Image markup QA and `$page->links()` / `MarkupQA::findLinks()` integration are unsupported. Configure Textformatters explicitly for HTML text escaping. |
 | Integer / Float / Datetime | Integer/Float preserve explicit zero. Invalid numbers/dates raise `WireException` rather than using permissive native conversion or blank fallback. |
 | Checkbox / Toggle | Custom checkbox scalars are supported. Toggle supports native `formatType` output modes; custom integer option keys remain supported. |
 | Choices | Values are raw keys, not native FieldtypeOptions objects or option IDs. |
@@ -728,7 +730,7 @@ External sources must be rendered native value inputs. Rows, fieldsets, File/Ima
 ],
 ```
 
-The source Field must use the same Inputfield type (here, Textarea configured for TinyMCE). Flex copies Inputfield settings and compatible FieldtypeText/FieldtypeFile `textformatters`, never source values or storage. Local settings override inherited ones; an explicit formatter list replaces the inherited list, including `[]`.
+The source Field must use the same Inputfield type (here, Textarea configured for TinyMCE). Flex copies Inputfield settings, compatible FieldtypeText/FieldtypeFile `textformatters` and Textarea `contentType`/`htmlOptions`, never source values or storage. Local settings override inherited ones; an explicit formatter list replaces the inherited list, including `[]`.
 
 TinyMCE's native `settingsField` is separate from `inheritField`. See [text inputs](examples/03-text.php), [numbers/dates](examples/04-numbers-dates.php) and [advanced settings](examples/07-advanced.php) for prerequisites and examples.
 
@@ -751,7 +753,7 @@ Formatters run in configured order on formatted reads, after native language res
 
 The formatter receives the owning Page and a transient Field named `<flex_field>_<property>`, with no database ID, including inside Rows. Formatters requiring a stored Field or `$page->{$field->name}` need Flex-aware integration.
 
-Native URL `addRoot` and Textarea output options apply even without formatters. Storage-time markup QA/link abstraction remains unsupported. Choice keys stay raw except for Toggle `formatType`; [label helpers](#property-and-option-labels) encode display labels separately.
+Native URL `addRoot` and Textarea output options apply even without formatters. Textarea/TinyMCE with `contentType >= FieldtypeTextarea::contentTypeHTML` sleep/wake local HTML URLs; `htmlOptions => [FieldtypeTextarea::htmlLinkAbstract]` also tracks internal links across target moves/renames. This applies independently of output formatting, across languages, hidden/nested Rows and File/Image custom HTML, including an explicitly configured HTML description. TinyMCE alone does not enable it. Choice keys stay raw except for Toggle `formatType`; [label helpers](#property-and-option-labels) encode display labels separately.
 
 ### Language modes
 

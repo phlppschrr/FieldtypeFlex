@@ -529,7 +529,7 @@ class FlexValue extends WireData implements \JsonSerializable {
 			return $format === 3 ? $input->formatLabel($label, false) : $label;
 		}
 		if($this->formatted && $def && $def['kind'] === 'text') {
-			$field = $this->textformatterField((string) $key, $def);
+			$field = FlexMarkup::field($this->flexPage, $this->flexField, (string) $key, $def);
 			return $field->type->formatValue($this->flexPage, $field, (string) $value);
 		}
 		if($this->formatted && $value instanceof LanguagesPageFieldValue) {
@@ -737,21 +737,6 @@ class FlexValue extends WireData implements \JsonSerializable {
 		return $value;
 	}
 
-	/** Supply native output formatting with property settings, never a storage field. */
-	private function textformatterField(string $name, array $definition): Field {
-		$input = $definition['input'];
-		$type = $input instanceof InputfieldTextarea ? 'FieldtypeTextarea'
-			: ($input instanceof InputfieldURL ? 'FieldtypeURL'
-				: ($input instanceof InputfieldEmail ? 'FieldtypeEmail' : 'FieldtypeText'));
-		$field = $this->wire(new Field());
-		$field->type = $this->wire()->modules->get($type);
-		$field->name = $this->flexField->name . '_' . $name;
-		foreach($definition['settings'] + $input->getArray() as $key => $setting) {
-			if(!in_array($key, ['id', 'name', 'type', 'value', 'inheritField'], true)) $field->set($key, $setting);
-		}
-		return $field;
-	}
-
 	/** Build native Page field settings without binding a second storage field. */
 	private function pageReferenceField(string $name): Field {
 		$field = $this->wire(new Field());
@@ -816,6 +801,8 @@ class FlexValue extends WireData implements \JsonSerializable {
 			}
 			return new FlexRows($this->flexPage, $this->flexField, $this->flexAddress === '' ? $name : "$this->flexAddress.$name", $def, $value);
 		}
+		// Hydrate known leaves after renames; runtime exports and assignments stay awake.
+		$value = FlexMarkup::value($this->flexPage, $this->flexField, $name, $def, $value, false);
 		if($def['languages']) {
 			$synthetic = clone $this->flexField;
 			$synthetic->langBlankInherit = $input->langBlankInherit;

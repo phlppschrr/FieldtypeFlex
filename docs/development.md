@@ -32,6 +32,9 @@ explicit/inherited/empty lists, HTML output, multilingual values and nested rows
 Its media formatter suite covers absent/explicit/empty and inherited description chains,
 single/collection output, language changes and fallback, raw exports, read-only
 unformatted views, nested images, variations and unchanged canonical metadata.
+The formatting suite's `markup.php` compares native Textarea storage and wakeup,
+repeated roundtrips, target renames, subdirectory changes, hidden/nested Rows,
+languages, File/Image metadata, selective saves, stale conflicts and rollback.
 Run suites sequentially against one fixture; their owned baseline field name is shared.
 
 The admin suite executes the production PHP and JavaScript Row-title parsers

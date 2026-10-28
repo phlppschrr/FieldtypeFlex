@@ -3,6 +3,7 @@
 require_once __DIR__ . '/src/FlexField.php';
 require_once __DIR__ . '/src/FlexFieldDefs.php';
 require_once __DIR__ . '/src/FlexValue.php';
+require_once __DIR__ . '/src/FlexMarkup.php';
 require_once __DIR__ . '/src/FlexRows.php';
 require_once __DIR__ . '/src/FlexPath.php';
 require_once __DIR__ . '/src/FlexDependencies.php';
@@ -428,7 +429,7 @@ class FieldtypeFlex extends Fieldtype implements FieldtypeHasFiles, FieldtypeHas
 				// Unrelated pending tree edits are not part of this file save.
 			}
 		}
-		$meta = FlexMedia::describe($file, $file->assetId());
+		$meta = FlexMarkup::sleepFile($page, $field, $file->pagefiles->metadataSchema(), FlexMedia::describe($file, $file->assetId()));
 		$own = !$this->wire()->database->inTransaction();
 		$this->storage()->requireTransactional($field);
 		$committed = $this->storage()->atomic(function() use ($page, $field, $file, $meta, $columns, $allowed) {
@@ -905,6 +906,8 @@ class FieldtypeFlex extends Fieldtype implements FieldtypeHasFiles, FieldtypeHas
 		$current = new FlexValue($page, $field, $this->getDefinitions($field, $page), $value->rawArray());
 		$raw = $current->rawArray();
 		$current->validateTree();
+		$raw = FlexMarkup::sleep($page, $field, $current->definitions(), $raw);
+		FlexPath::validate($raw, $field);
 		return [
 			'data'   => FlexStorage::encode($raw),
 			'search' => FlexStorage::search($raw),

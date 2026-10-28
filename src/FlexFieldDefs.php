@@ -379,6 +379,11 @@ class FlexFieldDefs extends Wire {
 				if($input instanceof InputfieldToggle && !array_key_exists('formatType', $settings)) {
 					$settings['formatType'] = $inherit->get('formatType') ?? 0;
 				}
+				if($inherit->type instanceof FieldtypeTextarea) {
+					foreach(['contentType', 'htmlOptions'] as $key) {
+						if(!array_key_exists($key, $settings)) $settings[$key] = $inherit->get($key);
+					}
+				}
 				// Textformatters belong to the Fieldtype, not the source Inputfield.
 				if(($inherit->type instanceof FieldtypeText || $inherit->type instanceof FieldtypeFile) && !array_key_exists('textformatters', $settings)) {
 					$settings['textformatters'] = $inherit->get('textformatters') ?? [];
