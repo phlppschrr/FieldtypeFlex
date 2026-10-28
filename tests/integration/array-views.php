@@ -73,11 +73,11 @@ $same('images:1', $before['hero']['_flex'], 'rawArray uses image metadata envelo
 
 $formatted = $type->formatValue($page, $arrayField, $value);
 $display = $formatted->getArray();
-$same('A &amp; B', $display['heading'], 'formatted getArray encodes eligible text');
+$same('A & B', $display['heading'], 'formatted getArray leaves text without formatters unchanged');
 $same('18.10.2026', $display['starts_on'], 'formatted getArray formats date');
 $assert($display['download'] instanceof Pagefile && $display['hero'] instanceof Pageimage, 'formatted getArray applies single-media output');
-$same('Row &amp; title', $display['rows']->first()->getArray()['heading'], 'formatted getArray retains rows with formatted leaves');
-$same('Nested &amp; text', $display['rows']->first()->notes->first()->text, 'formatted nested rows keep their runtime objects');
+$same('Row & title', $display['rows']->first()->getArray()['heading'], 'formatted getArray retains raw row leaves without formatters');
+$same('Nested & text', $display['rows']->first()->notes->first()->text, 'formatted nested rows keep unformatted text when no formatter exists');
 $same($display['heading'], iterator_to_array($formatted)['heading'], 'iteration follows getArray formatting');
 $same($before, $formatted->rawArray(), 'formatted rawArray is unchanged canonical data');
 $same($before, json_decode(json_encode($formatted), true), 'JSON serialization uses rawArray with formatting on');

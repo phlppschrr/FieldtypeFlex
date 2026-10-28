@@ -52,3 +52,82 @@ The reusable demo seed is ddev flex-seed. The nested demo has a separate guarded
     ddev exec php scripts/seed-nested.php
 
 Only use these scripts with the disposable .dev/pw installation.
+
+## Native core Fieldtype baseline
+
+The separate `core-fieldtypes` CI job runs 13 unmodified native WireTests from
+our pinned newer core on PHP 8.3 / MariaDB 10.11. Run the same baseline locally:
+
+    ddev exec php scripts/wiretest.php --core
+
+The allowlist covers Text, Textarea, Integer, Float, Datetime, Email, URL,
+Checkbox, Toggle, Page, Options, File and Image. Each runs sequentially in a
+fresh PHP process; failures are aggregated and missing/skipped tests fail the
+job. The runner accepts only the disposable `.dev/pw` site. Core tests retain
+reusable WireTests fields/pages there, following native test lifecycle behavior.
+No separate WireTests download or dependency update is involved.
+
+This baseline checks the native environment. Flex compatibility remains covered
+in every existing matrix configuration by `ddev flex-test compatibility`, now
+including `native-selectors.php`: complete result-set comparisons against saved
+native Fields with matching, nonmatching, blank, missing-property and absent-field
+storage. Existing suites cover formatter chains, Page traversal and media.
+Comparisons follow API.md's supported contract: numeric-zero preservation,
+choice return types and formatted label escaping can intentionally differ; Flex date-only
+and partial-date matching, reference name/path matching and media metadata
+selectors are not inferred from the native tests.
+
+Native scalar inequality treats blanks differently across Fieldtypes. Nonblank
+`!=` comparisons therefore compare populated owners and separately assert Flex's
+missing-value behavior, including the explicit native Text/Flex difference.
+Unrounded Float parity uses native `colType=double` to avoid SQL FLOAT precision
+loss; this does not change Flex's canonical storage.
+
+## Data maintenance verification
+
+`ddev flex-test maintenance` tests the shared raw data path, typed rename/cleanup,
+preview revisions, atomic projections and media ownership. Keep API, CLI and Admin
+adapters thin; test raw JSON without hydration/default insertion. Include strict
+old/new equality, blanks/zero, missing definitions, unknown types, direct field-table
+owner enumeration and error-safe continuation. Preserve old `flexPrune` metadata in
+regressions to prove it has no effect.
+
+For browser checks, create an isolated disposable field/template/Page, save legacy
+root/row/file keys, then declare `renamedFrom` and omit two other properties. Check
+conflict preview, repair the conflict, apply renames, list potentially orphaned
+properties, select just one, preview and apply cleanup. Save through ProcessPageEdit
+with a native `collapsedHidden` property; verify hidden/unknown values, row/asset IDs,
+media addresses and bytes independently from the database. Check console errors.
+Opening and normally saving field configuration must not scan or migrate data.
+
+Native CLI checks run from `.dev/pw`: `ddev exec php .dev/pw/index.php flex --help`.
+Refresh module metadata after adding CLI support. Test both pinned cores through
+the real `index.php flex` dispatcher where the core provides it, including exit 0,
+argument exit 2 and conflict exit 1. The pinned 3.0.259 snapshot has no dispatcher;
+record that limitation and run the API/Admin/adapter cases there. Keep CLI metadata
+and methods without a direct interface declaration so optional CLI support does
+not change the module requirements. Add `node --check FlexMaintenance.js` to JS checks. No AgentTools dependency
+is required. Keep dependencies/pins unchanged and report unrun matrix configurations.
+
+## Automatic projection/media lifecycle verification
+
+`ddev flex-test media rows nested maintenance public-api` covers automatic
+projection writes, native cloning/deletion/emptying, save failures and caller rollback.
+`media-lifecycle.php` exercises native `ProcessWire::finished` and an actual plain
+PHP subprocess that only bootstraps ProcessWire and exits. No application collector
+or rebuild call drives these cases. It covers outer commit/rollback, subtree media,
+selected property cleanup, expired staging/upload/clone records, unknown files and
+references retained in unknown properties. A full protected/failed batch precedes
+later candidates to verify durable cursor continuation, wrapping and retry after a
+physical deletion failure. Low-level collector/repair tests use internal services
+explicitly; these methods are outside the supported application contract.
+
+For browser verification, save an isolated Page with a nested File property and
+TinyMCE body through ProcessPageEdit, removing the File and changing a scalar.
+Independently reread canonical JSON, row selectors, the registered asset and actual
+paths; retain an unrelated unknown file. Capture browser warnings/errors. Leave
+outer transactions open in PHP tests, never force a commit in the lifecycle hook.
+
+When a subprocess changes files, clear the parent process's stat cache before
+filesystem readback. Verify journal ownership independently too: a cached positive
+`is_file()` result can otherwise misreport successful child-process cleanup.

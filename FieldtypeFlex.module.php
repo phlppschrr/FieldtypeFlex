@@ -6,17 +6,53 @@ require_once __DIR__ . '/src/FlexValue.php';
 require_once __DIR__ . '/src/FlexRows.php';
 require_once __DIR__ . '/src/FlexPath.php';
 require_once __DIR__ . '/src/FlexStorage.php';
+require_once __DIR__ . '/src/FlexMaintenance.php';
+require_once __DIR__ . '/src/FlexMaintenanceCli.php';
+require_once __DIR__ . '/src/FlexMaintenanceAdmin.php';
 require_once __DIR__ . '/src/FlexQuery.php';
 require_once __DIR__ . '/src/FlexAdmin.php';
 require_once __DIR__ . '/InputfieldFlexRows.module.php';
 require_once __DIR__ . '/src/FlexMedia.php';
 
+// Native CLI also discovers metadata/methods without an implements declaration.
+// This is the upstream-recommended compatibility path for cores without CliModule.
 /** Structured ProcessWire values with native inputs, typed rows and owned media. */
 class FieldtypeFlex extends Fieldtype implements FieldtypeHasFiles, FieldtypeHasPagefiles, FieldtypeHasPageimages {
 	private ?FlexMedia $mediaService = null;
 	private array $adminDefinitionErrors = [];
 	private array $adminInputErrors = [];
 	private array $adminFormErrors = [];
+
+	/** Preview declared renames in an ID-ordered batch. See API.md for the result contract. */
+	public function checkRenames(Field $field, int $afterPageId = 0, int $limit = 100): array {
+		return (new FlexMaintenance($this))->scan($field, 'rename', $afterPageId, $limit);
+	}
+
+	/** Apply exactly one checked batch; stale data or schema decisions fail per page. */
+	public function applyRenames(Field $field, array $preview): array {
+		return (new FlexMaintenance($this))->apply($field, 'rename', [], $preview);
+	}
+
+	/** List potentially orphaned properties, with bounded page IDs and concrete addresses. */
+	public function listOrphans(Field $field, int $afterPageId = 0, int $limit = 100): array {
+		return (new FlexMaintenance($this))->scan($field, 'orphans', $afterPageId, $limit);
+	}
+
+	/** Preview or apply an explicit selection from a checked orphan batch. */
+	public function cleanupProperties(Field $field, array $paths, array $preview, bool $apply = false): array {
+		return (new FlexMaintenance($this))->apply($field, 'cleanup', $paths, $preview, $apply);
+	}
+
+	/** Native ProcessWire CLI help. */
+	public function getCliCommands() {
+		return FlexMaintenanceCli::help();
+	}
+
+	/** Execute native CLI commands, explicitly propagating failures past core's exception handler. */
+	public function executeCli(array $args) {
+		$status = (new FlexMaintenanceCli($this))->run($args);
+		if($status) exit($status);
+	}
 
 	/**
 	 * Return module metadata and installation requirements.
@@ -31,6 +67,7 @@ class FieldtypeFlex extends Fieldtype implements FieldtypeHasFiles, FieldtypeHas
 			'author'   => __('FieldtypeFlex contributors'),
 			'href'     => 'https://github.com/phlppschrr/FieldtypeFlex',
 			'autoload' => true,
+			'cli'      => 'flex',
 			'requires' => ['ProcessWire>=3.0.259', 'PHP>=8.1.0'],
 			'installs' => ['InputfieldFlex', 'InputfieldFlexRows'],
 		];
@@ -62,9 +99,28 @@ class FieldtypeFlex extends Fieldtype implements FieldtypeHasFiles, FieldtypeHas
 	 * @return void
 	 */
 	public function init() {
+		$this->addHookAfter('ProcessWire::finished', function() {
+			$this->media()->sweep();
+		});
 		// Core discards a third sort component before getMatchQuerySort(). Validate
 		// its meaning while the original selectors still exist; root collections sort by count.
 		$this->addHookBefore('PageFinder::getQuery', $this, 'validateSortPaths');
+		$this->addHookBefore('InputfieldSelector::render', function() {
+			$names = [];
+			foreach($this->wire()->fields as $field) {
+				if($field->type instanceof self) {
+					$names[] = $field->name;
+				}
+			}
+			if(!$names) {
+				return;
+			}
+			$this->wire()->config->js('FieldtypeFlexSelectorFields', $names);
+			$this->wire()->config->scripts->add($this->wire()->config->urls->get('FieldtypeFlex') . 'FieldtypeFlex.js');
+		});
+		$this->addHookBefore('ProcessField::executeEdit', function() {
+			(new FlexMaintenanceAdmin($this))->dispatch();
+		});
 		$this->addHookBefore('ProcessPageEdit::ajaxSave', $this, 'dispatchAdmin');
 		$this->addHookAfter('ProcessPageEdit::buildForm', $this, 'addPageEditFormGuard');
 		$this->addHookBefore('ProcessPageEdit::processInput', $this, 'checkPageEditFormGuard');
@@ -305,16 +361,6 @@ class FieldtypeFlex extends Fieldtype implements FieldtypeHasFiles, FieldtypeHas
 	}
 
 	/**
-	 * Collect a bounded batch of expired drafts and removed owned files.
-	 *
-	 * @param int $limit Maximum number of records to process.
-	 * @return array
-	 */
-	public function collectFiles(int $limit = 100): array {
-		return $this->media()->collect($limit);
-	}
-
-	/**
 	 * Repair and finalize missing originals on a saved page clone.
 	 *
 	 * @param Page $copy
@@ -390,7 +436,7 @@ class FieldtypeFlex extends Fieldtype implements FieldtypeHasFiles, FieldtypeHas
 			$file->resetTrackChanges();
 		}
 		if($own) {
-			$this->media()->collect(100, $page, $field);
+			$this->media()->sweep($page, $field);
 		}
 		return true;
 	}
@@ -932,7 +978,7 @@ class FieldtypeFlex extends Fieldtype implements FieldtypeHasFiles, FieldtypeHas
 		});
 		$this->media()->baselines($value, $committed);
 		if($own && !$page->get('_cloning')) {
-			$this->media()->collect(100, $page, $field);
+			$this->media()->sweep($page, $field);
 		}
 		return $result;
 	}
@@ -945,16 +991,23 @@ class FieldtypeFlex extends Fieldtype implements FieldtypeHasFiles, FieldtypeHas
 	 * @return bool
 	 */
 	public function ___deletePageField(Page $page, Field $field) {
+		// Keep a native override so template-wide deletion uses the per-page path.
+		return parent::___deletePageField($page, $field);
+	}
+
+	/** Keep both native deletePageField() and emptyPageField() transactional. */
+	protected function emptyPageFieldTable(Page $page, Field $field) {
 		$this->storage()->requireRowSchema();
 		$own = !$this->wire()->database->inTransaction();
 		$result = $this->storage()->atomic(function() use ($page, $field) {
-			$result = parent::___deletePageField($page, $field);
+			$result = parent::emptyPageFieldTable($page, $field);
+			if(!$result) return false;
 			$this->storage()->deleteProjection($page, $field);
 			$this->media()->sync($page, $field, []);
 			return $result;
 		});
 		if($own) {
-			$this->media()->collect(100, $page, $field);
+			$this->media()->sweep($page, $field);
 		}
 		return $result;
 	}
@@ -973,7 +1026,7 @@ class FieldtypeFlex extends Fieldtype implements FieldtypeHasFiles, FieldtypeHas
 			$q->execute(['id' => $field->id]);
 			$q = $this->wire()->database->prepare("UPDATE fieldtype_flex_assets SET state='pending_delete' WHERE fields_id=:id");
 			$q->execute(['id' => $field->id]);
-			$this->media()->collect(100, null, $field);
+			$this->media()->sweep(null, $field);
 		}
 		return $result;
 	}
@@ -989,18 +1042,6 @@ class FieldtypeFlex extends Fieldtype implements FieldtypeHasFiles, FieldtypeHas
 				throw new WireException($this->_('Remove saved Flex fields before uninstalling FieldtypeFlex'));
 			}
 		}
-	}
-
-	/**
-	 * Rebuild a bounded page batch of repeatable row projections.
-	 *
-	 * @param Field $field Owning Flex field.
-	 * @param int $afterPageId Resume after this page ID.
-	 * @param int $limit Maximum number of records to process.
-	 * @return array
-	 */
-	public function rebuildRowIndex(Field $field, int $afterPageId = 0, int $limit = 100): array {
-		return $this->storage()->rebuildRows($field, $afterPageId, $limit);
 	}
 
 	/**
@@ -1162,18 +1203,6 @@ class FieldtypeFlex extends Fieldtype implements FieldtypeHasFiles, FieldtypeHas
 			],
 			[
 				'InputfieldCheckbox',
-				'flexEntityEncode',
-				$this->_('Entity encode text with output formatting'),
-				$this->_('Enabled by default. Rich HTML from TinyMCE is preserved.'),
-			],
-			[
-				'InputfieldCheckbox',
-				'flexPrune',
-				$this->_('Remove undefined properties on save'),
-				$this->_('Enabled by default. Disable for dynamic schemas that temporarily hide properties.'),
-			],
-			[
-				'InputfieldCheckbox',
 				'flexHideWrap',
 				$this->_('Hide outer field label'),
 				$this->_('Display the child inputs without the Flex heading.'),
@@ -1185,7 +1214,7 @@ class FieldtypeFlex extends Fieldtype implements FieldtypeHasFiles, FieldtypeHas
 			$input->label = $label;
 			$input->description = $description;
 			if($input instanceof InputfieldCheckbox) {
-				$default = in_array($name, ['flexEntityEncode', 'flexPrune'], true) ? 1 : 0;
+				$default = 0;
 				$input->checked($field->get($name) === null ? (bool) $default : (bool) $field->get($name));
 				$input->uncheckedValue = 0;
 			} else {
@@ -1272,6 +1301,7 @@ class FieldtypeFlex extends Fieldtype implements FieldtypeHasFiles, FieldtypeHas
 			$examples->value = $catalog;
 			$wrapper->add($examples);
 		}
+		(new FlexMaintenanceAdmin($this))->addInput($wrapper, $field);
 		return $wrapper;
 	}
 

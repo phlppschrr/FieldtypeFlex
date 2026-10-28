@@ -210,7 +210,7 @@ class FlexValue extends WireData implements \JsonSerializable {
 	}
 
 	/**
-	 * Copy a subtree to a new instance, retaining unknown values in preservation mode.
+	 * Copy a subtree to a new instance, retaining unknown values and owned media.
 	 * Reading or formatting never calls this operation; media copies remain staged.
 	 *
 	 * @param FlexValue $source Unformatted source subtree.
@@ -221,9 +221,6 @@ class FlexValue extends WireData implements \JsonSerializable {
 	public function copyValuesFrom(FlexValue $source): void {
 		foreach($source->definitions()->properties() as $name => $definition) {
 			$this->set($name, $source->getUnformatted($name));
-		}
-		if($this->flexField->flexPrune === null || (bool) $this->flexField->flexPrune) {
-			return;
 		}
 		$walk = function(array $raw, string $from, string $to) use (&$walk, $source): array {
 			foreach($raw as $name => &$item) {
@@ -378,7 +375,7 @@ class FlexValue extends WireData implements \JsonSerializable {
 			}
 		};
 		$flatten($options, $translated);
-		if($this->shouldEntityEncode($definition)) {
+		if($this->formatted) {
 			foreach($labels as $key => $label) {
 				$labels[$key] = $this->wire()->sanitizer->entities($label);
 			}
@@ -466,21 +463,6 @@ class FlexValue extends WireData implements \JsonSerializable {
 		return is_scalar($value) || $value instanceof \Stringable;
 	}
 
-	private function shouldEntityEncode(array $definition): bool {
-		if(!$this->formatted) {
-			return false;
-		}
-		$setting = $this->flexField->get('flexEntityEncode');
-		if($setting !== null && !(bool) $setting) {
-			return false;
-		}
-		$input = $definition['input'];
-		if($input instanceof InputfieldTinyMCE) {
-			return false;
-		}
-		return !($input instanceof InputfieldTextarea && $input->isContentTypeHTML());
-	}
-
 	/**
 	 * Read a typed property using the current output-formatting state.
 	 *
@@ -502,12 +484,13 @@ class FlexValue extends WireData implements \JsonSerializable {
 			$format = $language && !$language->isDefault() ? $def['input']->get('dateOutputFormat' . $language->id) : '';
 			return $this->wire()->datetime->formatDate($timestamp, $format ?: $def['input']->dateOutputFormat);
 		}
-		if($this->formatted && $def && array_key_exists('textformatters', $def['settings'])) {
+		if($this->formatted && $def && $def['kind'] === 'text' && (
+			$def['input'] instanceof InputfieldText
+			|| $def['input'] instanceof InputfieldHidden
+			|| $def['input'] instanceof InputfieldIcon
+		)) {
 			$field = $this->textformatterField((string) $key, $def);
 			return $field->type->formatValue($this->flexPage, $field, (string) $value);
-		}
-		if($this->formatted && $def && $def['input'] instanceof InputfieldURL && $def['input']->addRoot && !$def['input']->noRelative && str_starts_with((string) $value, '/')) {
-			$value = rtrim($this->wire()->config->urls->root, '/') . $value;
 		}
 		if($this->formatted && $value instanceof LanguagesPageFieldValue) {
 			$value = (string) $value;
@@ -525,22 +508,6 @@ class FlexValue extends WireData implements \JsonSerializable {
 			return $value->outputCollection($limit);
 		}
 
-		if($this->shouldEntityEncode($def)) {
-			$encode = function($v) use (&$encode) {
-				if(is_string($v)) {
-					return $this->wire()->sanitizer->entities($v);
-				}
-				if(is_array($v)) {
-					return array_map($encode, $v);
-				}
-				return $v;
-			};
-
-			if(is_array($value)) {
-				return array_map($encode, $value);
-			}
-			return $encode($value);
-		}
 		return $value;
 	}
 
@@ -634,9 +601,7 @@ class FlexValue extends WireData implements \JsonSerializable {
 		$language = $this->wire()->user->language;
 		$suffix = $language && !$language->isDefault() ? (string) $language->id : '';
 		$label = (string) ($input->get('label' . $suffix) ?: $input->label);
-		$encode = $this->flexField->get('flexEntityEncode');
-		return $this->formatted && ($encode === null || (bool) $encode)
-			? $this->wire()->sanitizer->entities($label) : $label;
+		return $this->formatted ? $this->wire()->sanitizer->entities($label) : $label;
 	}
 
 	/**
@@ -685,8 +650,7 @@ class FlexValue extends WireData implements \JsonSerializable {
 	 * @return array
 	 */
 	public function rawArray(): array {
-		$prune = $this->flexField->get('flexPrune');
-		$raw = $prune !== null && !(bool) $prune ? $this->unknown : [];
+		$raw = $this->unknown;
 		foreach($this->definitions->properties() as $name => $def) {
 			$raw[$name] = $this->encodeProperty($name, parent::get($name));
 		}

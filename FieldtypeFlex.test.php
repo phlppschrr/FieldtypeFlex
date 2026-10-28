@@ -213,6 +213,7 @@ class WireTest_FieldtypeFlex extends WireTest {
 	private function testFormatting(): void {
 		$field = $this->createField([
 			'text' => ['type' => 'text'],
+			'encoded' => ['type' => 'text', 'textformatters' => ['TextformatterEntities']],
 			'date' => [
 				'type'             => 'datetime',
 				'dateInputFormat'  => 'Y-m-d',
@@ -222,12 +223,13 @@ class WireTest_FieldtypeFlex extends WireTest {
 		]);
 		$page = $this->createPage();
 		$name = $field->name;
-		$page->$name = ['text' => '<b>A & B</b>', 'date' => '2026-10-15', 'choice' => 'a'];
+		$page->$name = ['text' => '<b>A & B</b>', 'encoded' => '<b>A & B</b>', 'date' => '2026-10-15', 'choice' => 'a'];
 		$page->save($name);
 		$raw = $page->getUnformatted($name)->rawArray();
 		$page->of(true);
 		$value = $page->get($name);
-		$this->expect('entity encoding', '&lt;b&gt;A &amp; B&lt;/b&gt;', $value->text);
+		$this->expect('no implicit entity encoding', '<b>A & B</b>', $value->text);
+		$this->expect('explicit TextformatterEntities encoding', '&lt;b&gt;A &amp; B&lt;/b&gt;', $value->encoded);
 		$this->expect('date output format', '15.10.2026', $value->date);
 		$this->expect('formatted option label', 'A &amp; B', $value->optionLabel('choice', 'a'));
 		$this->expect('raw values preserved', $raw, $value->rawArray());
@@ -358,20 +360,17 @@ class WireTest_FieldtypeFlex extends WireTest {
 		$page->$name = ['old_name' => 'Keep', 'obsolete' => 'Retain when configured'];
 		$page->save($name);
 		$field->flexDefinition = json_encode(['heading' => ['type' => 'text', 'renamedFrom' => 'old_name']]);
-		$field->flexPrune = 0;
 		$field->save();
 		$page = $this->reload($page);
 		$this->expect('lazy rename read', 'Keep', $page->getUnformatted($name)->heading);
 		$page->save($name);
 		$raw = $this->reload($page)->getUnformatted($name)->rawArray();
-		$this->expect('prune disabled preserves unknown key', 'Retain when configured', $raw['obsolete']);
+		$this->expect('unknown property preserved during renames', 'Retain when configured', $raw['obsolete']);
 		$this->expect('renamed key canonicalized', false, array_key_exists('old_name', $raw));
 		$this->rejects('conflicting rename rejected', fn() => $field->type->sanitizeValue($page, $field, ['old_name' => 'Old', 'heading' => 'New']));
-		$field->flexPrune = 1;
-		$field->save();
 		$page = $this->reload($page);
 		$page->save($name);
-		$this->expect('prune removes obsolete key', ['heading' => 'Keep'], $this->reload($page)->getUnformatted($name)->rawArray());
+		$this->expect('unknown key survives repeated normal saves', 'Retain when configured', $this->reload($page)->getUnformatted($name)->rawArray()['obsolete']);
 	}
 
 	private function temporaryFile(string $suffix, string $contents): string {

@@ -47,7 +47,7 @@ try {
 	$page->getUnformatted($mediaName)->download->remove($file);
 	$page->save($mediaName);
 	$assert(is_file($oldPath), 'caller-owned transaction cannot delete committed original before commit');
-	$throws(fn() => $type->collectFiles(), 'collector refuses to run within an outer transaction');
+	$throws(fn() => $type->media()->collect(), 'collector refuses to run within an outer transaction');
 } finally {
 	$wire->database->rollBack();
 }
@@ -347,7 +347,7 @@ $wire->database->prepare("UPDATE fieldtype_flex_assets SET expires=:time WHERE p
 	'time' => time()-1,
 	'page' => $rolledCloneId,
 ]);
-$cloneCleanup = $type->collectFiles(1000);
+$cloneCleanup = $type->media()->collect(1000);
 $assert(!is_file($rolledClonePath . $rolledFile->basename()) && !is_file($rolledVariation) && $type->media()->asset($rolledAsset, true) === null, 'expired rolled-back clone cleanup removes registered originals and native variations');
 $assert(is_file($value->hero->first()->filename()), 'rolled-back clone cleanup cannot remove source originals');
 
@@ -404,7 +404,7 @@ $newPage->save();
 $pages[] = $newPage;
 $assert(is_file($newPage->getUnformatted($mediaName)->hero->first()->filename()) && $newPage->getUnformatted($mediaName)->hero->first()->assetId() !== $page->getUnformatted($mediaName)->hero->first()->assetId(), 'assignment to an unsaved owner defers an independent media copy until save');
 
-// Lazy schema evolution preserves IDs/bytes; omission and pruning have distinct lifecycle effects.
+// Lazy schema evolution and omitted definitions preserve IDs, bytes and ownership.
 $page = $wire->pages->getFresh($id);
 $page->of(false);
 $oldHero = $page->getUnformatted($mediaName)->hero->first();
@@ -423,22 +423,22 @@ $same($renamedId, $page->getUnformatted($mediaName)->banner->first()->assetId(),
 $assert(is_file($renamedPath) && $type->media()->asset($renamedId, true)['address'] === 'banner', 'media rename changes address without moving physical bytes');
 unset($definition['banner']);
 $media->flexDefinition = json_encode($definition);
-$media->flexPrune = 0;
+$media->flexPrune = 0; // Legacy metadata is ignored.
 $media->save();
 $page->getUnformatted($mediaName)->note = 'Temporary omission';
 $page->save($mediaName);
-$assert(isset($type->storage()->persisted($page, $media)['banner']) && is_file($renamedPath), 'prune disabled retains omitted media and its ownership');
+$assert(isset($type->storage()->persisted($page, $media)['banner']) && is_file($renamedPath), 'omitted media and ownership are always retained');
 $omittedCopy = $wire->pages->clone($wire->pages->getFresh($id));
 $pages[] = $omittedCopy;
 $omittedRaw = $type->storage()->persisted($omittedCopy, $media);
-$assert($omittedRaw['banner']['items'][0]['id'] !== $renamedId && is_file($omittedCopy->filesManager()->path() . $omittedRaw['banner']['items'][0]['basename']), 'native page clone rebinds media omitted by a prune-disabled schema');
+$assert($omittedRaw['banner']['items'][0]['id'] !== $renamedId && is_file($omittedCopy->filesManager()->path() . $omittedRaw['banner']['items'][0]['basename']), 'native page clone rebinds omitted media');
 $media->flexPrune = 1;
 $media->save();
 $page = $wire->pages->getFresh($id);
 $page->of(false);
-$page->getUnformatted($mediaName)->note = 'Prune omitted image';
+$page->getUnformatted($mediaName)->note = 'Legacy setting cannot prune omitted image';
 $page->save($mediaName);
-$assert(!isset($type->storage()->persisted($page, $media)['banner']) && !is_file($renamedPath), 'pruning removes only omitted owned media after commit');
+$assert(isset($type->storage()->persisted($page, $media)['banner']) && is_file($renamedPath), 'legacy prune=true cannot remove omitted media');
 $stagedFiles = $page->getUnformatted($mediaName)->download;
 $stagedFiles->add($fixtureFile);
 $expired = $stagedFiles->last();
@@ -448,6 +448,26 @@ $wire->database->prepare('UPDATE fieldtype_flex_assets SET expires=:time WHERE a
 ]);
 $type->media()->collect(100, $page, $media);
 $assert(!is_file($expired->filename()) && $type->media()->asset($expired->assetId(), true) === null, 'bounded collector expires uncommitted owned imports');
+
+// A registered staged asset can outlive its field's physical table.
+$orphanField = $createField('flex_media_orphan', ['download' => ['type' => 'file', 'extensions' => 'txt']]);
+$orphanValue = $type->getBlankValue($page, $orphanField);
+$orphanValue->download->add($fixtureFile);
+$orphanFile = $orphanValue->download->first();
+$wire->database->prepare('UPDATE fieldtype_flex_assets SET expires=:time WHERE asset_id=:id')->execute([
+	'time' => time()-1,
+	'id' => $orphanFile->assetId(),
+]);
+$orphanTable = $wire->database->escapeTable($orphanField->table);
+$orphanSnapshot = 'flex_orphan_' . bin2hex(random_bytes(4));
+$wire->database->exec("RENAME TABLE `$orphanTable` TO `$orphanSnapshot`");
+try {
+	$cleanup = $type->media()->collect(100, $page, $orphanField);
+	$same([], $cleanup['failed'], 'collector handles a missing field table without a failed cleanup');
+	$assert(!is_file($orphanFile->filename()) && $type->media()->asset($orphanFile->assetId(), true) === null, 'collector removes expired registered bytes when the field table is absent');
+} finally {
+	$wire->database->exec("RENAME TABLE `$orphanSnapshot` TO `$orphanTable`");
+}
 
 unlink($imageFixture);
 unlink($fixtureFile);

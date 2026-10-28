@@ -104,9 +104,16 @@ class FlexStorage extends Wire {
 	 */
 	public function requireTransactional(Field $field): void {
 		$this->requireRowSchema();
-		$query = $this->wire()->database->prepare('SELECT ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=:table');
-		$query->execute(['table' => $field->table]);
-		if(strcasecmp((string) $query->fetchColumn(), 'InnoDB') !== 0) {
+		$db = $this->wire()->database;
+		$transactional = $db->supportsTransaction($field->table);
+		// Core 3.0.259 reads only lowercase 'engine', although PDO normally
+		// returns 'Engine'. Keep the pre-dialect InnoDB check exact.
+		if(!$transactional && !method_exists($db, 'dialect')) {
+			$query = $db->prepare('SELECT ENGINE FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=:table');
+			$query->execute(['table' => $field->table]);
+			$transactional = strcasecmp((string) $query->fetchColumn(), 'InnoDB') === 0;
+		}
+		if(!$transactional) {
 			throw new WireException($this->_('Structured Flex values require an InnoDB field table'));
 		}
 	}
@@ -132,6 +139,17 @@ class FlexStorage extends Wire {
 			throw new WireException($this->_('Invalid canonical Flex JSON'));
 		}
 		return $raw;
+	}
+
+	/** Read exact stored JSON shape, optionally locking the field row in the caller’s transaction. @internal */
+	public function document(Page $page, Field $field, bool $lock = false): \stdClass {
+		$table = $this->wire()->database->escapeTable($field->table);
+		$q = $this->wire()->database->prepare("SELECT data FROM `$table` WHERE pages_id=:page" . ($lock ? ' FOR UPDATE' : ''));
+		$q->execute(['page' => $page->id]);
+		$json = $q->fetchColumn();
+		$document = json_decode($json === false || $json === '' ? '{}' : $json, false, FlexPath::JSON_DEPTH, JSON_THROW_ON_ERROR);
+		if(!$document instanceof \stdClass) throw new WireException('Stored Flex data must be a JSON object');
+		return $document;
 	}
 
 	/**
@@ -172,7 +190,7 @@ class FlexStorage extends Wire {
 	 * @return void
 	 */
 	public function requireRowSchema(): void {
-		$columns = $this->wire()->database->query('SHOW COLUMNS FROM fieldtype_flex_rows')->fetchAll(\PDO::FETCH_COLUMN);
+		$columns = $this->wire()->database->getColumns('fieldtype_flex_rows');
 		foreach(['row_type', 'schema_path', 'schema_key', 'row_key', 'parent_row_key'] as $column) {
 			if(!in_array($column, $columns, true)) {
 				throw new WireException($this->_('The Flex row index schema is invalid. Repair the module installation before saving or querying Flex fields.'));

@@ -222,7 +222,7 @@ class FlexFieldDefs extends Wire {
 	}
 
 	/**
-	 * Reject a lost definition before existing values can be pruned.
+	 * Reject a lost definition before existing values can be edited.
 	 *
 	 * @param array $raw Existing or assigned unformatted values.
 	 * @return void

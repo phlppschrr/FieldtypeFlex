@@ -12,21 +12,10 @@ $fileField = clone $field;
 $fileField->flexDefinition = '';
 $fileField->flexDefinitionFile = 'flex-fields/flex-integration.php';
 $same("flex_test:$id", $type->getBlankValue($page, $fileField)->context, 'PHP receives page and field context');
-copy(dirname(__DIR__, 2) . '/examples/objects.php', $testPath);
-$optionsPath = $wire->config->paths->templates . 'flex-fields/options.php';
-$createdOptionsHelper = !is_file($optionsPath);
-if($createdOptionsHelper) {
-	copy(dirname(__DIR__, 2) . '/examples/options.php', $optionsPath);
-}
-try {
-	$objectDefs = $type->getDefinitions($fileField, $page);
-	$assert(isset($objectDefs->properties()['email']), 'InputfieldWrapper definitions');
-	$assert($objectDefs->getPropertyInputfield('email') instanceof InputfieldEmail, 'defs inputfield metadata API');
-} finally {
-	if($createdOptionsHelper) {
-		unlink($optionsPath);
-	}
-}
+copy(dirname(__DIR__, 2) . '/examples/02-basic-objects.php', $testPath);
+$objectDefs = $type->getDefinitions($fileField, $page);
+$assert(isset($objectDefs->properties()['email']), 'InputfieldWrapper definitions');
+$assert($objectDefs->getPropertyInputfield('email') instanceof InputfieldEmail, 'defs inputfield metadata API');
 unlink($testPath);
 $fileField->flexDefinitionFile = '../config.php';
 $throws(fn() => $type->getDefinitions($fileField, $page), 'definition path traversal rejected');

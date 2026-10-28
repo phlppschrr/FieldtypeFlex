@@ -18,10 +18,8 @@ if(!is_dir($path)) {
 	mkdir($path, 0755, true);
 }
 $examples = dirname(__DIR__) . '/examples/';
-foreach(['contact.php', 'options.php'] as $exampleFile) {
-	if(!is_file($path . $exampleFile)) {
-		copy($examples . $exampleFile, $path . $exampleFile);
-	}
+if(!is_file($path . 'contact.php')) {
+	copy($examples . '02-basic.php', $path . 'contact.php');
 }
 $field = $wire->fields->get('contact');
 if(!$field) {
@@ -47,17 +45,8 @@ if(!$page->id) {
 	]);
 	$page->of(false);
 	$page->contact = [
-		'first_name' => 'Hanna',
-		'last_name'  => 'Flex',
-		'email'      => 'hanna@example.test',
-		'bio'        => 'ProcessWire expert from Berlin',
-		'city'       => 'Berlin',
-		'country'    => 'DE',
-		'interests'  => ['code', 'design'],
-		'newsletter' => 1,
-		'notes'      => 'Open source news',
-		'num_tours'  => 5,
-		'date_from'  => '2026-10-14',
+		'title' => 'Hanna Flex',
+		'email' => 'hanna@example.test',
 	];
 	$page->save();
 }
@@ -70,11 +59,11 @@ if(!$category->id) {
 		'title'    => 'Example category',
 	]);
 	$category->of(false);
-	$category->contact = ['first_name' => 'Category'];
+	$category->contact = ['title' => 'Category'];
 	$category->save();
 }
 echo "FieldtypeFlex installed. Demo page: {$page->id} (/flex-demo/). ProcessWire {$wire->config->version}\n";
-foreach(['advanced.php' => 'showcase.php'] as $exampleFile => $targetFile) {
+foreach(['03-text.php' => 'showcase.php'] as $exampleFile => $targetFile) {
 	if(!is_file($path . $targetFile)) {
 		copy($examples . $exampleFile, $path . $targetFile);
 	}
@@ -92,12 +81,12 @@ if(!$showcase) {
 		$template->fieldgroup->save();
 	}
 	$page->showcase = [
-		'summary' => [
+		'text_translation' => [
 			'default' => 'English summary',
-			'de'      => 'Deutsche Zusammenfassung',
+			'de' => 'Deutsche Zusammenfassung',
 		],
-		'body'    => '<p>Rich text from <strong>FieldtypeFlex</strong>.</p>',
-		'heading' => 'Open source compound fields',
+		'text_body' => '<p>Rich text from <strong>FieldtypeFlex</strong>.</p>',
+		'text_heading' => 'Open source compound fields',
 	];
 	$page->save('showcase');
 }

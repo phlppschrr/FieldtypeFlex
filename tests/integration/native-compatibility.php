@@ -90,13 +90,15 @@ foreach([0, 1, 2] as $mode) {
 
 // Same field settings, same values, before and after database persistence.
 $matrix = [
-	'email' => ['FieldtypeEmail', [], ['type' => 'email'], ['', 'valid@example.test', 'invalid', ' user@example.test ']],
-	'url' => ['FieldtypeURL', ['textformatters' => ['TextformatterEntities']], ['type' => 'url'], ['', 'https://example.test/path?a=1&b=2', '/relative', 'example.test']],
-	'hidden' => ['FieldtypeText', ['textformatters' => ['TextformatterEntities']], ['type' => 'hidden'], ['', 'Hidden & value']],
-	'icon' => ['FieldtypeText', ['textformatters' => ['TextformatterEntities']], ['type' => 'icon'], ['', 'fa-star']],
+	'email' => ['FieldtypeEmail', [], ['type' => 'email'], ['', 'valid@example.test', 'invalid', ' user@example.test ', 'user+tag@mail.example.co.uk', 'User@Example.COM']],
+	'url' => ['FieldtypeURL', ['textformatters' => ['TextformatterEntities']], ['type' => 'url', 'textformatters' => ['TextformatterEntities']], ['', 'https://example.test/path?a=1&b=2', '/relative', 'example.test', 'javascript:alert(1)']],
+	'url_absolute' => ['FieldtypeURL', ['noRelative' => 1, 'textformatters' => []], ['type' => 'url', 'noRelative' => 1, 'textformatters' => []], ['', '/rejected/path/', 'https://example.test/', 'javascript:alert(1)']],
+	'float_unrounded' => ['FieldtypeFloat', ['colType' => 'double', 'precision' => -1, 'zeroNotEmpty' => 1], ['type' => 'float', 'precision' => -1, 'zeroNotEmpty' => 1], [3.14159, -2.34567, '12.75123']],
+	'hidden' => ['FieldtypeText', ['textformatters' => ['TextformatterEntities']], ['type' => 'hidden', 'textformatters' => ['TextformatterEntities']], ['', 'Hidden & value']],
+	'icon' => ['FieldtypeText', ['textformatters' => ['TextformatterEntities']], ['type' => 'icon', 'textformatters' => ['TextformatterEntities']], ['', 'fa-star']],
 	'toggle' => ['FieldtypeToggle', ['formatType' => 0], ['type' => 'Toggle'], ['', null, false, true, 0, 1, 2, 'yes', 'off']],
-	'text' => ['FieldtypeText', ['textformatters' => ['TextformatterEntities']], ['type' => 'text'], ['', 'A & <B>', '0']],
-	'textarea' => ['FieldtypeTextarea', ['textformatters' => ['TextformatterEntities']], ['type' => 'textarea'], ['', "A & B\nLine 2"]],
+	'text' => ['FieldtypeText', ['textformatters' => ['TextformatterEntities']], ['type' => 'text', 'textformatters' => ['TextformatterEntities']], ['', 'A & <B>', '0']],
+	'textarea' => ['FieldtypeTextarea', ['textformatters' => ['TextformatterEntities']], ['type' => 'textarea', 'textformatters' => ['TextformatterEntities']], ['', "A & B\nLine 2"]],
 	'html' => ['FieldtypeTextarea', ['contentType' => 1], ['type' => 'textarea', 'contentType' => 1], ['', '<p>A &amp; B</p>']],
 	'tinymce' => ['FieldtypeTextarea', ['inputfieldClass' => 'InputfieldTinyMCE', 'contentType' => 1], ['type' => 'TinyMCE'], ['', '<p>Hello <strong>world</strong></p>']],
 	'integer' => ['FieldtypeInteger', ['zeroNotEmpty' => 1], ['type' => 'integer', 'zeroNotEmpty' => 1], ['', null, false, true, 0, -17, '42']],
@@ -164,7 +166,7 @@ foreach(['FieldtypeTextLanguage' => 'text', 'FieldtypeTextareaLanguage' => 'Tiny
 	$settings = ['textformatters' => $inputType === 'text' ? ['TextformatterEntities'] : [], 'langBlankInherit' => 0];
 	if($inputType === 'TinyMCE') $settings += ['inputfieldClass' => 'InputfieldTinyMCE', 'contentType' => 1];
 	$n = $native($nativeType, $settings);
-	$f = $createField('flex_native_language', ['value' => ['type' => $inputType, 'useLanguages' => true, 'langBlankInherit' => 0]]);
+	$f = $createField('flex_native_language', ['value' => ['type' => $inputType, 'useLanguages' => true, 'langBlankInherit' => 0, 'textformatters' => $settings['textformatters']]]);
 	foreach(['populated' => [$defaultLanguage->id => 'Default & text', $language->id => 'Deutsch & Text'], 'fallback' => [$defaultLanguage->id => 'Fallback', $language->id => ''], 'empty' => []] as $case => $translations) {
 		$p = $wire->pages->getFresh($id);
 		$p->of(false);
@@ -319,7 +321,7 @@ $page->set($n->name, 'A & B');
 $page->set($f->name, ['value' => 'A & B']);
 $page->of(true);
 $same('A & B', $page->get($n->name), 'native text without a Textformatter does not encode');
-$same('A &amp; B', $page->get($f->name)->value, 'Flex default output policy encodes eligible text');
+$same('A & B', $page->get($f->name)->value, 'Flex plain text matches native output without formatters');
 foreach(['integer' => 'FieldtypeInteger', 'float' => 'FieldtypeFloat'] as $kind => $nativeType) {
 	$n = $native($nativeType, ['zeroNotEmpty' => 0]);
 	$f = $createField('flex_native_zero', ['value' => ['type' => $kind]]);

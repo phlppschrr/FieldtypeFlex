@@ -18,6 +18,7 @@ $defaultLanguage = $wire->languages->getDefault();
 $multilingual = $createField('flex_language', [
 	'text' => [
 		'type'                  => 'text',
+		'textformatters'        => ['TextformatterEntities'],
 		'useLanguages'          => true,
 		'label'                 => 'Text',
 		'label' . $language->id => 'Deutsch',
@@ -171,13 +172,11 @@ $same('Innen &lt;Gruppe&gt;', $formattedHelpers->optionLabel('choice', 'inside')
 $same('Zero &lt;value&gt;', $formattedHelpers->optionLabel('choice', 0), 'formatted zero-key option label is entity encoded once');
 $same('Zero <value>', $helperValue->optionLabel('choice', 0), 'formatting does not mutate raw option metadata');
 $same($rawLabels, $helperValue->getOptions('choice'), 'formatted label reads do not mutate option metadata');
-$same('&lt;p&gt;Literal&lt;/p&gt;', $formattedHelpers->note, 'unknown numeric textarea content types remain entity encoded');
+$same('<p>Literal</p>', $formattedHelpers->note, 'unconfigured numeric textarea content is not implicitly encoded');
 $same('<p>Trusted</p>', $formattedHelpers->html, 'native HTML textarea content type preserves markup');
 $same('<p>Literal</p>', $helperValue->note, 'raw textarea value remains unformatted');
-$noEncodeField = clone $helperField;
-$noEncodeField->flexEntityEncode = 0;
-$noEncode = $type->formatValue($page, $noEncodeField, ['note' => '<p>Literal</p>']);
-$same('<p>Literal</p>', $noEncode->note, 'flexEntityEncode still disables output encoding');
+$same('0', $formattedHelpers->zero_text, 'unconfigured plain text retains numeric-string content');
+$same('Zero &lt;value&gt;', $formattedHelpers->getOptions('choice')[0], 'formatted option-map display labels are HTML encoded');
 
 $validation = $field->getInputfield($page);
 $validation->value = $page->flex_test;

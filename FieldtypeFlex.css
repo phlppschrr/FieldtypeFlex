@@ -146,3 +146,5 @@
 .flex-rows-status:empty {
     display: none;
 }
+
+.FlexMaintenanceReport { overflow-x: auto; }

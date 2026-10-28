@@ -25,11 +25,11 @@ Requires **ProcessWire 3.0.259+**, **PHP 8.1+**, **MySQL 8.0+ or MariaDB 10.11+*
 
 Place the module in `/site/modules/FieldtypeFlex/`, then go to **Modules → Refresh** in ProcessWire Admin and install **FieldtypeFlex**.
 
+Native CLI maintenance commands are available on supported ProcessWire versions; PHP and Admin maintenance remain available on older cores.
+
 ## Quick start
 
-Create a Flex field named `content` and add it to a page template.
-
-For the rich-text example below, also create a regular ProcessWire Textarea field named `rich_text_source`, configured to use TinyMCE. Flex will inherit its editor settings and textformatters; the source field does not need to be added to the page template.
+Create a Flex field named `content` and add it to a page template. The example uses the installed `TextformatterEntities` module to escape plain text for HTML output.
 
 Create `site/templates/flex-fields/content.php`:
 
@@ -38,8 +38,9 @@ Create `site/templates/flex-fields/content.php`:
 
 return [
     'heading' => [
-        'type'  => 'text',
-        'label' => __('Heading'),
+        'type'           => 'text',
+        'label'          => __('Heading'),
+        'textformatters' => ['TextformatterEntities'],
     ],
     'hero' => [
         'type'     => 'image',
@@ -62,12 +63,13 @@ return [
                 'rowTitle' => '{heading}',
                 'children' => [
                     'heading' => [
-                        'type'  => 'text',
-                        'label' => __('Heading'),
+                        'type'           => 'text',
+                        'label'          => __('Heading'),
+                        'textformatters' => ['TextformatterEntities'],
                     ],
                     'body' => [
                         'type'         => 'TinyMCE',
-                        'inheritField' => 'rich_text_source',
+                        'inheritField' => 'body', // Existing ProcessWire field using TinyMCE
                         'label'        => __('Body'),
                     ],
                 ],
@@ -81,7 +83,8 @@ return [
                         'maxFiles' => 1,
                     ],
                     'caption' => [
-                        'type' => 'text',
+                        'type'           => 'text',
+                        'textformatters' => ['TextformatterEntities'],
                     ],
                 ],
             ],
@@ -150,7 +153,7 @@ Access Flex properties directly in a ProcessWire template:
 </article>
 ```
 
-Flex follows the Page's output-formatting state. Ordinary text is entity-encoded by default when output formatting is enabled, while TinyMCE content retains its HTML markup. Explicit or inherited [native Textformatters](API.md#textformatters) control text output without additional Flex encoding.
+Flex follows the Page's output-formatting state. Plain text is **not HTML-encoded automatically**; configure `TextformatterEntities` for text rendered in HTML or escape it in the template. Explicit or inherited [native Textformatters](API.md#textformatters) control text output, while TinyMCE content retains its HTML markup. Choice values are raw keys; label helpers encode display labels when formatted.
 
 ### Query with ProcessWire selectors
 
@@ -180,6 +183,8 @@ $images = $page->content->blocks->rowsOfType('image');
 $count = $page->content->blocks->countOfType('text');
 ```
 
+Root Page-reference properties can also query supported native fields on referenced pages. See [Page-reference traversal](API.md#root-page-reference-traversal) for details.
+
 See [API.md](API.md#selectors) for supported operators, same-row conditions and nested selectors.
 
 ## Nested rows
@@ -190,19 +195,28 @@ For example, sections can contain content blocks, and individual blocks can cont
 
 There is no fixed two-level nesting limit. The effective depth depends on database JSON limits and configurable resource budgets.
 
-See the [nested rows example](examples/nested.php) and [API reference](API.md#nested-repeatables-and-resource-limits).
+See the [typed and nested Rows example](examples/08-rows.php) and [API reference](API.md#nested-repeatables-and-resource-limits).
 
 ## More examples
 
-- [Structured content](examples/structured.php) — typed rows, files and images
-- [Nested rows](examples/nested.php) — multiple levels of row collections
-- [Contact](examples/contact.php) — text, choices and ordinary fieldsets
-- [Multilingual fields](examples/languages.php) — language-aware properties
-- [Native Inputfield objects](examples/typed-objects.php) — programmatic row definitions
-- [Native Repeater](examples/repeater.php) — Flex within ProcessWire Repeater items
-- [Inputfield configuration reuse](examples/inherit-field.php) — inherit settings from existing fields
+The [configuration reference catalog](examples/README.md) starts with identical
+JSON, PHP-array and InputfieldWrapper definitions, followed by focused native
+Inputfield examples, typed/nested Rows and a composable Kitchen Sink.
+
+- [Basic JSON](examples/01-basic.json) and [basic PHP](examples/02-basic.php)
+- [Basic InputfieldWrapper](examples/02-basic-objects.php) — optional object syntax
+- [Text and formatting](examples/03-text.php), [numbers and dates](examples/04-numbers-dates.php), [choices](examples/05-choices.php)
+- [Page references and media](examples/06-references-media.php)
+- [Advanced settings](examples/07-advanced.php) and [typed/nested Rows](examples/08-rows.php)
+- [Kitchen Sink](examples/09-kitchen-sink.php) — combines tested configurations
 
 For the complete definition syntax, value types, settings and runtime methods, see **[API.md](API.md)**.
+
+## Data preservation and maintenance
+
+FieldtypeFlex preserves unknown stored properties during normal saves. Use `renamedFrom` to evolve property names and the superuser maintenance tools to review bulk renames or explicitly remove obsolete properties. Maintenance operations provide previews and conflict protection.
+
+See the [Maintenance APIs](API.md#maintenance-apis) for Admin, PHP and optional CLI commands, batch handling and safety details.
 
 ## Current limitations
 
@@ -210,7 +224,7 @@ FieldtypeFlex is a pre-release. Some ProcessWire features and integrations are n
 
 - SQLite and PostgreSQL databases.
 - Native ProcessWire page-version save/restore.
-- Selector traversal through Page references.
+- Page-reference selector traversal from typed rows, across multiple hops, or into unsupported target fields.
 - Certain media options, including overwrite mode and custom metadata templates. TinyMCE drag-and-drop uploads require a regular ProcessWire Image field as their destination.
 
 See [API.md](API.md) for the complete supported contract.

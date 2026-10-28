@@ -178,7 +178,7 @@ $same('final.png', $hero->basename(), 'repeated rename survives save and reload'
 $same($asset, $hero->assetId(), 'repeated rename preserves the logical identity');
 $assert(is_file($firstStage), 'superseded staging remains registered until conservative expiry');
 $type->media()->abandon($type->media()->assetByName($page, basename($firstStage))['asset_id']);
-$type->collectFiles(1000);
+$type->media()->collect(1000);
 $assert(!is_file($firstStage) && is_file($hero->filename()), 'expired superseded staging cleanup preserves the renamed original');
 
 // A canonical basename alone cannot claim a staging record from another property.

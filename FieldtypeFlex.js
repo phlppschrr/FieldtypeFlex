@@ -1,5 +1,34 @@
 (function($) {
     'use strict';
+    function preserveSelectorPaths() {
+        var selector = window.InputfieldSelector;
+        if(!selector || selector.flexPathsPreserved) return;
+        var change = selector.changeAny;
+        // Older core assumes every multi-dot path ends in a synthetic `.id`.
+        // Keep the native builder, compensating only while that trimming exists.
+        if(!/\.substring\(0,\s*[\w$.]+\.lastIndexOf\(["']\.["']\)\)/.test(String(change))) return;
+        var active = false;
+        selector.changeAny = function($item) {
+            if(active) return change.apply(this, arguments);
+            var fields = ProcessWire.config.FieldtypeFlexSelectorFields || [], adjusted = [];
+            $item.closest('.InputfieldSelector').find('.select-subfield option:selected').each(function() {
+                var path = this.value.split('.');
+                if(path.length !== 3 || fields.indexOf(path[0]) < 0) return;
+                adjusted.push([this, this.value]);
+                this.value += '.__flex_terminal';
+            });
+            active = true;
+            try {
+                return change.apply(this, arguments);
+            } finally {
+                adjusted.forEach(function(item) { item[0].value = item[1]; });
+                active = false;
+            }
+        };
+        selector.flexPathsPreserved = true;
+    }
+    preserveSelectorPaths();
+    $(preserveSelectorPaths);
     function message(key, fallback) {
         var config = window.ProcessWire && ProcessWire.config && ProcessWire.config.FieldtypeFlex;
         return config && config[key] ? config[key] : fallback;

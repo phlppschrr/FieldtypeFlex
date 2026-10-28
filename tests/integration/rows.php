@@ -48,6 +48,20 @@ $same($rowId, $page->{$structured->name}->slides->first()->rowId(), 'row identit
 $same(5.5, $page->{$structured->name}->slides->first()->price, 'typed row values survive database roundtrip');
 $same('Berlin', $page->{$structured->name}->slides->first()->city, 'ordinary fieldsets remain flat inside a row');
 $name = $structured->name;
+// Check the actual table, independently of the configured default storage engine.
+$engineProbe = clone $structured;
+$engineProbe->name = 'flex_engine_' . bin2hex(random_bytes(4));
+$engineTable = $wire->database->escapeTable($engineProbe->table);
+$throws(fn() => $type->storage()->requireTransactional($engineProbe), 'missing field table fails the transactional requirement');
+$wire->database->exec("CREATE TABLE `$engineTable` (pages_id INT UNSIGNED PRIMARY KEY) ENGINE=MyISAM");
+try {
+	$throws(fn() => $type->storage()->requireTransactional($engineProbe), 'nontransactional field table is rejected despite InnoDB default');
+	$wire->database->exec("ALTER TABLE `$engineTable` ENGINE=InnoDB");
+	$type->storage()->requireTransactional($engineProbe);
+	$assert(true, 'actual InnoDB field table satisfies the transactional requirement');
+} finally {
+	$wire->database->exec("DROP TABLE `$engineTable`");
+}
 $rows = $page->{$name}->slides;
 $otherRow = $rows->addRow('item', [
 	'heading' => 'Other',
@@ -66,7 +80,7 @@ $page->save();
 $same('Paris', $wire->pages->getFresh($id)->getUnformatted($name)->slides->first()->city, 'full page save persists nested row edit');
 $formatted = $wire->pages->getFresh($id)->get($name);
 $formatted->of(true);
-$same('Intro &lt;one&gt;', $formatted->slides->getById($rowId)->heading, 'formatted row reads use property escaping');
+$same('Intro <one>', $formatted->slides->getById($rowId)->heading, 'unconfigured row text remains raw on formatted reads');
 $throws(fn() => $formatted->slides->addRow('item'), 'formatted row collection rejects writes');
 $throws(fn() => $formatted->slides->first()->set('heading', 'Bad'), 'formatted row leaves reject writes');
 $same('Intro <one>', $formatted->rawArray()['slides']['items'][1]['values']['heading'], 'formatted row view does not contaminate storage');
@@ -100,7 +114,7 @@ try {
 }
 $same($originalRows, $wire->pages->getFresh($id)->getUnformatted($name)->rawArray(), 'caller rollback restores canonical row values');
 $same([$id], $wire->pages->findIDs("id=$id, $name.slides.count=2"), 'caller rollback restores row query projection');
-$same(1, $type->rebuildRowIndex($structured)['count'], 'row query projection can be rebuilt from canonical values');
+$same(1, $type->storage()->rebuildRows($structured)['count'], 'row query projection can be rebuilt from canonical values');
 $same([$id], $wire->pages->findIDs("id=$id, $name.slides.item.heading=Other"), 'row index rebuild preserves query results');
 $rowOnly = $createField('flex_row_only', [
 	'items' => [

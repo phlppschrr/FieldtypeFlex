@@ -5,12 +5,35 @@ if(PHP_SAPI !== 'cli' || !isset($same, $createField)) {
 	exit;
 }
 
-// Included by advanced.php, sharing its guarded disposable fixture and cleanup registry.
+// Included by the integration runner, sharing its guarded disposable fixture and cleanup registry.
 if(PHP_SAPI !== 'cli' || !isset($same, $page, $temporaryFields)) {
 	http_response_code(404);
 	exit;
 }
-$rich = $createField('flex_rich', require dirname(__DIR__, 2) . '/examples/repeater.php');
+// Keep this isolated Repeater fixture minimal; the public example catalog focuses on definitions.
+$rich = $createField('flex_rich', [
+    'heading' => ['type' => 'Text', 'label' => 'Item heading'],
+    'body' => [
+        'type' => 'TinyMCE',
+        'height' => 180,
+        'lazyMode' => 1,
+        'toolbar' => 'bold italic link code',
+        'menubar' => false,
+    ],
+    'details' => [
+        'type' => 'Fieldset',
+        'children' => [
+            'translation' => [
+                'type' => 'TinyMCE',
+                'useLanguages' => true,
+                'height' => 180,
+                'lazyMode' => 1,
+                'toolbar' => 'bold italic code',
+                'menubar' => false,
+            ],
+        ],
+    ],
+]);
 // Preload must reach both editors (including the one nested in a fieldset) without rendering HTML.
 $ready = [];
 $hook = $wire->addHookAfter('InputfieldTinyMCE::renderReadyHook', static function(HookEvent $event) use (&$ready) {

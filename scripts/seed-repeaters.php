@@ -11,7 +11,11 @@ if(!$rich) {
 	$rich->name = 'repeater_content';
 	$rich->label = 'Flex rich text';
 	$rich->type = $wire->modules->get('FieldtypeFlex');
-	$rich->flexDefinition = json_encode(require dirname(__DIR__) . '/examples/repeater.php');
+	$rich->flexDefinition = json_encode([
+		'heading' => ['type' => 'text'],
+		'body' => ['type' => 'TinyMCE', 'height' => 180],
+		'translation' => ['type' => 'TinyMCE', 'useLanguages' => true, 'height' => 180],
+	], JSON_THROW_ON_ERROR);
 	$wire->fields->save($rich);
 }
 $template = $wire->templates->get('flex-repeaters');

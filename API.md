@@ -35,24 +35,24 @@ Individual properties retain types appropriate to their definitions. **The Page'
 
 | Definition | Unformatted value | Formatted value | Canonical JSON representation |
 | --- | --- | --- | --- |
-| Text, plain textarea, email, URL, single select | `string` | `string`, entity-encoded by default | String |
+| Text, plain textarea, email, URL, single select | `string` | `string`; Textformatters apply only to text-valued inputs | String |
 | HTML textarea, TinyMCE | `string` | HTML string | String |
 | Integer / Float | `int` / `float`, or `''` | Same | Number or `''` |
 | Checkbox | `1` / `0` by default; custom non-empty checked/unchecked values supported | Same | Scalar |
 | Toggle | `0`, `1`, `2` or `''` | Same (native `formatNone` behavior) | Number or `''` |
-| Multiple choices | `string[]` | Optionally encoded `string[]` | Array of keys |
-| TextTags | Space-separated string | Optionally encoded string | String |
+| Multiple choices | `string[]` | Same raw keys | Array of keys |
+| TextTags | Space-separated string | Same raw keys | String |
 | Datetime | Unix timestamp `int`, or `''` | Formatted string; timestamp if no output format (or `U`); `''` if empty | `Y-m-d` or `Y-m-d H:i:s` |
 | Page reference (`derefAsPage=0`) | `PageArray` | `PageArray`, native filtering rules below | Page ID array |
 | Page reference (`derefAsPage=1`) | `Page` or `false` | Same, with unpublished pages omitted | Page ID or `false` |
 | Page reference (`derefAsPage=2`) | `Page` or `NullPage` | Same, with unpublished pages omitted | Page ID or `0` |
-| Multilingual text | `LanguagesPageFieldValue` | Current-language `string`, optionally encoded | Map keyed by language ID |
+| Multilingual text | `LanguagesPageFieldValue` | Current-language `string`, formatted by configured Textformatters | Map keyed by language ID |
 | `rows` | `FlexRows` containing `FlexRow` | Same classes, formatted leaf values | `rows:1` envelope |
 | File / Image | `FlexFiles` / `FlexImages` | Collection, compatible `Pagefile` / `Pageimage`, or `null` | Media metadata envelope |
 
 Page-reference mutation follows native `FieldtypePage` rules; see [Page references](#page-references).
 
-Selection properties store **option keys**, not their display labels. Page-reference visibility follows the installed core’s `allowUnpub` and formatting rules, described below. For details on media output modes, see [File and Image properties](#file-and-image-properties).
+Selection properties store **raw option keys**, not their display labels; they are not HTML-encoded. The `label()`, `getOptions()` and `optionLabel()` display helpers encode labels when output formatting is enabled. Page-reference visibility follows the installed core’s `allowUnpub` and formatting rules, described below. For details on media output modes, see [File and Image properties](#file-and-image-properties).
 
 ### Output formatting and serialization
 
@@ -68,7 +68,7 @@ $json = json_encode($page->content);  // Unformatted JSON view
 
 `getArray()` and iteration retain runtime objects such as `FlexRows`, Page references and media objects (media may be a single object when formatted). Language objects are retained only with formatting off; formatted language reads are strings, and unformatted date reads are timestamps. Neither array method accepts a property argument. `rawArray()` recursively serializes their canonical data; `(string) $value` and `json_encode($value)` use that same unformatted representation. These are **not** HTML-safe rendering methods. They expose logical persistence data, not the exact database JSON bytes: empty PHP property arrays serialize as `[]`, while database storage preserves property maps as `{}`.
 
-`getArray()` contains known properties only; with `flexPrune=false`, `rawArray()` also retains unknown stored keys. Both describe current memory, including unsaved edits, and neither saves nor refreshes data. Returned runtime objects are not independent deep copies. A row’s `getArray()` contains its own properties; `FlexRows::getArray()` is inherited from WireArray and keyed by stable row IDs.
+`getArray()` contains known properties only; `rawArray()` always retains unknown stored keys. Both describe current memory, including unsaved edits, and neither saves nor refreshes data. Returned runtime objects are not independent deep copies. A row’s `getArray()` contains its own properties; `FlexRows::getArray()` is inherited from WireArray and keyed by stable row IDs.
 
 The JSON contains row IDs, types, values and media metadata—not uploaded file bytes. Flex owns its media storage separately and maintains derived data needed for selectors. Do not edit canonical envelopes or selector projections directly, or use serialized media metadata to copy files between pages.
 
@@ -115,7 +115,7 @@ $value->optionLabel('appearance', 'featured');  // Explicit option label
 $value->getOptions('appearance');               // Key => translated label map
 ```
 
-`optionLabel()` returns `''` for unknown choices and array selections. Omitting its second argument resolves the current single selection; explicitly passing `null` selects the empty-string option key. To resolve a multiple selection, iterate its keys and call `optionLabel()` for each. These helpers are also available on `FlexRow` and follow the current user language and formatting state. `label()` returns `''` for an unknown property; `getOptions()` returns `[]` for unknown/non-choice properties and omits optgroup headings and separators. Zero and blank option keys are valid. Formatted property labels are entity-encoded when `flexEntityEncode` is enabled; option labels follow the property’s encoding policy. Reads do not change the stored option keys.
+`optionLabel()` returns `''` for unknown choices and array selections. Omitting its second argument resolves the current single selection; explicitly passing `null` selects the empty-string option key. To resolve a multiple selection, iterate its keys and call `optionLabel()` for each. These helpers are also available on `FlexRow` and follow the current user language and formatting state. `label()` returns `''` for an unknown property; `getOptions()` returns `[]` for unknown/non-choice properties and omits optgroup headings and separators. Zero and blank option keys are valid. Formatted property and option labels are always HTML entity-encoded; unformatted labels stay raw. Option *keys* are never automatically encoded. Reads do not change the stored option keys.
 
 Schema paths such as `blocks.text.appearance` can inspect a nested definition with `label()`, `getOptions()` or an explicit-key `optionLabel()`. Omitting the key on such a path returns `''`: a schema path identifies no concrete row. Use the row object for its current selection.
 
@@ -123,44 +123,15 @@ Schema paths such as `blocks.text.appearance` can inspect a nested definition wi
 
 Datetime properties return Unix timestamps with output formatting off, like native `FieldtypeDatetime`. `rawArray()` and stored JSON still use canonical `Y-m-d` or `Y-m-d H:i:s` strings without a UTC offset. PHP/site timezone applies; use ISO values for reproducible selectors. Formatted reads use the current-language `dateOutputFormat`, then the default `dateOutputFormat`; an empty format or `U` returns a timestamp, as in the core. Blank/null/false/zero inputs become `''`. Canonical ISO inputs are recognized before localized editor formats; Unix integers, numeric timestamp strings and `DateTime` objects are also accepted. A timestamp’s time component is preserved even without a time editor.
 
-Integers and floats remain numeric on output. Direct assignments normalize numeric strings, reject non-numeric input with `WireException`, and apply configured Float `precision` on assignment and hydration (`2` by default; null, blank or negative disables rounding). Blank or null numeric input becomes `''`; normal PHP/JSON floating-point precision applies. Plain text is entity-encoded on formatted reads when `flexEntityEncode` is enabled; HTML textarea and TinyMCE markup are preserved. Email and URL properties use the native sanitizers on API assignment, including the input’s IDN/relative-URL settings; Toggle normalizes native yes/no/other values to integers. Text-valued inputs can configure native ProcessWire Textformatters; see [Textformatters](#textformatters).
+Integers and floats remain numeric on output. Direct assignments normalize numeric strings, reject non-numeric input with `WireException`, and apply configured Float `precision` on assignment and hydration (`2` by default; null, blank or negative disables rounding). Blank or null numeric input becomes `''`; normal PHP/JSON floating-point precision applies. Text without configured or inherited formatters remains unchanged on formatted reads. Configure `TextformatterEntities` for HTML text content or escape output in the template; HTML textarea and TinyMCE markup are preserved. Email and URL properties use the native sanitizers on API assignment, including the input’s IDN/relative-URL settings; Toggle normalizes native yes/no/other values to integers. Text-valued inputs can configure native ProcessWire Textformatters; see [Textformatters](#textformatters).
 
 ### Page references
 
-`derefAsPage=0` returns a `PageArray` even when empty, in both formatting states.
-`1` returns a `Page` or boolean `false`; `2` returns a `Page` or `NullPage`. These
-modes do not change merely because output formatting is disabled. A NullPage is
-an object: check its `id`, rather than relying on object truthiness.
+`derefAsPage=0` returns a `PageArray`; `1` returns `Page` or `false`; `2` returns `Page` or `NullPage`—**in either output-formatting state**. Check `NullPage->id`, not object truthiness.
 
-Flex delegates loading, formatted filtering and persistence validation to the
-installed native `FieldtypePage`, using the property’s configured input settings:
+Flex uses native `FieldtypePage` for hydration, output filtering and save-time validation. `allowUnpub=false` excludes unpublished references on load; `true` retains them unformatted. Formatted output filters unpublished references according to native single/multiple rules; hidden references remain available. **Access permissions are not read filters**: call `$target->viewable()` when required.
 
-- `allowUnpub=false` (default) excludes pages with status at/above unpublished
-  on hydration; `true` permits them unformatted. Hidden pages remain available.
-- Formatted single references hide unpublished pages. Formatted multi references
-  with `allowUnpub=true` omit unpublished pages. The core assumes multi values
-  with `allowUnpub=false` were already filtered on load: a directly assigned,
-  unsaved unpublished Page may therefore remain visible until reload.
-- Access permissions are **not** a read filter, in either formatting state.
-  Check referenced pages with native `viewable()` when your application requires
-  access-controlled output. Neither an ID lookup nor a Page reference grants access.
-- Direct property assignment to a single reference accepts a Page, PageArray,
-  numeric ID or a native path/name/title/selector string. An ordinary ID array is
-  not a native single-reference assignment; use a PageArray or assign one ID.
-- For multiple references, assigning a Page, ID, ID array or resolved string
-  appends to the existing selection. Assigning a PageArray replaces it. Assigning
-  null/blank retains the current multi selection; use `removeAll()` or an empty
-  PageArray to clear it. The native negative-ID string removes that selection.
-- Flex clones assigned collections/language objects to keep ownership and change tracking independent; shared input-object identity is not promised. Native PageArray `add()`/`remove()` changes are saved with the containing Flex
-  field. Self-references are excluded. Canonical serialization/save uses native
-  selectable-page validation (`parent_id`, `template_id`, `findPagesSelector`),
-  so references failing those rules do not persist. Native Page objects may still
-  be edited separately; saving Flex does not save a referenced Page’s own fields.
-
-Assign through the property API for native mutation semantics. Replacing an
-entire Flex value initializes its properties from raw values (Page IDs/ID arrays),
-rather than applying a sequence of native field assignments. Native editor
-submissions always replace the submitted selection, also within typed rows.
+Single references accept Page/PageArray, ID, path/name or native selector input. Multi-reference assignment of a Page/ID/ID array/string **appends**; a `PageArray` **replaces**. Null/blank multi assignment does not clear the selection; use `removeAll()` or an empty `PageArray`. Editor submissions replace selections. Saving enforces native selectable-page rules (`parent_id`, `template_id`, `findPagesSelector`); referenced Pages must be saved separately. See [selector traversal](#root-page-reference-traversal).
 
 ### Limits of native compatibility
 
@@ -170,8 +141,8 @@ It does not establish complete emulation of every Fieldtype setting:
 
 | Area | Explicit difference |
 | --- | --- |
-| Plain Text/Textarea, Email/URL output | Flex encodes eligible formatted text by default; native Text requires `TextformatterEntities` for the same output. `flexEntityEncode=false` matches plain native output. An explicit or inherited `textformatters` list uses native output formatting instead, including an empty list. |
-| HTML / TinyMCE | Common HTML values match; native Textarea markup-QA and link abstraction are not provided by Flex’s storage layer. With a formatter list, native output `htmlOptions` are applied. |
+| Plain Text/Textarea, Email/URL output | Flex delegates to native output formatting for text-valued properties even without a formatter list. As in native fields, `TextformatterEntities` must be configured for automatic HTML text escaping. Flex keeps its own JSON persistence rather than native Fieldtype storage. |
+| HTML / TinyMCE | Common HTML values match; native Textarea markup-QA and link abstraction are not provided by Flex’s storage layer. Native output `htmlOptions` apply on formatted reads, including when no formatter list is configured. |
 | Integer / Float | Flex always preserves explicit zero, Native Integer requires `zeroNotEmpty=1` to retain zero on save; native Float already retains zero. It rejects invalid/non-numeric API inputs rather than applying native permissive conversion or returning blank. |
 | Datetime | Runtime types match; JSON keeps ISO strings. Invalid API dates raise `WireException` instead of the native blank fallback; localized input parsing remains supported. |
 | Checkbox | Default `1`/`0` matches native Checkbox. Custom non-empty checked/unchecked scalars are a Flex/Inputfield extension; native FieldtypeCheckbox stores `1`/`0`. |
@@ -197,9 +168,10 @@ Alternatively set `flexDefinitionFile` to a PHP/JSON path relative to `site/temp
 
 return [
     'heading' => [
-        'type'     => 'text',
-        'label'    => __('Heading'),
-        'required' => true,
+        'type'           => 'text',
+        'label'          => __('Heading'),
+        'required'       => true,
+        'textformatters' => ['TextformatterEntities'],
     ],
     'hero' => [
         'type'     => 'image',
@@ -229,7 +201,7 @@ Each type’s `children` may be an array or native wrapper, including nested `In
 
 A field without a definition may initially be empty. If an automatic definition disappears after the field contains data, Flex refuses further saves rather than replacing stored values with an empty schema. Invalid definitions report the field and source and block Page Edit saves while preserving submitted values for correction.
 
-### Renaming and pruning properties
+### Renaming and preserving properties
 
 ```php
 'heading' => [
@@ -238,7 +210,9 @@ A field without a definition may initially be empty. If an automatic definition 
 ],
 ```
 
-`renamedFrom` can also list old keys. Flex reads renamed values on hydration and persists the new name on save; conflicting old/new values are errors. With `flexPrune=true` (default), schema keys no longer present are removed on save. Renames apply within their own scope, including row leaves; equal old/new values can merge, differing values throw `WireException`. Set `flexPrune=false` when a definition intentionally omits properties in some Page contexts; unknown stored keys then remain in `rawArray()`.
+`renamedFrom` resolves old keys on read and persists new keys on individual saves, including nested rows. Equal values merge; conflicting old/new values throw `WireException`. Field configuration saves never migrate data, so selectors may see old keys until stored owners are migrated.
+
+Unknown properties, nested data and owned media **always survive ordinary saves**; the old `flexPrune` switch is removed. Use [maintenance](#maintenance-apis) to apply bulk renames or explicitly remove unknown keys. Prefer complete definitions for all Page/role contexts and native collapsed/Locked input states; dynamically omitted properties complicate orphan discovery.
 
 ## Rows
 
@@ -335,7 +309,7 @@ $block->notes->addRow('note', ['text' => 'A note']);
 $page->save('content');
 ```
 
-The example assumes the nested `sections → blocks → notes` schema in [examples/nested.php](examples/nested.php). Paths for schema lookup and selectors include each type, for example `sections.section.blocks.text.heading`.
+The example assumes the nested `sections → blocks → notes` schema in [examples/08-rows.php](examples/08-rows.php). Paths for schema lookup and selectors include each type, for example `sections.section.blocks.text.heading`.
 
 Native `InputfieldWrapper` definitions use `InputfieldFlexRows` instead of the array/JSON type keyword:
 
@@ -352,7 +326,7 @@ $rows->types = [
 $inputs->add($rows); // $inputs is the returned InputfieldWrapper
 ```
 
-See [examples/typed-objects.php](examples/typed-objects.php). Flex fields may also be assigned to native ProcessWire Repeater item templates; that is distinct from defining a `rows` property.
+See the [basic InputfieldWrapper example](examples/02-basic-objects.php); the object-based definition path remains supported. Flex fields may also be assigned to native ProcessWire Repeater item templates; that is distinct from defining a `rows` property.
 
 Nesting is constrained by database JSON depth and field resources rather than a fixed number of repeatable levels. Defaults are **2,000 rows across all descendants** and **8 MiB canonical JSON** per field; see [Field settings](#field-settings). Very large editor forms may require larger PHP `max_input_vars` and `post_max_size` settings. Incomplete/truncated submissions are rejected rather than silently saved.
 
@@ -445,9 +419,34 @@ Global `leaf!=value` means no row at that path matches `value`, rather than “s
 
 Nested same-row expressions correlate child rows with their concrete parent. Nested path counts outside such an expression total matching descendants across all qualifying parents; inside it they count only that parent’s descendants. Missing collections/parents count as zero. Numeric zero remains populated rather than blank.
 
+Date range comparisons exclude blank or missing dates. For scalar properties,
+nonblank `!=value` includes missing values; native Fieldtypes can differ in their
+handling of blank values for inequality. Checkbox `=0` requires a stored zero;
+it does not match a missing JSON property or absent Flex storage, unlike native
+Checkbox's unchecked default. Use blank checks to query missing values.
+
 Root and row media support blank checks and `.count` numeric comparisons, not metadata/filename selectors. Whole-field text search (`content*=Welcome`) searches flattened values, excluding schema names and row identity/type metadata. Text matching follows database collation; `~=` means all words and `~|=` any word. Use ProcessWire selector escaping for dynamic values; SQL parameter binding does not escape selector syntax.
 
-Selector metadata is exposed to native `InputfieldSelector` by `getSelectorInfo()`. Definitions must expose queryable properties without a specific Page. Page option discovery follows native selectable-page rules and is capped at 500. Sorting supports scalar properties and root collection/media counts, for example `sort=content.blocks.count`. Page-reference traversal, Page-name/path matching, arbitrary JSON paths, advanced fuzzy/full-text queries, sorting multi-selections, and sorting by repeated values or type-specific counts are not supported. Invalid paths/operators raise `PageFinderSyntaxException`.
+Selector metadata is exposed to native `InputfieldSelector` by `getSelectorInfo()`. Definitions must expose queryable properties without a specific Page. Page option discovery follows native selectable-page rules and is capped at 500. Sorting supports scalar properties and root collection/media counts, for example `sort=content.blocks.count`. Arbitrary JSON paths, advanced fuzzy/full-text queries on Flex's own JSON text, sorting multi-selections, and sorting by repeated values or type-specific counts are not supported. Invalid paths/operators raise `PageFinderSyntaxException`.
+
+### Root Page-reference traversal
+
+Query one **native target Field** through a root Flex Page-reference property:
+
+```php
+$pages->find('recipe.ingredient.title=Flour');
+$pages->find('recipe.ingredients.title~=Flour'); // multiple Page references
+$pages->find('recipe.ingredient.price>=2.5');    // native numeric target field
+```
+
+Path: `FLEX_FIELD.PAGE_PROPERTY.TARGET_FIELD`. Supported targets: native Text/Textarea/PageTitle (including language variants), Email, URL, Integer, Float, Checkbox, Toggle, Datetime, Options and Page. Native PageFinder handles target operators, options, language behavior, blank values and indexes; third-party subclasses are not automatically supported.
+
+- Positive matching requires a matching referenced Page. `ingredient.title!=Flour` means **no referenced Page matches** `title=Flour`; separate conditions may match different Pages.
+- `ingredient.title=""` requires a reference with a blank target title. `ingredient.title!=""` includes empty reference collections; use `ingredient=""`/`ingredient!=""` to test the reference itself.
+- Native `parent_id`, `template_id(s)` and `findPagesSelector` restrict targets; default target matching uses `include=all`. Hidden, unpublished and access-restricted targets can contribute matches—this is **not an authorization filter**.
+- Unsupported: native Page properties (`id`, `name`, `path`), File/Image and compound/third-party targets, additional Page hops, traversal from rows, target sorting, same-target `@` grouping, selector negation and native multi-dot OR-field traversal. Ordinary `!=` and OR values work.
+
+Target IDs are materialized without the editor's 500-option cap and matched against Flex JSON. Native target indexes help, but Flex root references have no dedicated property index; large target sets and wide owner scans can be expensive. Target edits affect subsequent queries without resaving owners. Discovery exposes supported dotted field suffixes.
 
 ## Inputfield settings
 
@@ -479,9 +478,9 @@ Definitions reuse settings from the selected **native Inputfield**. The `textfor
 ],
 ```
 
-For direct datepicker, TinyMCE and native `settingsField` definitions, see [dates](examples/dates.php), [rich text](examples/rich-text.php) and [settingsField](examples/settings-field.php), including their prerequisites.
+For native datepicker, TinyMCE and `inheritField` definitions, see [numbers/dates](examples/04-numbers-dates.php), [text inputs](examples/03-text.php) and [advanced settings](examples/07-advanced.php), including their prerequisites.
 
-The source Field must use the same Inputfield type (for this example, a Textarea field configured for TinyMCE). Flex copies its Inputfield settings and, for a source using `FieldtypeText` or a subclass (including Textarea, language variants, Email and URL), its actual Fieldtype `textformatters` list. Local settings override inherited settings; an explicit `textformatters` list replaces the inherited list completely, including `[]`. A source without formatters supplies an empty list. Source values and database storage are never copied. TinyMCE's own `settingsField` is a separate native setting, not an alias of `inheritField`. See [examples/inherit-field.php](examples/inherit-field.php).
+The source Field must use the same Inputfield type (for this example, a Textarea field configured for TinyMCE). Flex copies its Inputfield settings and, for a source using `FieldtypeText` or a subclass (including Textarea, language variants, Email and URL), its actual Fieldtype `textformatters` list. Local settings override inherited settings; an explicit `textformatters` list replaces the inherited list completely, including `[]`. A source without formatters supplies an empty list. Source values and database storage are never copied. TinyMCE's own `settingsField` is a separate native setting, not an alias of `inheritField`. See [examples/07-advanced.php](examples/07-advanced.php).
 
 ### Textformatters
 
@@ -502,13 +501,9 @@ Formatter order is significant. Flex delegates to native Text/Textarea/Email/URL
 
 Formatters run only on formatted reads. Multilingual values first resolve to the current language using native fallback/`langBlankInherit` and template `noLang` behavior. Every read starts from the unformatted value, including nested rows; `rawArray()`, canonical JSON and change tracking remain unchanged. Saving requires output formatting off as usual.
 
-The encoding rule is based on **whether a formatter list was configured**, not whether it is nonempty:
+An absent formatter list and an explicit `[]` both mean **no Textformatter transformation**. Explicit or inherited formatters control formatted text output in their configured order. Flex never adds its own entity-encoding step: `TextformatterEntities` must be selected for HTML text escaping; Markdown-generated HTML remains HTML when using a Markdown formatter.
 
-- Without a direct or inherited list, `flexEntityEncode` retains its existing default encoding of ordinary text; HTML Textarea/TinyMCE preserve markup.
-- With a direct or inherited list, that list controls the text output completely. Flex adds no entity encoding before or after it, regardless of `flexEntityEncode`. `TextformatterEntities` encodes once; Markdown-generated HTML remains HTML. An explicit `[]` returns native unformatted text on formatted reads (subject to native URL/HTML output options).
-- Label helpers still follow `flexEntityEncode` independently. Deliberately repeated or differently ordered formatters retain their native effects.
-
-Native Textarea output options such as lazy image loading apply with a configured list. Flex does not implement native Textarea storage-time markup QA or link abstraction. See [rich text](examples/rich-text.php) and [inheritField](examples/inherit-field.php).
+This concerns text-valued properties only. Selection keys remain raw; `label()`, `optionLabel()` and `getOptions()` entity-encode display labels when formatted. Native URL `addRoot` and Textarea output options (such as lazy image loading) apply even without a formatter list. Flex does not implement native Textarea storage-time markup QA or link abstraction. See [rich text](examples/03-text.php) and [inheritField](examples/07-advanced.php).
 
 ### Language modes
 
@@ -518,7 +513,7 @@ Native Textarea output options such as lazy image loading apply with a configure
 | `true` | Multilingual value | Definition error |
 | `'auto'` | Multilingual value | Plain text |
 
-`'auto'` is available on Text/Textarea subclasses, including TinyMCE. An unformatted multilingual value uses `LanguagesPageFieldValue`; formatted reads return the current-language string. JSON retains a language-ID map. Direct scalar property assignment updates the current user language while preserving other translations (a template with `noLang` uses the default). When a multilingual property switches to plain mode, Flex reads its default-language text; **saving the field replaces the language map with that plain value and discards other translations**. Reads alone do not discard stored translations. A previously stored scalar becomes the default-language value when multilingual mode is enabled. String conversion uses the current user language; `hasValue()` checks all languages. Flex remembers the default-language ID during field saves while the Languages API exists; save a Flex field before uninstalling LanguageSupport so this ID is available afterward. The live Languages API takes precedence over the remembered ID. A blank or missing default remains blank regardless of the current user. Without the API and a remembered ID, old language maps cannot be read as plain text. No bulk conversion or module installation runs. See [examples/languages-auto.php](examples/languages-auto.php).
+`'auto'` is available on Text/Textarea subclasses, including TinyMCE. An unformatted multilingual value uses `LanguagesPageFieldValue`; formatted reads return the current-language string. JSON retains a language-ID map. Direct scalar property assignment updates the current user language while preserving other translations (a template with `noLang` uses the default). When a multilingual property switches to plain mode, Flex reads its default-language text; **saving the field replaces the language map with that plain value and discards other translations**. Reads alone do not discard stored translations. A previously stored scalar becomes the default-language value when multilingual mode is enabled. String conversion uses the current user language; `hasValue()` checks all languages. Flex remembers the default-language ID during field saves while the Languages API exists; save a Flex field before uninstalling LanguageSupport so this ID is available afterward. The live Languages API takes precedence over the remembered ID. A blank or missing default remains blank regardless of the current user. Without the API and a remembered ID, old language maps cannot be read as plain text. No bulk conversion or module installation runs. See [examples/03-text.php](examples/03-text.php).
 
 ### Tested Inputfields
 
@@ -543,8 +538,6 @@ These settings apply to the **Flex Field**, rather than individual properties:
 | --- | --- | --- |
 | `flexDefinition` | Empty | Inline JSON definition |
 | `flexDefinitionFile` | Empty | Explicit definition file relative to `site/templates` |
-| `flexEntityEncode` | `true` | Encode eligible formatted text and labels |
-| `flexPrune` | `true` | Remove stored keys omitted from the active schema on save |
 | `flexHideWrap` | `false` | Hide the outer editor heading |
 | `flexMaxDepth` | `0` | Additional nesting limit; zero means no extra Flex depth cap |
 | `flexMaxRows` | `2000` | Total row budget across descendants; zero removes this extra budget |
@@ -559,19 +552,71 @@ Get the Fieldtype module through ProcessWire:
 ```php
 $type = $modules->get('FieldtypeFlex');
 
-$type->rebuildRowIndex($field, $afterPageId = 0, $limit = 100);
-$type->collectFiles($limit = 100);
 $type->repairClonedFiles($copy);
 ```
 
-- `rebuildRowIndex(Field $field, int $afterPageId = 0, int $limit = 100): array` rebuilds the selector projection from canonical JSON in bounded batches. It returns `count` (processed pages) and `lastPageId` (continuation cursor).
-- `collectFiles(int $limit = 100): array` removes registered unreferenced Flex media in bounded batches. Call it periodically **outside a database transaction**; it preserves unknown files and references used by other fields or known page versions.
 - `repairClonedFiles(Page $copy): int` retries registered media copies for a cloned Page when its native directory copy was incomplete.
 - `saveFile($page, $field, $file, $columns)` selectively saves committed media metadata; see [Adding, saving, and ownership](#adding-saving-and-ownership).
 
-Batch limits for rebuild and cleanup must be `1..1000` (`WireException` otherwise). Continue rebuilding with `lastPageId` until `count` is zero. Cleanup returns `removed`, `variations` and `failed`; clone repair returns the number repaired. `$copy` must be the saved cloned Page, not a Flex row. `saveFile()` returns bool, defaults to all supported metadata columns when `$columns=[]`, and requires an unformatted owned file and live Page. New/replaced files must be saved through the containing field; stale metadata raises `WireException`.
+Clone repair returns the number repaired. `$copy` must be the saved cloned Page, not a Flex row. `saveFile()` returns bool, defaults to all supported metadata columns when `$columns=[]`, and requires an unformatted owned file and live Page. New/replaced files must be saved through the containing field; stale metadata raises `WireException`.
 
-Canonical field JSON is authoritative; maintenance methods do not create a second source of truth.
+### Automatic projections and file cleanup
+
+Field saves, metadata updates, maintenance, cloning and deletion keep canonical JSON, row/search projections and media ownership consistent. No regular projection rebuild or manual collector call is needed.
+
+File removal is conservative and **eventual**. Bounded cleanup runs after relevant writes and at `ProcessWire::finished` (at most 100 candidates per pass). Later PHP executions retry pending work; without further execution cleanup cannot progress. Staging expires after six hours. Referenced and unknown files remain protected. Open outer transactions postpone cleanup without implicit commits.
+
+These guarantees do not make whole-Page permanent deletion or native image-variation deletion rollback-safe. See [architecture](docs/architecture.md#automatic-media-work) for failure, cursor and transaction behavior.
+
+### Rename and potentially orphaned property maintenance
+
+```php
+$type = $modules->get('FieldtypeFlex');
+$field = $fields->get('content');
+
+$preview = $type->checkRenames($field, 0, 100);
+$result = $type->applyRenames($field, $preview);
+
+$inventory = $type->listOrphans($field, 0, 100); // Read-only, independent operation
+$paths = ['old_summary', 'blocks.text.old_caption']; // Type-qualified schema paths
+$cleanup = $type->cleanupProperties($field, $paths, $inventory); // Read-only preview
+$result = $type->cleanupProperties($field, $paths, $cleanup, true); // Explicit write
+```
+
+| Operation | Method |
+| --- | --- |
+| Preview renames | `checkRenames(Field $field, int $afterPageId = 0, int $limit = 100): array` |
+| Apply checked batch | `applyRenames(Field $field, array $preview): array` |
+| Inventory | `listOrphans(Field $field, int $afterPageId = 0, int $limit = 100): array` |
+| Preview/apply cleanup | `cleanupProperties(Field $field, array $paths, array $preview, bool $apply = false): array` |
+
+**Authorize PHP maintenance callers yourself.** Operations scan stored owner IDs in bounded batches (including hidden Pages and Repeater items). Apply locks and revalidates data/schema. Missing definitions, unknown row types and rename conflicts are reported, not silently pruned. Cleanup only removes explicitly selected unknown paths; ownership and selector projections update atomically.
+
+Results contain `fieldId`, `operation`, `paths`, `checked`, `changed`, `unchanged`, `wouldChange`, `pages` (opaque preview tokens), `properties` (counts/locations), `renames`, `conflicts`, `errors`, `retryPageIds`, `resumeAfterPageId`, `afterPageId`, `lastPageId`, `complete`, `success` and `finished`. Type-qualified paths select schema properties; concrete row addresses use row IDs.
+
+Continue successful incomplete batches with `lastPageId`; after errors repair and resume from `resumeAfterPageId`. A scan is not a global snapshot. Before removing `renamedFrom`, complete every batch and repeat a full preview from zero to confirm no pending renames. Apply rejects stale previews and respects existing transactions.
+
+### Native CLI
+
+On cores with native CLI dispatch, run from the ProcessWire root:
+
+```sh
+php index.php flex --help
+php index.php flex rename content --dry-run --limit=100 --after=0
+php index.php flex rename content --apply --limit=100 --after=0
+php index.php flex orphans content
+php index.php flex orphans content --details --limit=50 --after=0
+php index.php flex cleanup content --path=old_summary --path=blocks.text.old_caption --dry-run
+php index.php flex cleanup content --path=old_summary --path=blocks.text.old_caption --apply
+```
+
+Each invocation handles one batch (default 100 owners, `--limit=1..1000`). `--after` is the page-ID cursor; `--details` adds affected owner locations to orphan reports. Commands without `--apply` are read-only; apply takes and validates a fresh preview. Exit codes: `0` success, `1` conflicts/errors, `2` invalid request.
+
+CLI is optional and does not raise minimum requirements. Pinned ProcessWire 3.0.274 supports it, while pinned 3.0.259 lacks the dispatcher. On older cores use [PHP maintenance](#maintenance-apis) or Admin; a silent zero-exit CLI invocation is not proof of success. Refresh module metadata after upgrades.
+
+### Field configuration
+
+Superusers have **Field → Details → Data maintenance** for batched previews, bulk renames, orphan inventory and explicitly selected cleanup. Actions require CSRF validation; cleanup has separate selection, preview and apply steps. Ordinary field-configuration saves do not migrate data. Repair conflicts and rerun affected batches.
 
 ## Notes and limitations
 

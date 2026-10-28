@@ -16,7 +16,7 @@ $renamedValue = $type->sanitizeValue($page, $renamed, [
 	'old_name' => 'Preserved',
 	'removed'  => 'Obsolete',
 ]);
-$same(['new_name' => 'Preserved'], $renamedValue->rawArray(), 'rename and pruning');
+$same(['removed' => 'Obsolete', 'new_name' => 'Preserved'], $renamedValue->rawArray(), 'rename and permanent unknown preservation');
 $throws(fn() => $type->sanitizeValue($page, $renamed, [
 	'old_name' => 'Old',
 	'new_name' => 'New',

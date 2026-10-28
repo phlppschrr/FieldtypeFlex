@@ -1,0 +1,13 @@
+{
+  "title": {
+    "type": "text",
+    "label": "Title",
+    "required": true,
+    "columnWidth": 50
+  },
+  "email": {
+    "type": "email",
+    "label": "Email",
+    "columnWidth": 50
+  }
+}

@@ -7,8 +7,6 @@
  *
  * @property string $flexDefinition Inline JSON; empty uses file lookup.
  * @property string $flexDefinitionFile PHP/JSON path inside site/templates.
- * @property bool $flexEntityEncode Encode eligible formatted text/labels (default true).
- * @property bool $flexPrune Prune omitted properties on save (default true).
  * @property bool $flexHideWrap Hide the outer editor heading (default false).
  * @property int $flexMaxDepth Additional depth cap; 0 adds no cap (default 0).
  * @property int $flexMaxRows Total descendant row budget; 0 disables it (default 2000).

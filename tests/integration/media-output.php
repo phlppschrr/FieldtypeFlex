@@ -129,4 +129,4 @@ foreach([30, -1, 3, 'auto', false, 1.5] as $invalidFormat) {
 	]);
 	$throws(fn() => $type->getDefinitions($viewField, $page), 'unsupported media outputFormat rejected');
 }
-$type->collectFiles(200);
+$type->media()->collect(200);

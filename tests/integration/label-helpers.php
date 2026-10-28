@@ -58,16 +58,15 @@ $same('', $value->optionLabel('rows.item.unit'), 'schema path has no concrete cu
 $same($before, $value->rawArray(), 'label reads preserve canonical values');
 
 $formatted = $type->formatValue($page, $labelField, $value);
-$same('a&amp;b', $formatted->unit, 'formatted selection key contains encoded ampersand');
+$same('a&b', $formatted->unit, 'formatted selection key remains raw data');
 $same('A &amp; B', $formatted->optionLabel('unit'), 'implicit lookup uses raw key and encodes label once');
 $formattedFirst = $formatted->rows->first();
 $same('Unit &lt;label&gt;', $formattedFirst->label('unit'), 'formatted row property label');
 $same('A &amp; B', $formattedFirst->optionLabel('unit'), 'formatted row selected label');
 $same('A &amp; B', $formattedFirst->notes->first()->optionLabel('unit'), 'formatted nested row selected label');
 $same($before, $value->rawArray(), 'formatted label reads preserve canonical values');
-$labelField->flexEntityEncode = 0;
-$same('A & B', $formatted->optionLabel('unit'), 'implicit label respects disabled entity encoding');
-$labelField->flexEntityEncode = null;
+$same('a&b', $formattedFirst->unit, 'formatted nested choice key remains unescaped');
+$same('A &amp; B', $formatted->optionLabel('unit'), 'display labels stay encoded without a field-wide switch');
 
 $value->unit = 0;
 $same('Zero', $value->optionLabel('unit'), 'implicit lookup preserves zero selection');

@@ -43,15 +43,61 @@ PHP, JSON and native InputfieldWrapper definitions use the same tree model. PHP 
 
 The JSON field value is the source of truth. Scalar leaves and native IDs are stored in its unformatted representation. Repeatable sets use a versioned rows:1 envelope containing ordered rows with an ID, type and values. File/Image values use versioned files:1 or images:1 envelopes containing registered asset IDs and native metadata.
 
-A separate InnoDB row projection supports typed row selectors and counts. Whole-field search uses flattened property values, not schema names, row IDs or row type markers. Projection updates and canonical JSON saves share the field transaction or savepoint. The projection can be rebuilt from canonical data with rebuildRowIndex(); it is not a second source of truth.
+A separate InnoDB row projection supports typed row selectors and counts. Whole-field search uses flattened property values, not schema names, row IDs or row type markers. Projection updates and canonical JSON saves share the field transaction or savepoint. Normal writes, metadata saves, raw maintenance and clones update projections automatically; native deletion and emptying remove them. Both `deletePageField()` and inherited `emptyPageField()` use the transactional `emptyPageFieldTable()` override. `FlexStorage::rebuildRows()` remains an internal repair/migration tool, outside the supported API. The projection is not a second source of truth.
 
 Selector values are bound parameters. Property names, operators, type keys and JSON paths are validated against the active schema before SQL is built. Blank, negative and count queries account for absent fields and row ancestors. Same-row expressions correlate every condition to one concrete row and its descendants.
 
+Root Page-reference traversal resolves one terminal native Field from an explicit
+supported-type list and delegates its predicate to PageFinder. Target inclusion,
+static reference restrictions and negative/blank semantics follow native custom
+Page-field traversal. Target IDs are materialized without a discovery limit,
+converted to integer literals like core and tested in owner-correlated EXISTS
+predicates. Multiple references expand through JSON_TABLE; single references use
+a numeric JSON expression. There is no added schema or reference projection.
+Native target indexes remain available, while Flex JSON relationship lookup can
+scan candidate owners. Discovery adds native target descriptors only at the root,
+without recursive Fieldtype discovery. Unsupported negation/grouping, target
+types, native-property aliases and deeper paths fail explicitly; API.md records
+the current boundary. Template reference hydration is independent.
+
 ## Values and output formatting
 
-Persisted values are never entity encoded or converted to display-date strings. Output formatting follows the owning Page and is a cloned view. Text, choice labels and dates are formatted when read; date runtime reads are Unix timestamps while canonical JSON remains ISO strings. Raw multilingual values are language objects; formatted values are current-language strings. Rich HTML follows the native TinyMCE/Inputfield pipeline. Explicit or inherited `textformatters` lists delegate formatted text reads to native FieldtypeText/Textarea/Email/URL with a transient property Field and the real owning Page. These lists, including empty lists, replace Flex’s automatic value encoding; labels retain `flexEntityEncode`. Missing lists retain existing encoding defaults. Formatter output is never cached into canonical values. Native Textarea output HTML options apply, but storage-time markup QA/link abstraction is not introduced. Page-reference access follows native derefAsPage, allowUnpub hydration and formatting. Native FieldtypePage validates canonical reference IDs during serialization; a transient Field carries each property’s native settings without creating a second database field. Direct multi-reference assignments append unless a PageArray replaces the collection; editor submissions replace the selection. Nested language and PageArray objects participate in change tracking and are rebound to the owning Page after cloning or assignment.
+Persisted values are never entity encoded or converted to display-date strings. Output formatting follows the owning Page and is a cloned view. Text, choice labels and dates are formatted when read; date runtime reads are Unix timestamps while canonical JSON remains ISO strings. Raw multilingual values are language objects; formatted values are current-language strings. Rich HTML follows the native TinyMCE/Inputfield pipeline. All formatted text-valued property reads delegate to native FieldtypeText/Textarea/Email/URL with a transient property Field and the real owning Page. Missing or empty `textformatters` lists apply no text transformation; explicit/inherited lists apply native formatters in order. Flex adds no entity encoding; developers opt into `TextformatterEntities` for HTML text output. Choice keys remain raw data, while formatted property and option display labels are HTML entity encoded. Formatter output is never cached into canonical values. Native URL and Textarea output options apply, but storage-time markup QA/link abstraction is not introduced. Page-reference access follows native derefAsPage, allowUnpub hydration and formatting. Native FieldtypePage validates canonical reference IDs during serialization; a transient Field carries each property’s native settings without creating a second database field. Direct multi-reference assignments append unless a PageArray replaces the collection; editor submissions replace the selection. Nested language and PageArray objects participate in change tracking and are rebound to the owning Page after cloning or assignment.
 
-flexPrune=true removes properties omitted by the current schema on save. When dynamic definitions require omitted values to survive, flexPrune=false keeps unknown keys and nested values. renamedFrom maps an old key to a new one, and differing values in both keys cause an error rather than data loss.
+Unknown stored properties are always retained on saves, serialization and copies,
+including nested rows and owned media. `flexPrune` no longer exists as a setting or
+behavior switch; old metadata is ignored. `renamedFrom` resolves keys on hydration
+and individual saves; differing old/new values are errors. Prefer complete schemas
+with native collapsedHidden/Locked Inputfield presentation states for role/Page
+context differences. Dynamic omission remains possible, but undermines reliable
+orphan classification. Frontend rendering remains application responsibility.
+
+`FlexMaintenance` traverses persisted canonical JSON before hydration, with the
+owning Page's current schema. API methods, native CliModule and superuser field
+configuration adapters share this single transformation/persistence path. Typed
+schema paths identify selectable properties; concrete row-ID addresses identify
+occurrences and media owners. Missing/invalid schemas and unknown row types are
+errors, never reasons to erase data. Rename sources are excluded from orphan
+selection; wholly removed subtrees are selectable units.
+
+Maintenance batches query the field table directly by owner ID so access/status
+filters and Repeater visibility cannot silently omit records. Preview tokens bind
+raw data revisions and recursive schema membership/kind/rename decisions. Apply
+locks and rereads each field row, re-evaluates definitions and rejects changed
+preview foundations. Only selected raw keys move/disappear: no FlexValue hydration,
+normalization or default insertion runs. Each changed field updates canonical JSON,
+whole-field search, row projection and media ownership under the existing transaction
+or savepoint. Removed media enters the normal pending-delete lifecycle; physical
+collection is automatically deferred until outside the outer transaction. Editor draft revision
+checks prevent older edits from overwriting maintenance results.
+
+Per-page failures retain explicit retry IDs and a safe resume cursor; the forward
+cursor records examination, not success. Previously committed pages survive later
+failures. No global transaction/snapshot is promised. Preview/apply summaries are
+per batch, and a final full scan is needed before dropping rename attributes.
+Admin runs 50-page CSRF-protected superuser POSTs; normal field configuration reads
+and saves perform no maintenance scan. CLI explicitly exits nonzero on failures
+because native ProcessWire CLI catches module exceptions.
 
 ## Media lifecycle
 
@@ -77,4 +123,36 @@ Supported databases are MySQL 8.0+ and MariaDB 10.11+ with InnoDB. Flex requires
 
 Database JSON nesting limits apply to the entire value, not just repeatable levels. MariaDB accepts up to 32 JSON levels and MySQL up to 100; nested repeatables, media and language values consume these levels differently. The effective depth is schema-dependent. Flex also enforces configurable row-count, byte-size and optional depth budgets, and refuses incomplete PageEdit posts before saving.
 
-Definitions that use Fieldtype-specific persistence, arbitrary JSON paths, nested Page-reference traversal, sorting repeated values and native page-version restore need additional explicit integration before they can be supported. SQLite and PostgreSQL are not supported.
+Definitions that use Fieldtype-specific persistence, arbitrary JSON paths, Page-reference traversal from rows or across additional hops, sorting repeated values and native page-version restore need additional explicit integration before they can be supported. SQLite and PostgreSQL are not supported.
+
+## Automatic media work
+
+The autoload module hooks native `ProcessWire::finished`. Both pinned cores also
+invoke this lifecycle event on destruction for a bootstrapped CLI/PHP instance that
+has not finished normally. Ordinary save/delete/upload-abandon/clone paths retain
+bounded eager attempts through the same best-effort media service. Each attempt
+skips an open caller transaction. There is no commit interception or implicit commit.
+If a transaction remains open at completion, later PHP execution handles eligible
+journal records. No execution means no progress; hard process termination can defer
+work too.
+
+Each pass selects at most 100 eligible ownership records, not a filesystem or
+canonical-data inventory. The global pass persists an asset-ID keyset cursor in
+native WireCache, advancing even for protected records and failures. At the end of
+the range it wraps for retries. Scoped eager attempts do not alter that cursor.
+Deleting or clearing the cache safely restarts the range; journal records remain
+the durable work source. Per-candidate transactions reread/lock ownership and
+canonical references; existing native-field/version/path protections remain.
+Collector and logging errors cannot escape the lifecycle wrapper and invalidate
+successful writes. Failed records remain registered for later retry. Unsaved staging
+and unfinished uploads expire after six hours; referenced clone records are retained.
+The internal collector and projection-repair methods have public PHP visibility for module services
+and tests, without being an application API or CLI maintenance command.
+
+These transaction guarantees concern Flex field writes and Flex's collector.
+Deleting a whole ProcessWire Page also clears its directory in core
+`PagesEditor::clear()` via non-hookable `PagefilesManager::emptyAllPaths()`;
+Flex does not make that native filesystem operation rollback-safe. Whole-Page
+permanent deletion and explicit native image-variation deletion retain core's
+immediate filesystem semantics and must not be confused with removing Flex
+properties, rows or originals through a field save.

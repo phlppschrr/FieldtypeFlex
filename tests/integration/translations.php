@@ -29,9 +29,10 @@ $translationSources = [
 	'src/FlexRows.php'            => ['Maximum repeatable item count reached', 'Invalid Flex row ID'],
 	'src/FlexValue.php'           => ["Invalid date for Flex '%s'"],
 	'src/InputfieldFlexMedia.php' => ['Rotate 90°', 'Flip vertically'],
-	'examples/advanced.php'   => ['Summary', 'Heading'],
-	'examples/options.php'    => ['Germany', 'Austria'],
-	'examples/manifest.php'   => ['Contact form — PHP', 'Shared options helper'],
+	'examples/03-text.php' => ['Heading', 'Summary'],
+	'examples/05-choices.php' => ['Germany', 'Austria'],
+	'examples/08-rows.php' => ['Text', 'Section'],
+	'examples/manifest.php' => ['Basic PHP array', 'Kitchen Sink'],
 ];
 
 try {
@@ -43,34 +44,49 @@ try {
 		$same([], array_values(array_diff($expectedPhrases, $phrases)), 'native language parser discovers public strings in ' . $relativePath);
 	}
 
-	$setTranslation = static function($domain, string $source, string $translated) use ($translator, &$translationDomains): void {
-		$domain = $translator->textdomainString($domain);
-		$translator->loadTextdomain($domain);
+	$setTranslation = static function($domain, string $source, string $translated) use (&$translationDomains): void {
+		// The native translator singleton can switch languages during helper calls.
+		// Select the active user's language at the point of each test registration.
+		$activeTranslator = wire('user')->language->translator();
+		$domain = $activeTranslator->textdomainString($domain);
+		$activeTranslator->loadTextdomain($domain);
 		$translationDomains[] = $domain;
-		$translator->setTranslation($domain, $source, $translated);
+		$activeTranslator->setTranslation($domain, $source, $translated);
 	};
 	$wire->user->language = $translationLanguage;
 
-	$setTranslation($translationRoot . '/FieldtypeFlex.module.php', 'PHP/JSON-defined compound fields with native inputs and selectors', 'Zusammengesetzte Felder');
+	// Native __() infers the calling file. Resolve its actual class source
+	// rather than assuming that the repository checkout is the module path.
+	$setTranslation((new \ReflectionMethod(FieldtypeFlex::class, 'getModuleInfo'))->getFileName(), 'PHP/JSON-defined compound fields with native inputs and selectors', 'Zusammengesetzte Felder');
+	$metadataFile = (new \ReflectionMethod(FieldtypeFlex::class, 'getModuleInfo'))->getFileName();
+	$same('Zusammengesetzte Felder', $translator->getTranslation($metadataFile, 'PHP/JSON-defined compound fields with native inputs and selectors'), 'translation stored under loaded module source textdomain');
+	$same($translationLanguage->id, wire('user')->language->id, 'global translation helper sees selected test language');
+	$assert(wire('languages') instanceof Languages, 'global languages API is registered');
+	$same(spl_object_id($translator), spl_object_id(wire('user')->language->translator()), 'global helper uses the same translator singleton');
+	$same('Zusammengesetzte Felder', wire('user')->language->translator()->getTranslation($metadataFile, 'PHP/JSON-defined compound fields with native inputs and selectors'), 'current user language translator also sees registered text');
+	$same('Zusammengesetzte Felder', __('PHP/JSON-defined compound fields with native inputs and selectors', $metadataFile), 'explicit module source textdomain resolves the test translation');
 	$same('Zusammengesetzte Felder', FieldtypeFlex::getModuleInfo()['summary'], 'module summary uses the native file textdomain');
-	$setTranslation($translationRoot . '/InputfieldFlex.module.php', 'Schema-defined compound input', 'Zusammengesetzte Eingabe');
+	$setTranslation((new \ReflectionMethod(InputfieldFlex::class, 'getModuleInfo'))->getFileName(), 'Schema-defined compound input', 'Zusammengesetzte Eingabe');
 	$same('Zusammengesetzte Eingabe', InputfieldFlex::getModuleInfo()['summary'], 'input module summary is translated');
-	$setTranslation($translationRoot . '/InputfieldFlexRows.module.php', 'Repeatable native inputs inside Flex', 'Wiederholbare Eingaben');
+	$setTranslation((new \ReflectionMethod(InputfieldFlexRows::class, 'getModuleInfo'))->getFileName(), 'Repeatable native inputs inside Flex', 'Wiederholbare Eingaben');
 	$same('Wiederholbare Eingaben', InputfieldFlexRows::getModuleInfo()['summary'], 'row module summary is translated');
 
-	$setTranslation($translationRoot . '/examples/options.php', 'Germany', 'Deutschland');
-	$translatedOptions = require $translationRoot . '/examples/options.php';
-	$same('Deutschland', $translatedOptions['DE'], 'included definition helper discovers its own textdomain without __FILE__');
+	$setTranslation($translationRoot . '/examples/05-choices.php', 'Germany', 'Deutschland');
+	$translatedOptions = require $translationRoot . '/examples/05-choices.php';
+	$same('Deutschland', $translatedOptions['choice_country']['options']['DE'], 'included native choice definitions use their source textdomain');
 
-	$setTranslation($translationRoot . '/examples/typed-objects.php', 'Text', 'Textbaustein');
+	$setTranslation($translationRoot . '/examples/08-rows.php', 'Text', 'Textbaustein');
 	$translatedRowsField = $createField('flex_translated_rows', []);
-	$translatedRowsDefs = new FlexFieldDefs($translatedRowsField, $page, require $translationRoot . '/examples/typed-objects.php');
+	$translatedRowsDefs = new FlexFieldDefs($translatedRowsField, $page, require $translationRoot . '/examples/08-rows.php');
 	$translatedRowsValue = new FlexValue($page, $translatedRowsField, $translatedRowsDefs);
 	$translatedRow = $translatedRowsValue->blocks->addRow('text');
 	$same('Textbaustein', $translatedRow->rowTypeLabel(), 'runtime type label uses the translation resolved by the native PHP definition');
 	$wire->user->language = $previousLanguage;
 	$same('Textbaustein', $translatedRow->rowTypeLabel(), 'runtime type label retains its evaluated definition instead of translating independently');
 	$wire->user->language = $translationLanguage;
+	// LanguageTranslator is shared across languages. Ensure its active language
+	// matches the user before registering ephemeral test translations.
+	$translator = $translationLanguage->translator();
 
 	$setTranslation($translationRoot . '/src/FlexMedia.php', 'Invalid Flex file metadata', 'Ungültige Dateimetadaten');
 	try {

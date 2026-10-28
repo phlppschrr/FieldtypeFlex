@@ -6,6 +6,23 @@ class FlexQuery extends Wire {
 	private int $rowAlias = 0;
 	private const TEXT_OPERATORS = ['=', '!=', '*=', '%=', '^=', '$=', '%^=', '%$=', '~=', '~|='];
 	private const NUMBER_OPERATORS = ['=', '!=', '>', '>=', '<', '<='];
+	private const PAGE_TARGET_TYPES = [
+		'FieldtypeText',
+		'FieldtypeTextLanguage',
+		'FieldtypeTextarea',
+		'FieldtypeTextareaLanguage',
+		'FieldtypePageTitle',
+		'FieldtypePageTitleLanguage',
+		'FieldtypeEmail',
+		'FieldtypeURL',
+		'FieldtypeInteger',
+		'FieldtypeFloat',
+		'FieldtypeCheckbox',
+		'FieldtypeToggle',
+		'FieldtypeDatetime',
+		'FieldtypeOptions',
+		'FieldtypePage',
+	];
 
 	/**
 	 * Initialize the object with its owning ProcessWire context.
@@ -46,6 +63,8 @@ class FlexQuery extends Wire {
 		$typed = $text;
 		if(in_array($def['kind'], ['integer', 'float'], true)) {
 			$typed = "CAST(NULLIF($text, '') AS DECIMAL(65, 15))";
+		} else if($def['kind'] === 'date') {
+			$typed = "NULLIF($text, '')";
 		} else if($def['kind'] === 'page' && !$def['multiple']) {
 			$typed = "CAST($text AS UNSIGNED)";
 		}
@@ -70,6 +89,9 @@ class FlexQuery extends Wire {
 		}
 		$root = explode('.', $subfield, 2)[0];
 		$rootDef = $subfield === 'data' ? null : $this->property($field, $root);
+		if($rootDef && $rootDef['kind'] === 'page' && str_contains($subfield, '.')) {
+			return $this->matchPage($query, $subfield, $operator, $value, $rootDef);
+		}
 		if($rootDef && $rootDef['kind'] === 'rows') {
 			return $this->matchRows($query, $subfield, $operator, $value, $rootDef);
 		}
@@ -118,6 +140,105 @@ class FlexQuery extends Wire {
 			$query->set('joinType', 'leftjoin');
 		}
 		$query->where($this->scalarPredicate($query, $json, $text, $typed, $def, $operator, $value));
+		return $query;
+	}
+
+	/** Only terminal native Fields: no aliases, metadata columns or recursive traversal. */
+	private function pageTarget(string $name): ?Field {
+		if(!preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/D', $name)) {
+			return null;
+		}
+		$field = $this->wire()->fields->get($name);
+		return $field && $field->type && in_array($field->type->className(), self::PAGE_TARGET_TYPES, true) ? $field : null;
+	}
+
+	/** Discover terminal target Fields without inspecting selected pages or recursing. */
+	private function pageTargetInfo(array $def, array &$cache): array {
+		$input = $def['input'];
+		$templateIds = FieldtypePage::getTemplateIDs([$input->template_id, $input->template_ids]);
+		$result = [];
+		foreach($this->wire()->fields as $candidate) {
+			if(!$this->pageTarget($candidate->name)) {
+				continue;
+			}
+			if($templateIds) {
+				$allowed = false;
+				foreach($templateIds as $id) {
+					$template = $this->wire()->templates->get($id);
+					if($template && $template->fieldgroup->has($candidate)) {
+						$allowed = true;
+					}
+				}
+				if(!$allowed) {
+					continue;
+				}
+			}
+			if(!isset($cache[$candidate->id])) {
+				$info = $candidate->type->getSelectorInfo($candidate, ['level' => 1]);
+				$info['subfields'] = [];
+				$info['operators'] = array_values(array_filter($info['operators'], static fn($op) => !str_starts_with($op, '!') || in_array($op, ['!=', '!=""'], true)));
+				if($candidate->type->className() === 'FieldtypePage') {
+					// This is an ID comparison, not another virtual Page picker/dereference.
+					$info['input'] = 'number';
+					$info['operators'] = self::NUMBER_OPERATORS;
+					$info['options'] = [];
+				}
+				$cache[$candidate->id] = $info;
+			}
+			$result[$candidate->name] = $cache[$candidate->id];
+		}
+		return $result;
+	}
+
+	/** Delegate target semantics to PageFinder, retaining native custom-subfield inclusion. */
+	private function matchPage($query, string $path, string $operator, $value, array $def) {
+		[$property, $target] = explode('.', $path, 2);
+		if(!$this->pageTarget($target)) {
+			throw new PageFinderSyntaxException($this->_('Unsupported Flex Page-reference target field'));
+		}
+		if($query->group !== null || ($query->selector instanceof Selector && $query->selector->not)) {
+			throw new PageFinderSyntaxException($this->_('Flex Page-reference traversal does not support selector negation or grouping'));
+		}
+		$input = $def['input'];
+		$pf = $query->pageFinder;
+		// Mirror FieldtypePage::getMatchQueryCustom(), including its include=all default.
+		$include = !$pf ? 'hidden' : (empty($pf->getOptions()['findAll']) ? 'all' : ($pf->includeMode ?: 'hidden'));
+		$configured = (string) ($input->findPagesSelector ?: $input->findPagesSelect);
+		if(str_contains($configured, 'page.')) {
+			$configured = preg_replace('/\bpage\.[a-zA-Z0-9_]+\s*[=!]+\s*[^,]*,?/', '', $configured);
+			$configured = preg_replace('/[a-zA-Z0-9_.]+\s*[=!]+\s*page\.[a-zA-Z0-9_.]+\s*,?/', '', $configured);
+		}
+		$selectors = $this->wire(new Selectors(str_contains($configured, 'include=') ? '' : "include=$include"));
+		if($pf && $pf->checkAccess === false) {
+			$selectors->add($selectors->create('check_access', '=', 0));
+		}
+		if(trim($configured, ', ') !== '') {
+			$selectors->import(trim($configured, ', '));
+		}
+		if($input->parent_id) {
+			$selectors->add($selectors->create('parent_id', '=', (int) $input->parent_id));
+		}
+		$templateIds = FieldtypePage::getTemplateIDs([$input->template_id, $input->template_ids]);
+		if($templateIds) {
+			$selectors->add($selectors->create('templates_id', '=', $templateIds));
+		}
+		$selectors->add($selectors->create($target, $operator === '!=' ? '=' : $operator, $value));
+		$finder = $this->wire(new PageFinder());
+		$matches = $finder->find($selectors, ['getTotal' => false, 'returnVerbose' => false]);
+		// These are database IDs, not selector text. Integer literals avoid a bind per ID,
+		// as native FieldtypePage does, and there is no editor-option limit on matching.
+		$ids = implode(',', array_map('intval', $matches));
+		$predicate = '1=0';
+		if($ids !== '') {
+			[$json, , $typed] = $this->expression($query->field, 'flex_reference', $property, $def);
+			$member = $def['multiple']
+				? "EXISTS (SELECT 1 FROM JSON_TABLE(COALESCE($json, '[]'), '$[*]' COLUMNS(id INT UNSIGNED PATH '$')) AS flex_reference_id WHERE flex_reference_id.id IN($ids))"
+				: "$typed IN($ids)";
+			$table = $this->wire()->database->escapeTable($query->field->table);
+			$predicate = "EXISTS (SELECT 1 FROM `$table` AS flex_reference WHERE flex_reference.pages_id=pages.id AND $member)";
+		}
+		$query->where(($operator === '!=' ? 'NOT ' : '') . "($predicate)");
+		$query->set('joinType', 'leftjoin');
 		return $query;
 	}
 
@@ -436,7 +557,8 @@ class FlexQuery extends Wire {
 			'subfields' => [],
 		];
 		$page = isset($data['page']) && $data['page'] instanceof Page ? $data['page'] : null;
-		$discover = function(FlexFieldDefs $defs) use (&$discover, $page): array {
+		$targetInfo = [];
+		$discover = function(FlexFieldDefs $defs, bool $root = true) use (&$discover, $page, &$targetInfo): array {
 			$subfields = [];
 			foreach($defs->properties() as $name => $def) {
 				if($def['kind'] === 'rows') {
@@ -445,7 +567,7 @@ class FlexQuery extends Wire {
 					foreach($def['types'] as $type => $typeDefinition) {
 						// Native InputfieldSelector inserts option labels without escaping.
 						$typeOptions[$type] = $this->wire()->sanitizer->entities($typeDefinition['label']);
-						$typeFields = $discover($typeDefinition['schema']);
+						$typeFields = $discover($typeDefinition['schema'], false);
 						$typeFields['count'] = [
 							'name'      => 'count',
 							'label'     => $this->_('Item count'),
@@ -529,7 +651,7 @@ class FlexQuery extends Wire {
 					'input'     => $input,
 					'operators' => $operators,
 					'options'   => $options,
-					'subfields' => [],
+					'subfields' => $root && $def['kind'] === 'page' ? $this->pageTargetInfo($def, $targetInfo) : [],
 				];
 			}
 			return $subfields;

@@ -18,10 +18,6 @@ Definition file,Fichier de définition,,site/modules/FieldtypeFlex/FieldtypeFlex
 Relative to site/templates. Automatic: flex-fields/NAME.php or .json. Configure exactly one source.,Chemin relatif à site/templates. Automatique : flex-fields/NAME.php ou .json. Configurez exactement une source.,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,9e7a313f703c86f26eb25291ac0e8360
 Inline JSON definition,Définition JSON intégrée,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,f64d78e1f8db3cd2845b3257d66038a2
 Optional alternative to a definition file. PHP is only loaded from trusted template files.,Alternative facultative à un fichier de définition. PHP est chargé uniquement depuis des fichiers de template fiables.,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,bcf8fb1487202ef87c7273faea8eb1c3
-Entity encode text with output formatting,Encoder le texte en entités HTML lors du formatage de sortie,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,408e3c67b9e2c7fed46cbb8399188d93
-Enabled by default. Rich HTML from TinyMCE is preserved.,Activé par défaut. Le HTML de TinyMCE est conservé.,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,da01d64dea3732cb0e39fef71a01fed6
-Remove undefined properties on save,Supprimer les propriétés non définies lors de l’enregistrement,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,7e3237d9a8596f4dd3ca1df3d3e11aea
-Enabled by default. Disable for dynamic schemas that temporarily hide properties.,Activé par défaut. Désactivez pour les schémas dynamiques qui masquent temporairement des propriétés.,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,0a676a41ada8eb540d5293eb567caf36
 Hide outer field label,Masquer le libellé du champ englobant,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,0a0411c4b5ea78a187bdd1a96c8d55ec
 Display the child inputs without the Flex heading.,Afficher les champs enfants sans le titre Flex.,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,cb9449da92c2d4bf85b36b07ca267aa5
 Definition source and structure,Source et structure de la définition,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,5cd74143e6e66b44f22e6c4b8e382ea9
@@ -260,145 +256,6 @@ Rotate 90°,Pivoter de 90°,,site/modules/FieldtypeFlex/src/InputfieldFlexMedia.
 Rotate 180°,Pivoter de 180°,,site/modules/FieldtypeFlex/src/InputfieldFlexMedia.php,c3f606a2e1fae204da410754e5823017
 Flip horizontally,Retourner horizontalement,,site/modules/FieldtypeFlex/src/InputfieldFlexMedia.php,00c77fa1672629fb03a1562ca053ec44
 Flip vertically,Retourner verticalement,,site/modules/FieldtypeFlex/src/InputfieldFlexMedia.php,9e0f97ca38e0d74e484a1d4692287b6d
-Summary,Résumé,,site/modules/FieldtypeFlex/examples/advanced.php,290612199861c31d1036b185b4e69b75
-Category,Catégorie,,site/modules/FieldtypeFlex/examples/advanced.php,3adbdb3ac060038aa0e6e6c138ef9873
-Categories,Catégories,,site/modules/FieldtypeFlex/examples/advanced.php,af1b98adf7f686b84cd0b443e022b7a0
-Body,Contenu,,site/modules/FieldtypeFlex/examples/advanced.php,ac101b32dda4448cf13a93fe283dddd8
-Country,Pays,,site/modules/FieldtypeFlex/examples/advanced.php,59716c97497eb9694541f7c3d37b1a4d
-Enable link,Activer le lien,,site/modules/FieldtypeFlex/examples/advanced.php,408730069c574f1774b533a7cdc90bf7
-Link,Lien,,site/modules/FieldtypeFlex/examples/advanced.php,97e7c9a7d06eac006a28bf05467fcc8b
-Heading,Titre,,site/modules/FieldtypeFlex/examples/advanced.php,0101316665d4f82adaa26d86fbbb2d6e
-Country,Pays,,site/modules/FieldtypeFlex/examples/choices.php,59716c97497eb9694541f7c3d37b1a4d
-Interests,Centres d’intérêt,,site/modules/FieldtypeFlex/examples/choices.php,c70952e4ab3806c049737cd7d2b8896b
-Code,Programmation,,site/modules/FieldtypeFlex/examples/choices.php,ca0dbad92a874b2f69b549293387925e
-Design,Design,,site/modules/FieldtypeFlex/examples/choices.php,1afa74da05ca145d3418aad9af510109
-Writing,Rédaction,,site/modules/FieldtypeFlex/examples/choices.php,af96ab416602c6852b1ba5201feaacf6
-Send me occasional news,Recevoir des nouvelles occasionnellement,,site/modules/FieldtypeFlex/examples/choices.php,f60266e776419d095eca8e1285825342
-First name,Prénom,,site/modules/FieldtypeFlex/examples/contact.php,20db0bfeecd8fe60533206a2b5e9891a
-Email,E-mail,,site/modules/FieldtypeFlex/examples/contact.php,ce8ae9da5b7cd6c3df2929543a9af92d
-Address,Adresse,,site/modules/FieldtypeFlex/examples/contact.php,dd7bf230fde8d4836917806aff6a6b27
-City,Ville,,site/modules/FieldtypeFlex/examples/contact.php,57d056ed0984166336b7879c2af3657f
-Country,Pays,,site/modules/FieldtypeFlex/examples/contact.php,59716c97497eb9694541f7c3d37b1a4d
-Start date,Date de début,,site/modules/FieldtypeFlex/examples/dates.php,4d34f1097f6c8b9cee28bca8b78bbee9
-Start date and time,Date et heure de début,,site/modules/FieldtypeFlex/examples/dates.php,eddaab14098e70b5cc9d8a4f6776c156
-Add a link,Ajouter un lien,,site/modules/FieldtypeFlex/examples/dependencies.php,083f62fcae98023532c130f6c6506bd5
-URL,URL,,site/modules/FieldtypeFlex/examples/dependencies.php,e6b391a8d2c4d45902a23a8b6585703d
-Link text,Texte du lien,,site/modules/FieldtypeFlex/examples/dependencies.php,63a11faa3a692d4e00fa8e03bbe8a0d6
-Start date and time,Date et heure de début,,site/modules/FieldtypeFlex/examples/inherit-field.php,eddaab14098e70b5cc9d8a4f6776c156
-Body,Contenu,,site/modules/FieldtypeFlex/examples/inherit-field.php,ac101b32dda4448cf13a93fe283dddd8
-Heading,Titre,,site/modules/FieldtypeFlex/examples/languages-auto.php,0101316665d4f82adaa26d86fbbb2d6e
-Summary,Résumé,,site/modules/FieldtypeFlex/examples/languages-auto.php,290612199861c31d1036b185b4e69b75
-Title,Titre,,site/modules/FieldtypeFlex/examples/languages.php,b78a3223503896721cca1303f776159b
-Summary,Résumé,,site/modules/FieldtypeFlex/examples/languages.php,290612199861c31d1036b185b4e69b75
-Contact form,Formulaire de contact,,site/modules/FieldtypeFlex/examples/manifest.php,c661cf76442d8d2cb318d560285a2a57
-Contact form — PHP,Formulaire de contact — PHP,,site/modules/FieldtypeFlex/examples/manifest.php,789c35d89df1a84345df05261b5c683a
-"A short contact schema with a required name, an email address and an ordinary fieldset. Uses the shared translated options helper.","Un schéma de contact court avec un nom obligatoire, une adresse e-mail et un groupe de champs ordinaire. Utilise le fichier auxiliaire partagé d’options traduites.",,site/modules/FieldtypeFlex/examples/manifest.php,4f08351ce531bfb40701227c3f6a8fc2
-Contact form — JSON,Formulaire de contact — JSON,,site/modules/FieldtypeFlex/examples/manifest.php,b5d243c552222f23b45b67c9b385743c
-"The same contact schema as the PHP version, using a plain JSON object.","Le même schéma de contact que la version PHP, avec un simple objet JSON.",,site/modules/FieldtypeFlex/examples/manifest.php,09214b897a7d429f8ba4e9b2cd5ad240
-Contact form — Inputfield objects,Formulaire de contact — objets Inputfield,,site/modules/FieldtypeFlex/examples/manifest.php,5c1fadd091fee4d9c55dfd5698692fb3
-The same contact form assembled with native Inputfield objects for IDE completion.,Le même formulaire de contact assemblé avec des objets Inputfield natifs pour l’autocomplétion dans l’IDE.,,site/modules/FieldtypeFlex/examples/manifest.php,b29f5cc7fe0d458f8efff099ecdc17d8
-Common inputs,Champs courants,,site/modules/FieldtypeFlex/examples/manifest.php,6012faf9ac4d92ee198bfa87441c6fe8
-Choices and checkboxes,Choix et cases à cocher,,site/modules/FieldtypeFlex/examples/manifest.php,de36e033f2d55154f7508cb474b44382
-"Select, checkbox collection and single checkbox examples.","Exemples de liste de sélection, de groupe de cases à cocher et de case à cocher unique.",,site/modules/FieldtypeFlex/examples/manifest.php,bcc2680a16bdb7866f0c99287c724dcf
-Date and time,Date et heure,,site/modules/FieldtypeFlex/examples/manifest.php,2b0b7c9cbd6d6e9fa6b99aa06e828673
-Native date inputs return Unix timestamps with output formatting disabled; JSON stores canonical strings.,Les champs de date natifs renvoient des horodatages Unix sans formatage de sortie ; JSON stocke des chaînes canoniques.,,site/modules/FieldtypeFlex/examples/manifest.php,dabbd98f664f717f03c98d8f35ce9d4a
-Conditional inputs,Champs conditionnels,,site/modules/FieldtypeFlex/examples/manifest.php,ce23741afc33b6517f3419388e4d5048
-showIf and requiredIf use native ProcessWire form dependency processing.,showIf et requiredIf utilisent le traitement natif des dépendances de formulaire de ProcessWire.,,site/modules/FieldtypeFlex/examples/manifest.php,b4b724099b72d43164798beb7b700142
-Optional modules,Modules facultatifs,,site/modules/FieldtypeFlex/examples/manifest.php,f90f4ac8085102bf149598c730ddb371
-Multilingual text,Texte multilingue,,site/modules/FieldtypeFlex/examples/manifest.php,a4a6ae762e1a19387464381d6c4867dc
-"Uses LanguageSupport, LanguageSupportFields and native language field values. Install both modules before requiring multilingual values.","Utilise LanguageSupport, LanguageSupportFields et les valeurs de champs multilingues natives. Installez les deux modules avant d’exiger des valeurs multilingues.",,site/modules/FieldtypeFlex/examples/manifest.php,20682c569e9afac11abf650a6046a253
-Optional multilingual text,Texte multilingue facultatif,,site/modules/FieldtypeFlex/examples/manifest.php,9b5cbddb0e69e71412acd48466fb5991
-"Uses useLanguages auto to enable multilingual text when LanguageSupport and LanguageSupportFields are installed, otherwise plain text.","Utilise useLanguages auto pour activer le texte multilingue si LanguageSupport et LanguageSupportFields sont installés, sinon du texte simple.",,site/modules/FieldtypeFlex/examples/manifest.php,f37f3628291e9f8eee56a169d3ac7480
-Native references,Références natives,,site/modules/FieldtypeFlex/examples/manifest.php,5c0c5c142ec5fcd87ec9c0db886675a7
-Page references,Références de pages,,site/modules/FieldtypeFlex/examples/manifest.php,28204b430b00c1eb8c40a8e24d1bc9cd
-Single and multiple Page inputs use native page discovery and derefAsPage behavior.,Les champs Page simples et multiples utilisent la recherche native de pages et le comportement derefAsPage.,,site/modules/FieldtypeFlex/examples/manifest.php,be67d42172113ce3a760624cfe758754
-Rich text,Texte enrichi,,site/modules/FieldtypeFlex/examples/manifest.php,8566a361dba8d7bd3ad44ea37ca49161
-Uses the TinyMCE input module. HTML values remain rich text when formatted.,Utilise le module de saisie TinyMCE. Les valeurs HTML restent du texte enrichi après formatage.,,site/modules/FieldtypeFlex/examples/manifest.php,5a6e681e0da4b4daff12a567c688fc68
-Native TinyMCE settingsField,settingsField natif de TinyMCE,,site/modules/FieldtypeFlex/examples/manifest.php,29078e996a7d07ec4cdc5e9043c9c0a7
-Requires a TinyMCE textarea field named rich_text_source. Native TinyMCE applies its editor settings at render/input time.,Nécessite un champ textarea TinyMCE nommé rich_text_source. TinyMCE applique ses paramètres d’éditeur lors du rendu et de la saisie.,,site/modules/FieldtypeFlex/examples/manifest.php,4b10c3bec2b082ba85350c184193e517
-Flex inheritField,inheritField de Flex,,site/modules/FieldtypeFlex/examples/manifest.php,ba842b600f3061b9a4b3e7e646dd227a
-Requires Datetime field date_input_source and TinyMCE textarea field rich_text_source. Flex reuses their Inputfields and then applies local overrides; storage and formatters are not inherited.,Nécessite le champ Datetime date_input_source et le champ textarea TinyMCE rich_text_source. Flex réutilise leurs Inputfields puis applique les réglages locaux ; le stockage et les formateurs ne sont pas hérités.,,site/modules/FieldtypeFlex/examples/manifest.php,599bf9a647897a7a1eda0815ffce1c72
-Combined example,Exemple combiné,,site/modules/FieldtypeFlex/examples/manifest.php,63c8e425f5525e9ea7d95d1b8aef2743
-Curated combination,Combinaison choisie,,site/modules/FieldtypeFlex/examples/manifest.php,5a5e56d376fb622bfda8eb7fb70df3c7
-"A compact combination of multilingual text, Page references, TinyMCE, choices, dependencies and the Flex renamedFrom extension.","Une combinaison compacte de texte multilingue, références de pages, TinyMCE, choix, dépendances et de l’extension Flex renamedFrom.",,site/modules/FieldtypeFlex/examples/manifest.php,8c95bd8ea76b1b7eb4d02c4a15efb787
-Flex extensions,Extensions Flex,,site/modules/FieldtypeFlex/examples/manifest.php,b651d739286816950974e7bfbc8e871c
-Nested rows,Lignes imbriquées,,site/modules/FieldtypeFlex/examples/manifest.php,8db166820ce216cb057779a189154eb2
-Sections contain typed text/image blocks; text blocks contain repeatable notes. Three levels share the same API and media lifecycle.,Les sections contiennent des blocs texte/image typés ; les blocs texte contiennent des notes répétables. Trois niveaux partagent la même API et le même cycle de vie des médias.,,site/modules/FieldtypeFlex/examples/manifest.php,4251abbee4f1efd613b2351044f51463
-Rows and media,Lignes et médias,,site/modules/FieldtypeFlex/examples/manifest.php,e412069b205ea7fdef7922dc28914e9e
-"Typed rows with uniform slides and facts plus mixed text, image and quote blocks; these are Flex extensions.","Lignes typées avec diapositives et faits uniformes, et blocs mixtes de texte, d’image et de citation ; ce sont des extensions Flex.",,site/modules/FieldtypeFlex/examples/manifest.php,e4cef3327fdc3e5811367274b9b635fd
-Typed rows — Inputfield objects,Lignes typées — objets Inputfield,,site/modules/FieldtypeFlex/examples/manifest.php,9f0bd30475f4aa931cc25429e584848e
-"The mixed text, image and quote row types assembled on a native InputfieldFieldset wrapper.","Les types de lignes mixtes de texte, d’image et de citation assemblés dans un conteneur InputfieldFieldset natif.",,site/modules/FieldtypeFlex/examples/manifest.php,eba319eaa3e72a5f771377ba21da683e
-Native Repeater,Repeater natif,,site/modules/FieldtypeFlex/examples/manifest.php,a45e5ce442353a6b00c159f33698869e
-Flex inside a native Repeater,Flex dans un Repeater natif,,site/modules/FieldtypeFlex/examples/manifest.php,3d57f9d006aea1ac29690dc6fc1b4984
-Uses native Repeater ownership with TinyMCE and optional multilingual children.,Utilise l’appartenance native au Repeater avec TinyMCE et des champs enfants multilingues facultatifs.,,site/modules/FieldtypeFlex/examples/manifest.php,fa90412e1188617f3f8d15b80630594d
-Helper files,Fichiers auxiliaires,,site/modules/FieldtypeFlex/examples/manifest.php,214c7a5f11547c97b9f134f06146ca43
-Shared options helper,Fichier auxiliaire partagé d’options,,site/modules/FieldtypeFlex/examples/manifest.php,4a7a5bf7b16a7f9e84cadc5229127011
-A translated country-options map included by several PHP definitions. Copy it beside the definition; it is not a field schema.,Une table d’options de pays traduites incluse par plusieurs définitions PHP. Copiez-la à côté de la définition ; ce n’est pas un schéma de champ.,,site/modules/FieldtypeFlex/examples/manifest.php,bcea38baa889914132a8d1548afe4324
-Sections,Sections,,site/modules/FieldtypeFlex/examples/nested.php,855c3eca6c7aaef477b4f03e4699944d
-Add section,Ajouter une section,,site/modules/FieldtypeFlex/examples/nested.php,deaacc1b560b4ac7dd5c493a419b5fd7
-Section,Section,,site/modules/FieldtypeFlex/examples/nested.php,d2c24d59e0baff4d0155fbdf62590867
-Section heading,Titre de section,,site/modules/FieldtypeFlex/examples/nested.php,3b4836a97d69d11cad15c98b1756d9a7
-Blocks,Blocs,,site/modules/FieldtypeFlex/examples/nested.php,04c4f9f595c4f21d1de65eb07056c15a
-Add block,Ajouter un bloc,,site/modules/FieldtypeFlex/examples/nested.php,2ff8071bcd15a31f9a743f1b06d0d00f
-Text,Texte,,site/modules/FieldtypeFlex/examples/nested.php,9dffbf69ffba8bc38bc4e01abf4b1675
-Block heading,Titre de bloc,,site/modules/FieldtypeFlex/examples/nested.php,223795d3a336ef80c5b6a070ae4e0d2a
-Body,Contenu,,site/modules/FieldtypeFlex/examples/nested.php,ac101b32dda4448cf13a93fe283dddd8
-Notes,Notes,,site/modules/FieldtypeFlex/examples/nested.php,f4c6f851b00d5518bf888815de279aba
-Add note,Ajouter une note,,site/modules/FieldtypeFlex/examples/nested.php,50cd1871f950375eef4e2efce35366c6
-Note,Note,,site/modules/FieldtypeFlex/examples/nested.php,3b0649c72650c313a357338dcdfb64ec
-Note text,Texte de la note,,site/modules/FieldtypeFlex/examples/nested.php,941819d612234a738bf742852b626e2a
-Image,Image,,site/modules/FieldtypeFlex/examples/nested.php,be53a0541a6d36f6ecb879fa2c584b08
-Caption,Légende,,site/modules/FieldtypeFlex/examples/nested.php,272ba7d164aa836995be6319a698be84
-First name,Prénom,,site/modules/FieldtypeFlex/examples/objects.php,20db0bfeecd8fe60533206a2b5e9891a
-Email,E-mail,,site/modules/FieldtypeFlex/examples/objects.php,ce8ae9da5b7cd6c3df2929543a9af92d
-Address,Adresse,,site/modules/FieldtypeFlex/examples/objects.php,dd7bf230fde8d4836917806aff6a6b27
-City,Ville,,site/modules/FieldtypeFlex/examples/objects.php,57d056ed0984166336b7879c2af3657f
-Country,Pays,,site/modules/FieldtypeFlex/examples/objects.php,59716c97497eb9694541f7c3d37b1a4d
-Germany,Allemagne,,site/modules/FieldtypeFlex/examples/options.php,d8b00929dec65d422303256336ada04f
-Austria,Autriche,,site/modules/FieldtypeFlex/examples/options.php,9891739094756d2605946c867b32ad28
-Category,Catégorie,,site/modules/FieldtypeFlex/examples/pages.php,3adbdb3ac060038aa0e6e6c138ef9873
-Related pages,Pages associées,,site/modules/FieldtypeFlex/examples/pages.php,75f00d1026324ea73916cb24389e4c1a
-Item heading,Titre de l’élément,,site/modules/FieldtypeFlex/examples/repeater.php,743da401cbe0b962dc0c6975356b6751
-Body,Contenu,,site/modules/FieldtypeFlex/examples/repeater.php,ac101b32dda4448cf13a93fe283dddd8
-Translated details,Détails traduits,,site/modules/FieldtypeFlex/examples/repeater.php,40716b1bc582f0aba1c09a5069bc9432
-Translated rich text,Texte enrichi traduit,,site/modules/FieldtypeFlex/examples/repeater.php,e97e5a7c8bf98951d7631a0dbc08a10f
-Body,Contenu,,site/modules/FieldtypeFlex/examples/rich-text.php,ac101b32dda4448cf13a93fe283dddd8
-Body,Contenu,,site/modules/FieldtypeFlex/examples/settings-field.php,ac101b32dda4448cf13a93fe283dddd8
-Content heading,Titre du contenu,,site/modules/FieldtypeFlex/examples/structured.php,a33f3a371782138f4b2977084fd1f719
-Hero image,Image principale,,site/modules/FieldtypeFlex/examples/structured.php,2c0e05278896f66ab2af09394e393f31
-Downloads,Téléchargements,,site/modules/FieldtypeFlex/examples/structured.php,c20c35ef53bf1b70789ce94e66800147
-Slides,Diapositives,,site/modules/FieldtypeFlex/examples/structured.php,a8d90ed8f17c347c8d46e0ef22c85ecb
-Add slide,Ajouter une diapositive,,site/modules/FieldtypeFlex/examples/structured.php,056f53405bf3cf4bde3731c26d725365
-Slide,Diapositive,,site/modules/FieldtypeFlex/examples/structured.php,6160a53ece50ce6d4f5ef4452549835e
-Slide heading,Titre de diapositive,,site/modules/FieldtypeFlex/examples/structured.php,49ef24d72173b5b2d60a96fdb7f3e72a
-Slide image,Image de diapositive,,site/modules/FieldtypeFlex/examples/structured.php,495bc3ee1e44cfd8ea290d068ce693dd
-Slide text,Texte de diapositive,,site/modules/FieldtypeFlex/examples/structured.php,3f009377566507e00c81bf9fe80028b9
-Summary,Résumé,,site/modules/FieldtypeFlex/examples/structured.php,290612199861c31d1036b185b4e69b75
-Price,Prix,,site/modules/FieldtypeFlex/examples/structured.php,3601146c4e948c32b6424d2c0a7f0118
-Enable link,Activer le lien,,site/modules/FieldtypeFlex/examples/structured.php,408730069c574f1774b533a7cdc90bf7
-Link,Lien,,site/modules/FieldtypeFlex/examples/structured.php,97e7c9a7d06eac006a28bf05467fcc8b
-Facts,Faits,,site/modules/FieldtypeFlex/examples/structured.php,cb0fec4f6f3462ce2ee816c1c60d1e2c
-Add fact,Ajouter un fait,,site/modules/FieldtypeFlex/examples/structured.php,e49862dba7a931b796996ec3a233811f
-Fact,Fait,,site/modules/FieldtypeFlex/examples/structured.php,b9e5b231986b70601158fee91a5a6298
-Number,Nombre,,site/modules/FieldtypeFlex/examples/structured.php,b2ee912b91d69b435159c7c3f6df7f5f
-Content blocks,Blocs de contenu,,site/modules/FieldtypeFlex/examples/structured.php,7e265727def7bfe8208ef70be024a52d
-Add block,Ajouter un bloc,,site/modules/FieldtypeFlex/examples/structured.php,2ff8071bcd15a31f9a743f1b06d0d00f
-Text,Texte,,site/modules/FieldtypeFlex/examples/structured.php,9dffbf69ffba8bc38bc4e01abf4b1675
-Heading,Titre,,site/modules/FieldtypeFlex/examples/structured.php,0101316665d4f82adaa26d86fbbb2d6e
-Body,Contenu,,site/modules/FieldtypeFlex/examples/structured.php,ac101b32dda4448cf13a93fe283dddd8
-Image,Image,,site/modules/FieldtypeFlex/examples/structured.php,be53a0541a6d36f6ecb879fa2c584b08
-Caption,Légende,,site/modules/FieldtypeFlex/examples/structured.php,272ba7d164aa836995be6319a698be84
-Quote,Citation,,site/modules/FieldtypeFlex/examples/structured.php,c48e929b2b1eabba2ba036884433345e
-Author,Auteur,,site/modules/FieldtypeFlex/examples/structured.php,a517747c3d12f99244ae598910d979c5
-Content blocks,Blocs de contenu,,site/modules/FieldtypeFlex/examples/typed-objects.php,7e265727def7bfe8208ef70be024a52d
-Add block,Ajouter un bloc,,site/modules/FieldtypeFlex/examples/typed-objects.php,2ff8071bcd15a31f9a743f1b06d0d00f
-Text,Texte,,site/modules/FieldtypeFlex/examples/typed-objects.php,9dffbf69ffba8bc38bc4e01abf4b1675
-Heading,Titre,,site/modules/FieldtypeFlex/examples/typed-objects.php,0101316665d4f82adaa26d86fbbb2d6e
-Body,Contenu,,site/modules/FieldtypeFlex/examples/typed-objects.php,ac101b32dda4448cf13a93fe283dddd8
-Image,Image,,site/modules/FieldtypeFlex/examples/typed-objects.php,be53a0541a6d36f6ecb879fa2c584b08
-Caption,Légende,,site/modules/FieldtypeFlex/examples/typed-objects.php,272ba7d164aa836995be6319a698be84
-Quote,Citation,,site/modules/FieldtypeFlex/examples/typed-objects.php,c48e929b2b1eabba2ba036884433345e
-Author,Auteur,,site/modules/FieldtypeFlex/examples/typed-objects.php,a517747c3d12f99244ae598910d979c5
 Declare a Rows collection with type rows,Déclarez une collection Rows avec type rows,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,213416550923ac2280e8c0040dd4f976
 Unsupported Flex definition setting: %s,Paramètre de définition Flex non pris en charge : %s,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,947f40ccd07699df067a868760b2226a
 %s requires type rows,%s nécessite type rows,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,1271da88e70021de795bc583c5287cbf
@@ -410,3 +267,143 @@ Row type children must be definitions or a wrapper,Les enfants du type de ligne 
 "textformatters on ""%s"" requires a text-valued input","textformatters pour ""%s"" nécessite un champ de saisie textuel",,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,b6d8d7c0f70393cdeff506e9a9c191b8
 "textformatters on ""%s"" must be a list of module names","textformatters pour ""%s"" doit être une liste de noms de modules",,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,75525c9e291581e109c5301bbe6ab12d
 "Invalid Textformatter module on ""%s"": %s","Module Textformatter invalide pour ""%s"" : %s",,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,08ebbc5c5c0b5b714b58769305f53b30
+Unsupported Flex Page-reference target field,Champ cible de référence de page Flex non pris en charge,,site/modules/FieldtypeFlex/src/FlexQuery.php,77799ded8d22a3401149fcec83eb7dd2
+Flex Page-reference traversal does not support selector negation or grouping,La traversée des références de page Flex ne prend pas en charge la négation ou le regroupement des sélecteurs,,site/modules/FieldtypeFlex/src/FlexQuery.php,12e59af690ae1161240003aaa61371bc
+Data maintenance,Maintenance des données,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,00527b2473e61f0aeb5f86275b587376
+Preview and explicitly apply data changes,Prévisualiser et appliquer explicitement les modifications,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,76ccb7046a730d78543142f6aca3fe23
+Potentially orphaned does not mean safe to delete. Dynamic definitions may intentionally omit properties.,Potentiellement orphelin ne signifie pas sans risque à supprimer. Les définitions dynamiques peuvent omettre volontairement des propriétés.,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,13e96ebd8ecdc2f8db1326245592bfcb
+Preview renames,Prévisualiser les renommages,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,6cc26fabfada29af67c8b2e52f6bf43a
+List potentially orphaned properties,Lister les propriétés potentiellement orphelines,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,d3fc98d08200eaeefa17dbdeaef01ddd
+Preview selected cleanup,Prévisualiser le nettoyage sélectionné,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,3d15172f79c4c72f17e8192268a64095
+Apply checked changes,Appliquer les modifications vérifiées,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,7ebb658086cce0c2e82591ed7380f752
+Checked pages,Pages vérifiées,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,b61d50b9f475d78d01a11e5803d838b7
+Unchanged pages,Pages inchangées,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,14dfe0f0df6e3d55c72f2795175260c1
+Renames,Renommages,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,9c2485a66f064c8690e791958c4d36ae
+Conflicts and errors,Conflits et erreurs,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,ee4c6264371befc21ad3f53efb44c079
+Old path,Ancien chemin,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,39cebb6e9507b2bf937ee5024fca1819
+Affected pages,Pages concernées,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,90ad095b30dc0896c1843ba661df070e
+Stored address,Adresse stockée,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,92e7d7c280919f7140bce550b3edafd7
+"Inspect errors and retry page IDs, then run a new preview.","Examinez les erreurs et les identifiants à réessayer, puis relancez la prévisualisation.",,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,455178e5af8118a2182f0b29c69749dc
+Checked old keys migrated. Run a new full preview before removing renamedFrom.,Les anciennes clés vérifiées ont été migrées. Relancez une prévisualisation complète avant de retirer renamedFrom.,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,11a9758a50275ed9505322bb56c2149d
+Selected cleanup completed.,Nettoyage sélectionné terminé.,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,61f13182e9ab656430fb0dc8daa17bb9
+Select explicit property paths.,Sélectionnez explicitement des chemins de propriété.,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,fa59c6b20fa8a194180638d3366410d7
+Missing CSRF token.,Jeton CSRF manquant.,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,a56bf84c6ab4d24d59a4d2c772f1c83a
+Preview completed.,Prévisualisation terminée.,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,9602cabbff5f580ae1b8d5d50f1a567e
+No pending renames remain in this complete scan. The checked renamedFrom attributes can now be removed.,Cette analyse complète ne trouve aucun renommage en attente. Les attributs renamedFrom vérifiés peuvent maintenant être retirés.,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,9fb768a845f739c150c85447624bb92b
+Changed pages,Pages modifiées,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,62d8e3cec3cfe8c5e75e2bd1b60cb901
+Pages with proposed changes,Pages avec modifications proposées,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,10a41016e4ae462f5022ac1633c780ab
+Potentially orphaned properties,Propriétés potentiellement orphelines,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,3aec7fbf85463647858ef0da38b1c135
+Property path,Chemin de propriété,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,96c4a3cdabc647ffd6d4f798af27bbce
+New path,Nouveau chemin,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,aac61668c0ffa2bc2394f1f6deae90cf
+Page IDs,Identifiants de pages,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,da9bb690a80908023ed9a1bb896a5212
+Media references,Références de médias,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,4891de56f295b810319bc3be219ca3ba
+Message,Message,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,4c2a8fe7eaf24721cc7a9f0175115bd4
+Title,Titre,,site/modules/FieldtypeFlex/examples/02-basic-objects.php,b78a3223503896721cca1303f776159b
+Email,E-mail,,site/modules/FieldtypeFlex/examples/02-basic-objects.php,ce8ae9da5b7cd6c3df2929543a9af92d
+Title,Titre,,site/modules/FieldtypeFlex/examples/02-basic.php,b78a3223503896721cca1303f776159b
+Email,E-mail,,site/modules/FieldtypeFlex/examples/02-basic.php,ce8ae9da5b7cd6c3df2929543a9af92d
+Heading,Titre,,site/modules/FieldtypeFlex/examples/03-text.php,0101316665d4f82adaa26d86fbbb2d6e
+Plain text (no automatic HTML escaping),Plain text (no automatic HTML escaping),,site/modules/FieldtypeFlex/examples/03-text.php,e3d082ed5255a87d9eef1e9f7e2cb9e6
+Summary,Résumé,,site/modules/FieldtypeFlex/examples/03-text.php,290612199861c31d1036b185b4e69b75
+Rich text,Texte enrichi,,site/modules/FieldtypeFlex/examples/03-text.php,8566a361dba8d7bd3ad44ea37ca49161
+Email address,Email address,,site/modules/FieldtypeFlex/examples/03-text.php,b357b524e740bc85b9790a0712d84a30
+Website,Website,,site/modules/FieldtypeFlex/examples/03-text.php,15bbb9d0bbf25e8d2978de1168c749dc
+Icon,Icon,,site/modules/FieldtypeFlex/examples/03-text.php,817434295a673aed431435658b65d9a7
+Optional multilingual heading,Optional multilingual heading,,site/modules/FieldtypeFlex/examples/03-text.php,1ab8ef690d7595feb63fb04fd53ef290
+Quantity,Quantity,,site/modules/FieldtypeFlex/examples/04-numbers-dates.php,694e8d1f2ee056f98ee488bdc4982d73
+Price,Prix,,site/modules/FieldtypeFlex/examples/04-numbers-dates.php,3601146c4e948c32b6424d2c0a7f0118
+Enabled state,Enabled state,,site/modules/FieldtypeFlex/examples/04-numbers-dates.php,cda7004abccba7634caef04513c9a143
+Confirmed,Confirmed,,site/modules/FieldtypeFlex/examples/04-numbers-dates.php,205bc73c4ab4286a1fb9d4c18322777c
+Start date,Date de début,,site/modules/FieldtypeFlex/examples/04-numbers-dates.php,4d34f1097f6c8b9cee28bca8b78bbee9
+Start date and time,Date et heure de début,,site/modules/FieldtypeFlex/examples/04-numbers-dates.php,eddaab14098e70b5cc9d8a4f6776c156
+Country,Pays,,site/modules/FieldtypeFlex/examples/05-choices.php,59716c97497eb9694541f7c3d37b1a4d
+Germany,Allemagne,,site/modules/FieldtypeFlex/examples/05-choices.php,d8b00929dec65d422303256336ada04f
+Austria,Autriche,,site/modules/FieldtypeFlex/examples/05-choices.php,9891739094756d2605946c867b32ad28
+Priority,Priority,,site/modules/FieldtypeFlex/examples/05-choices.php,502996d9790340c5fd7b86a5b93b1c9f
+Low,Low,,site/modules/FieldtypeFlex/examples/05-choices.php,28d0edd045e05cf5af64e35ae0c4c6ef
+Medium,Medium,,site/modules/FieldtypeFlex/examples/05-choices.php,87f8a6ab85c9ced3702b4ea641ad4bb5
+High,High,,site/modules/FieldtypeFlex/examples/05-choices.php,655d20c1ca69519ca647684edbb2db35
+Features,Features,,site/modules/FieldtypeFlex/examples/05-choices.php,98f770b0af18ca763421bac22b4b6805
+Design,Design,,site/modules/FieldtypeFlex/examples/05-choices.php,1afa74da05ca145d3418aad9af510109
+Code,Programmation,,site/modules/FieldtypeFlex/examples/05-choices.php,ca0dbad92a874b2f69b549293387925e
+Documentation,Documentation,,site/modules/FieldtypeFlex/examples/05-choices.php,5b6cf869265c13af8566f192b4ab3d2a
+Topics,Topics,,site/modules/FieldtypeFlex/examples/05-choices.php,34ac805c9077c5ca6ae3565dab6ce723
+Ordered choices,Ordered choices,,site/modules/FieldtypeFlex/examples/05-choices.php,a708058d5261cbfa732a7ba0ba0a25e0
+Tags,Tags,,site/modules/FieldtypeFlex/examples/05-choices.php,189f63f277cd73395561651753563065
+Primary page,Primary page,,site/modules/FieldtypeFlex/examples/06-references-media.php,6ddd9f932380c00e6b2d1ff93d1f83a1
+Related pages,Pages associées,,site/modules/FieldtypeFlex/examples/06-references-media.php,75f00d1026324ea73916cb24389e4c1a
+Cover image,Cover image,,site/modules/FieldtypeFlex/examples/06-references-media.php,84967207ddc311cfbe8ee66f677a1544
+Image gallery,Image gallery,,site/modules/FieldtypeFlex/examples/06-references-media.php,642fa08fba951378dca25cf328a60b56
+Downloads,Téléchargements,,site/modules/FieldtypeFlex/examples/06-references-media.php,c20c35ef53bf1b70789ce94e66800147
+Show link,Show link,,site/modules/FieldtypeFlex/examples/07-advanced.php,75c13cf9f858014b0c9eb3c63c81c833
+Link URL,Link URL,,site/modules/FieldtypeFlex/examples/07-advanced.php,5e4e1bd6f922fed062b62c446ca34f84
+Renamed heading,Renamed heading,,site/modules/FieldtypeFlex/examples/07-advanced.php,ce1748e29111a5dd36f2bcc40cbba6a7
+Optional translation,Optional translation,,site/modules/FieldtypeFlex/examples/07-advanced.php,e0f0f05b29cf0aeda27fcef6e63a122e
+Additional details,Additional details,,site/modules/FieldtypeFlex/examples/07-advanced.php,a6f019b2d34dc9e72957f5a606a4bca6
+Note,Note,,site/modules/FieldtypeFlex/examples/07-advanced.php,3b0649c72650c313a357338dcdfb64ec
+Rating,Rating,,site/modules/FieldtypeFlex/examples/07-advanced.php,dda9c06f33071c9b6fc237ee164109d8
+Inherited date control,Inherited date control,,site/modules/FieldtypeFlex/examples/07-advanced.php,0365385ec6cf8e4a515cedaecf976e7f
+Inherited rich text,Inherited rich text,,site/modules/FieldtypeFlex/examples/07-advanced.php,6605f90dda42be8d0337fc40c6eab7f9
+Content heading,Titre du contenu,,site/modules/FieldtypeFlex/examples/08-rows.php,a33f3a371782138f4b2977084fd1f719
+Hero image,Image principale,,site/modules/FieldtypeFlex/examples/08-rows.php,2c0e05278896f66ab2af09394e393f31
+Downloads,Téléchargements,,site/modules/FieldtypeFlex/examples/08-rows.php,c20c35ef53bf1b70789ce94e66800147
+Slides,Diapositives,,site/modules/FieldtypeFlex/examples/08-rows.php,a8d90ed8f17c347c8d46e0ef22c85ecb
+Add slide,Ajouter une diapositive,,site/modules/FieldtypeFlex/examples/08-rows.php,056f53405bf3cf4bde3731c26d725365
+Slide,Diapositive,,site/modules/FieldtypeFlex/examples/08-rows.php,6160a53ece50ce6d4f5ef4452549835e
+Slide heading,Titre de diapositive,,site/modules/FieldtypeFlex/examples/08-rows.php,49ef24d72173b5b2d60a96fdb7f3e72a
+Slide image,Image de diapositive,,site/modules/FieldtypeFlex/examples/08-rows.php,495bc3ee1e44cfd8ea290d068ce693dd
+Slide text,Texte de diapositive,,site/modules/FieldtypeFlex/examples/08-rows.php,3f009377566507e00c81bf9fe80028b9
+Summary,Résumé,,site/modules/FieldtypeFlex/examples/08-rows.php,290612199861c31d1036b185b4e69b75
+Price,Prix,,site/modules/FieldtypeFlex/examples/08-rows.php,3601146c4e948c32b6424d2c0a7f0118
+Enable link,Activer le lien,,site/modules/FieldtypeFlex/examples/08-rows.php,408730069c574f1774b533a7cdc90bf7
+Link,Lien,,site/modules/FieldtypeFlex/examples/08-rows.php,97e7c9a7d06eac006a28bf05467fcc8b
+Facts,Faits,,site/modules/FieldtypeFlex/examples/08-rows.php,cb0fec4f6f3462ce2ee816c1c60d1e2c
+Add fact,Ajouter un fait,,site/modules/FieldtypeFlex/examples/08-rows.php,e49862dba7a931b796996ec3a233811f
+Fact,Fait,,site/modules/FieldtypeFlex/examples/08-rows.php,b9e5b231986b70601158fee91a5a6298
+Number,Nombre,,site/modules/FieldtypeFlex/examples/08-rows.php,b2ee912b91d69b435159c7c3f6df7f5f
+Content blocks,Blocs de contenu,,site/modules/FieldtypeFlex/examples/08-rows.php,7e265727def7bfe8208ef70be024a52d
+Add block,Ajouter un bloc,,site/modules/FieldtypeFlex/examples/08-rows.php,2ff8071bcd15a31f9a743f1b06d0d00f
+Text,Texte,,site/modules/FieldtypeFlex/examples/08-rows.php,9dffbf69ffba8bc38bc4e01abf4b1675
+Heading,Titre,,site/modules/FieldtypeFlex/examples/08-rows.php,0101316665d4f82adaa26d86fbbb2d6e
+Body,Contenu,,site/modules/FieldtypeFlex/examples/08-rows.php,ac101b32dda4448cf13a93fe283dddd8
+Image,Image,,site/modules/FieldtypeFlex/examples/08-rows.php,be53a0541a6d36f6ecb879fa2c584b08
+Caption,Légende,,site/modules/FieldtypeFlex/examples/08-rows.php,272ba7d164aa836995be6319a698be84
+Quote,Citation,,site/modules/FieldtypeFlex/examples/08-rows.php,c48e929b2b1eabba2ba036884433345e
+Author,Auteur,,site/modules/FieldtypeFlex/examples/08-rows.php,a517747c3d12f99244ae598910d979c5
+Sections,Sections,,site/modules/FieldtypeFlex/examples/08-rows.php,855c3eca6c7aaef477b4f03e4699944d
+Add section,Ajouter une section,,site/modules/FieldtypeFlex/examples/08-rows.php,deaacc1b560b4ac7dd5c493a419b5fd7
+Section,Section,,site/modules/FieldtypeFlex/examples/08-rows.php,d2c24d59e0baff4d0155fbdf62590867
+Section heading,Titre de section,,site/modules/FieldtypeFlex/examples/08-rows.php,3b4836a97d69d11cad15c98b1756d9a7
+Blocks,Blocs,,site/modules/FieldtypeFlex/examples/08-rows.php,04c4f9f595c4f21d1de65eb07056c15a
+Block heading,Titre de bloc,,site/modules/FieldtypeFlex/examples/08-rows.php,223795d3a336ef80c5b6a070ae4e0d2a
+Notes,Notes,,site/modules/FieldtypeFlex/examples/08-rows.php,f4c6f851b00d5518bf888815de279aba
+Add note,Ajouter une note,,site/modules/FieldtypeFlex/examples/08-rows.php,50cd1871f950375eef4e2efce35366c6
+Note,Note,,site/modules/FieldtypeFlex/examples/08-rows.php,3b0649c72650c313a357338dcdfb64ec
+Note text,Texte de la note,,site/modules/FieldtypeFlex/examples/08-rows.php,941819d612234a738bf742852b626e2a
+Reusable groups in Rows,Reusable groups in Rows,,site/modules/FieldtypeFlex/examples/09-kitchen-sink.php,416934b671525740d538c4612a9f00c2
+Choices,Choices,,site/modules/FieldtypeFlex/examples/09-kitchen-sink.php,6ef697f11922be2e4de0971f7d70997f
+Numbers and states,Numbers and states,,site/modules/FieldtypeFlex/examples/09-kitchen-sink.php,032add2fc7529100ba041636e62e9499
+Getting started,Premiers pas,,site/modules/FieldtypeFlex/examples/manifest.php,cb59b87e00d11222bfd9159d0d23836f
+Basic JSON,JSON simple,,site/modules/FieldtypeFlex/examples/manifest.php,2f4e9a72e75a131432ccd2c6435a7079
+Two native fields represented as plain JSON.,Two native fields represented as plain JSON.,,site/modules/FieldtypeFlex/examples/manifest.php,878ddcd8026747616374a1ad9ccecaad
+Basic PHP array,Tableau PHP simple,,site/modules/FieldtypeFlex/examples/manifest.php,cd4102bf720fe6e402263d61d4625794
+The same basic configuration using a recommended PHP definition.,The same basic configuration using a recommended PHP definition.,,site/modules/FieldtypeFlex/examples/manifest.php,7ccb4aea980b783c1130d77fc1b93b68
+Basic Inputfield objects,Objets Inputfield simples,,site/modules/FieldtypeFlex/examples/manifest.php,8c35cdacac1fd109b0d6c42431fc4c5e
+The same configuration as a native InputfieldWrapper tree.,The same configuration as a native InputfieldWrapper tree.,,site/modules/FieldtypeFlex/examples/manifest.php,9e78f51eac9fc20850444d924f212f01
+Core Inputfields,Champs natifs,,site/modules/FieldtypeFlex/examples/manifest.php,06ef48ed4efc59b7216f4522e2991436
+Text and rich text,Texte et texte enrichi,,site/modules/FieldtypeFlex/examples/manifest.php,7999cfa39a6b96fab576ca70e4f41691
+"Text, Textarea, TinyMCE, URL, Email, Hidden, Icon and output formatting.","Text, Textarea, TinyMCE, URL, Email, Hidden, Icon and output formatting.",,site/modules/FieldtypeFlex/examples/manifest.php,b641e59ea5c412d109902a72dce1fb9e
+Numbers and dates,Nombres et dates,,site/modules/FieldtypeFlex/examples/manifest.php,305b25db7170844b707e1f86e0c37f41
+"Integer, Float, Checkbox, Toggle and Datetime layout variants.","Integer, Float, Checkbox, Toggle and Datetime layout variants.",,site/modules/FieldtypeFlex/examples/manifest.php,59b8726d4625798f24a925dad104ecc4
+Choice controls,Champs de sélection,,site/modules/FieldtypeFlex/examples/manifest.php,7369c899a631a10a9ac8edb2b8a02e99
+"Native single, multiple, tagged and ordered choice controls.","Native single, multiple, tagged and ordered choice controls.",,site/modules/FieldtypeFlex/examples/manifest.php,2d2433b89e6f51c17434df8592728309
+References and media,Références et médias,,site/modules/FieldtypeFlex/examples/manifest.php,e9ef6cabe2226888f430f31c332c16a9
+"Native single/multiple Pages, images and file collections.","Native single/multiple Pages, images and file collections.",,site/modules/FieldtypeFlex/examples/manifest.php,ba4682daa35a771c66135e0628beee90
+Advanced,Avancé,,site/modules/FieldtypeFlex/examples/manifest.php,9b6545e4cea9b4ad4979d41bb9170e2b
+Dependencies and inheritance,Dépendances et héritage,,site/modules/FieldtypeFlex/examples/manifest.php,17c30aeee60e8ff25db2a13aa2461874
+"Dependencies, auto languages, fieldsets, rename mapping and inherited native input settings.","Dependencies, auto languages, fieldsets, rename mapping and inherited native input settings.",,site/modules/FieldtypeFlex/examples/manifest.php,3c16a2ce08c673b2dec59b27e19ef5d6
+Typed and nested Rows,Lignes typées et imbriquées,,site/modules/FieldtypeFlex/examples/manifest.php,d699c468912e87e9ea052d9c2b7a14aa
+"Typed Rows, nested collections, mixed media, editor layouts and row titles.","Typed Rows, nested collections, mixed media, editor layouts and row titles.",,site/modules/FieldtypeFlex/examples/manifest.php,79c5d8a7b89957bd97876eebd880d0a9
+Kitchen Sink,Exemple complet,,site/modules/FieldtypeFlex/examples/manifest.php,77901897bcfd593f45a4788aa4eb5a26
+Combines the Core Inputfield references and reuses choice/number definitions inside typed Rows.,Combines the Core Inputfield references and reuses choice/number definitions inside typed Rows.,,site/modules/FieldtypeFlex/examples/manifest.php,d713019e8cd40192d4c1ef9151081696
+Editor guidance,Aide de l'éditeur,,site/modules/FieldtypeFlex/examples/07-advanced.php,25f5051ba4696eee08e6386c488ae673

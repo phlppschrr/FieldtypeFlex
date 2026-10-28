@@ -744,7 +744,7 @@ class FlexImages extends Pageimages {
 	use FlexMediaCollection;
 }
 
-/** Durable ownership, staged imports and post-commit cleanup. */
+/** Durable ownership, staged imports and post-commit cleanup. @internal */
 class FlexMedia extends Wire {
 	private FieldtypeFlex $type;
 	private ?WireDatabasePDO $stagingDatabase = null;
@@ -1138,7 +1138,7 @@ class FlexMedia extends Wire {
 		$q = $this->journal()->pdo('writer')->prepare("UPDATE fieldtype_flex_assets SET state='pending_delete' WHERE asset_id=:id");
 		$q->execute(['id' => $id]);
 		if(!$this->wire()->database->inTransaction()) {
-			$this->collect(100, $page, $field);
+			$this->sweep($page, $field);
 		}
 	}
 
@@ -1479,7 +1479,7 @@ class FlexMedia extends Wire {
 				unset($this->manifest[$id]);
 			}
 			if(!$this->wire()->database->inTransaction()) {
-				$this->collect(100, $copy, $field);
+				$this->sweep($copy, $field);
 			}
 		}
 	}
@@ -1522,6 +1522,27 @@ class FlexMedia extends Wire {
 	}
 
 	/**
+	 * Internal best-effort lifecycle work, including requests that never save Flex.
+	 * Open caller transactions are left to a later finished event/request.
+	 */
+	public function sweep(?Page $owner = null, ?Field $field = null): void {
+		try {
+			if($this->wire()->database->inTransaction()) return;
+			if(!$this->wire()->database->tableExists('fieldtype_flex_assets')) return;
+			$result = $this->collect(100, $owner, $field);
+			foreach($result['failed'] as $id => $message) {
+				$this->wire()->log->save('flex-media', "$id: $message");
+			}
+		} catch(\Throwable $error) {
+			// Cleanup must never turn a committed save or completed response into a failure.
+			try {
+				$this->wire()->log->save('flex-media', $error->getMessage());
+			} catch(\Throwable $ignored) {
+			}
+		}
+	}
+
+	/**
 	 * Collect a bounded batch of expired or removed assets outside caller transactions.
 	 *
 	 * @param int $limit Maximum number of records to process.
@@ -1547,14 +1568,30 @@ class FlexMedia extends Wire {
 			$where .= ' AND fields_id=:field';
 			$bind['field'] = $field->id;
 		}
-		$q = $db->prepare("SELECT asset_id FROM fieldtype_flex_assets WHERE $where LIMIT $limit");
+		// A durable keyset cursor advances past failed/protected records as well as
+		// deletions. Scoped eager cleanup must not move the global request cursor.
+		$global = !$owner && !$field;
+		$cursor = $global ? (string) $this->wire()->cache->get('FlexMedia.collectCursor') : '';
+		if(!preg_match('/^[a-f0-9]{32}$/D', $cursor)) $cursor = '';
+		$select = "SELECT asset_id FROM fieldtype_flex_assets WHERE $where AND asset_id>:cursor ORDER BY asset_id LIMIT $limit";
+		$bind['cursor'] = $cursor;
+		$q = $db->prepare($select);
 		$q->execute($bind);
+		$ids = $q->fetchAll(\PDO::FETCH_COLUMN);
+		if($global && !$ids && $cursor !== '') {
+			$bind['cursor'] = '';
+			$q->execute($bind);
+			$ids = $q->fetchAll(\PDO::FETCH_COLUMN);
+		}
+		if($global) {
+			$this->wire()->cache->save('FlexMedia.collectCursor', $ids ? end($ids) : '', WireCache::expireNever);
+		}
 		$result = [
 			'removed'    => 0,
 			'variations' => 0,
 			'failed'     => [],
 		];
-		foreach($q->fetchAll(\PDO::FETCH_COLUMN) as $id) {
+		foreach($ids as $id) {
 			try {
 				$outcome = $this->type->storage()->atomic(function() use ($id, $db) {
 					$record = $this->asset($id, true);
@@ -1565,9 +1602,7 @@ class FlexMedia extends Wire {
 					$field = $this->wire()->fields->get((int) $record['fields_id']);
 					$raw = [];
 					if($page->id && $field && $field->type instanceof FieldtypeFlex) {
-						$exists = $db->prepare('SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=:table');
-						$exists->execute(['table' => $field->table]);
-						if($exists->fetchColumn()) {
+						if($db->tableExists($field->table)) {
 							$raw = $this->type->storage()->persisted($page, $field, true);
 						}
 					}
@@ -1598,7 +1633,7 @@ class FlexMedia extends Wire {
 							$paths = array_filter($image->getFiles(), fn($path) => $path !== $image->filename());
 							$image->removeVariations();
 							foreach($paths as $path) {
-								if(is_file($path)) {
+								if(file_exists($path) || is_link($path)) {
 									throw new WireException($this->_('Unable to remove owned image variation'));
 								}
 							}
@@ -1645,7 +1680,7 @@ class FlexMedia extends Wire {
 						$file->unlink();
 						clearstatcache();
 						foreach($paths as $path) {
-							if(is_file($path)) {
+							if(file_exists($path) || is_link($path)) {
 								throw new WireException($this->_('Unable to remove owned file or variation'));
 							}
 						}
@@ -1715,6 +1750,9 @@ class FlexMedia extends Wire {
 						}
 						foreach($paths as $path) {
 							if(is_file($path) && !unlink($path)) {
+								throw new WireException($this->_('Unable to remove staged orphan'));
+							}
+							if(file_exists($path) || is_link($path)) {
 								throw new WireException($this->_('Unable to remove staged orphan'));
 							}
 						}

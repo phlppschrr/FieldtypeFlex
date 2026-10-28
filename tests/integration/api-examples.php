@@ -8,7 +8,7 @@ if(PHP_SAPI !== 'cli' || !isset($same, $createField)) {
 // Execute the actual reference snippets in the existing disposable suite fixture.
 $api = file_get_contents(dirname(__DIR__, 2) . '/API.md');
 preg_match_all('/```php\n(.*?)```/s', $api, $matches);
-$same(20, count($matches[1]), 'all API PHP examples have an execution context');
+$same(22, count($matches[1]), 'all API PHP examples have an execution context');
 $blocks = array_combine(range(1, count($matches[1])), $matches[1]);
 $modules = $wire->modules;
 $fields = $wire->fields;
@@ -35,13 +35,14 @@ $same(['heading', 'hero'], array_keys($base), 'API complete definition executes'
 $rowSchema = $snippet($fragment($blocks[8]))['result'];
 $mediaSchema = $snippet($fragment($blocks[14]))['result'];
 $renameSchema = $snippet($fragment($blocks[7]))['result'];
-$inheritSchema = $snippet($fragment(str_replace('rich_text_source', $sourceField->name, $blocks[19])))['result'];
+$inheritSchema = $snippet($fragment(str_replace('rich_text_source', $sourceField->name, $blocks[20])))['result'];
 $schema = $base + $rowSchema + $mediaSchema + $inheritSchema + [
 	'summary' => ['type' => 'text'],
 	'appearance' => ['type' => 'select', 'label' => 'Appearance & style', 'options' => ['featured' => 'Featured & selected']],
 	'starts_on' => ['type' => 'datetime', 'dateInputFormat' => 'd.m.Y', 'dateOutputFormat' => 'd.m.Y'],
 ];
-$schema += require dirname(__DIR__, 2) . '/examples/nested.php';
+$nestedReference = require dirname(__DIR__, 2) . '/examples/08-rows.php';
+$schema['sections'] = $nestedReference['sections'];
 $apiField = $createField('flex_api_examples', $schema);
 $name = $apiField->name;
 $page->of(false);
@@ -116,8 +117,34 @@ $same([$id], $wire->pages->findIDs("id=$id, $name.blocks.text.heading=Introducti
 $same([], $wire->pages->findIDs("id=$id, $name.blocks.text=\"heading=Introduction, body*=ProcessWire\""), 'API same-row selector rejects split matches');
 $copy = $wire->pages->clone($page);
 $pages[] = $copy;
-$execute(20, compact('copy'));
-$assert(is_array($type->collectFiles(1)), 'API maintenance example executes outside transaction');
+$execute(21, compact('copy'));
+$assert(!method_exists($type, 'collectFiles') && !method_exists($type, 'rebuildRowIndex'), 'public module has no manual projection or collection wrappers');
+$r = $execute(22);
+$assert($r['inventory']['success'] && $r['cleanup']['success'], 'API batched rename and selected cleanup examples execute');
+
+// The traversal snippet queries actual native target fields and both reference modes.
+$price = $wire->wire(new Field());
+$price->name = 'flex_api_price_' . bin2hex(random_bytes(4));
+$price->type = $modules->get('FieldtypeFloat');
+$temporaryFields[] = $price;
+$price->save();
+$template->fieldgroup->add($price);
+$template->fieldgroup->save();
+$second->of(false);
+$second->title = 'Flour';
+$second->set($price->name, 2.75);
+$second->save();
+$recipe = $createField('flex_api_recipe', [
+	'ingredient' => ['type' => 'page', 'derefAsPage' => 2],
+	'ingredients' => ['type' => 'page', 'derefAsPage' => 0],
+]);
+$page->of(false);
+$page->set($recipe->name, ['ingredient' => $second->id, 'ingredients' => [$second->id]]);
+$page->save($recipe->name);
+$snippet(str_replace(['recipe.', '.price'], [$recipe->name . '.', '.' . $price->name], $blocks[19]), $context);
+foreach(['ingredient.title=Flour', 'ingredients.title~=Flour', 'ingredient.' . $price->name . '>=2.5'] as $condition) {
+	$same([$id], $wire->pages->findIDs($recipe->name . '.' . $condition), 'API traversal snippet finds the recipe through ' . $condition);
+}
 
 // JSON views preserve logical data; the database encoder additionally preserves map shape.
 $emptyField = clone $apiField;

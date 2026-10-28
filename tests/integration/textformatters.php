@@ -75,17 +75,45 @@ try {
 		'plain' => ['type' => 'textarea', 'inheritField' => $n->name, 'textformatters' => []],
 		'entities' => ['type' => 'textarea', 'inheritField' => $n->name, 'textformatters' => ['TextformatterEntities']],
 		'legacy' => ['type' => 'text'],
+		'unlisted' => ['type' => 'textarea'],
 	]);
-	$v = $type->sanitizeValue($page, $f, array_fill_keys(['body', 'plain', 'entities', 'legacy'], '**Bold** & <em>HTML</em>'));
+	$v = $type->sanitizeValue($page, $f, array_fill_keys(['body', 'plain', 'entities', 'legacy', 'unlisted'], '**Bold** & <em>HTML</em>'));
 	$out = $type->formatValue($page, $f, $v);
 	$same($n->type->formatValue($page, $n, $v->body), $out->body, 'inheritField copies Fieldtype formatter list');
-	$same($v->plain, $out->plain, 'explicit empty list overrides inherited formatters and default encoding');
+	$same($v->plain, $out->plain, 'explicit empty list overrides inherited formatters');
 	$same($wire->sanitizer->entities($v->entities), $out->entities, 'explicit list replaces inherited list entirely');
-	$same($wire->sanitizer->entities($v->legacy), $out->legacy, 'omitted formatter setting preserves legacy encoding');
-	$f->flexEntityEncode = 0;
-	$out = $type->formatValue($page, $f, $v);
-	$same($n->type->formatValue($page, $n, $v->body), $out->body, 'explicit formatter runs with flexEntityEncode disabled');
-	$same($v->legacy, $out->legacy, 'flexEntityEncode disabled still controls unconfigured text');
+	$same($v->legacy, $out->legacy, 'omitted formatter list leaves text unchanged');
+	$same($out->plain, $out->unlisted, 'missing and explicit empty formatter lists have the same plain Textarea output');
+
+	// Compare absent formatter metadata against an explicit empty list across
+	// plain text, native URL root handling and HTML Textarea output options.
+	$plainSettings = ['contentType' => FieldtypeTextarea::contentTypeHTML, 'htmlOptions' => [FieldtypeTextarea::htmlImageLoadingLazy]];
+	$defaults = $createField('flex_format_defaults', [
+		'text_omitted' => ['type' => 'text'],
+		'text_empty' => ['type' => 'text', 'textformatters' => []],
+		'url_omitted' => ['type' => 'url', 'addRoot' => 1, 'noRelative' => 0],
+		'url_empty' => ['type' => 'url', 'addRoot' => 1, 'noRelative' => 0, 'textformatters' => []],
+		'html_omitted' => ['type' => 'textarea'] + $plainSettings,
+		'html_empty' => ['type' => 'textarea', 'textformatters' => []] + $plainSettings,
+	]);
+	$rawValues = [
+		'text_omitted' => '<b>Plain & text</b>',
+		'text_empty' => '<b>Plain & text</b>',
+		'url_omitted' => '/path/?a=1&b=2',
+		'url_empty' => '/path/?a=1&b=2',
+		'html_omitted' => '<img src="/test.png">',
+		'html_empty' => '<img src="/test.png">',
+	];
+	$defaultsRaw = $type->sanitizeValue($page, $defaults, $rawValues);
+	$defaultsFormatted = $type->formatValue($page, $defaults, $defaultsRaw);
+	$same($defaultsFormatted->text_omitted, $defaultsFormatted->text_empty, 'omitted versus empty formatter list for plain text');
+	$same('<b>Plain & text</b>', $defaultsFormatted->text_omitted, 'no list preserves unescaped plain text');
+	$same($defaultsFormatted->url_omitted, $defaultsFormatted->url_empty, 'omitted versus empty formatter list for native URL settings');
+	$assert(str_contains($defaultsFormatted->url_omitted, '?a=1&b=2'), 'native URL handling does not implicitly entity encode queries');
+	$same($defaultsFormatted->html_omitted, $defaultsFormatted->html_empty, 'omitted versus empty formatter list for HTML Textarea options');
+	$assert(str_contains($defaultsFormatted->html_omitted, 'loading="lazy"'), 'native HTML Textarea output options apply without a formatter list');
+	$same($defaultsRaw->rawArray(), $defaultsFormatted->rawArray(), 'formatted outputs do not change canonical data');
+
 	$n->textformatters = [];
 	$wire->fields->save($n);
 	$v = $type->sanitizeValue($page, $f, ['body' => '<b>Raw</b>']);

@@ -7,11 +7,11 @@ if(PHP_SAPI !== 'cli' || !isset($same, $createField)) {
 
 // Definition files: JSON and PHP sources; dynamically changing PHP must never share a page cache.
 $definitionPath = $wire->config->paths->templates . 'flex-fields/definition-test.json';
-copy(dirname(__DIR__, 2) . '/examples/contact.json', $definitionPath);
+copy(dirname(__DIR__, 2) . '/examples/01-basic.json', $definitionPath);
 $jsonField = clone $field;
 $jsonField->flexDefinition = '';
 $jsonField->flexDefinitionFile = 'flex-fields/definition-test.json';
-$assert(isset($type->getDefinitions($jsonField, $page)->properties()['city']), 'JSON file definitions');
+$assert(isset($type->getDefinitions($jsonField, $page)->properties()['title']), 'JSON file definitions');
 unlink($definitionPath);
 $dynamicPath = $wire->config->paths->templates . 'flex-fields/dynamic-test.php';
 file_put_contents($dynamicPath, '<?php namespace ProcessWire; return ["context_" . $page->id => ["type" => "text"]];');

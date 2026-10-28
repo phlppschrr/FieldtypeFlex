@@ -47,6 +47,7 @@ jobs:
       - run: composer validate --no-check-publish
       - run: python3 scripts/package.py HEAD /tmp/FieldtypeFlex.zip
       - run: node --check FieldtypeFlex.js
+      - run: node --check FlexMaintenance.js
       - run: php tests/integration.php
       - id: wiretests
         name: Check native WireTests availability
@@ -66,6 +67,41 @@ jobs:
       - name: Run WireTests lifecycle checks
         if: steps.wiretests.outputs.available == 'true'
         run: php tests/wiretest-lifecycle.php
+      - name: Show fixture error diagnostics
+        if: failure()
+        run: |
+          for log in .dev/pw/site/assets/logs/{errors,exceptions}.txt; do
+            if [ -f "$log" ]; then tail -v -n 80 "$log"; fi
+          done
+
+  core-fieldtypes:
+    runs-on: ubuntu-latest
+    name: Native core Fieldtypes / PHP 8.3 / MariaDB 10.11
+    services:
+      database:
+        image: mariadb:10.11
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: db
+          MYSQL_USER: db
+          MYSQL_PASSWORD: db
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=10s --health-timeout=5s --health-retries=10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo_mysql, gd, mbstring, fileinfo, dom
+          coverage: none
+      - run: bash scripts/setup-ci.sh
+        env:
+          FLEX_DB_HOST: 127.0.0.1
+          FLEX_PROCESSWIRE_REF_FILE: scripts/processwire-ref.txt
+      - name: Run selected unmodified native Fieldtype tests
+        run: php scripts/wiretest.php --core
       - name: Show fixture error diagnostics
         if: failure()
         run: |

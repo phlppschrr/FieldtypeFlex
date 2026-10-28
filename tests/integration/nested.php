@@ -127,8 +127,7 @@ if(!isset($same, $assert, $throws)) {
 		$copy->nodes->first()->heading = 'Independent';
 		$same('X', $a->nodes->first()->heading, 'duplicated children remain independent');
 		$read->save($field->name);
-		$type->rebuildRowIndex($field);
-		$same([$id], $find('nodes.item.nodes.item.heading=Independent'), 'recursive projection rebuild retains descendants');
+		$same([$id], $find('nodes.item.nodes.item.heading=Independent'), 'saving duplicated subtrees projects descendants automatically');
 
 		$admin = $type->admin();
 		$draft = $admin->open($value, $field->name);
@@ -236,7 +235,7 @@ if(!isset($same, $assert, $throws)) {
 		$sourceRecords = FlexMedia::records($preservedSource->rawArray());
 		$copyRecords = FlexMedia::records($preservedCopy->rawArray());
 		$assert($copyRecords[0]['meta']['id'] !== $sourceRecords[0]['meta']['id'], 'preservation-mode duplicate independently copies unknown descendant media');
-		$type->collectFiles(100);
+		$type->media()->collect(100);
 
 		$sharedIdRaw = $before;
 		$sharedIdRaw['nodes']['items'][1]['values']['nodes']['items'][0]['id'] = $sharedIdRaw['nodes']['items'][0]['values']['nodes']['items'][0]['id'];
