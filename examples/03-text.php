@@ -1,63 +1,64 @@
 <?php namespace ProcessWire;
 
 /**
- * Text controls, HTML escaping and optional language support.
- * Install InputfieldTinyMCE before using the text_body property.
+ * Text controls, HTML escaping and multilingual content.
  * TextformatterEntities escapes HTML text; an empty formatter list leaves text raw.
  */
 return [
-    'text_heading' => [
+    'heading' => [
         'type' => 'text',
-        'label' => __('Heading'),
+        'label' => 'Heading',
         'required' => true,
         'columnWidth' => 50,
         'textformatters' => ['TextformatterEntities'],
     ],
-    'text_plain' => [
+    'plain' => [
         'type' => 'text',
-        'label' => __('Plain text (no automatic HTML escaping)'),
+        'label' => 'Unformatted text',
         'columnWidth' => 50,
         'textformatters' => [],
     ],
-    'text_summary' => [
+    'summary' => [
         'type' => 'textarea',
-        'label' => __('Summary'),
+        'label' => 'Summary',
         'rows' => 4,
         'columnWidth' => 100,
         'textformatters' => ['TextformatterEntities'],
     ],
-    'text_body' => [
+    'body' => [
         'type' => 'TinyMCE',
-        'label' => __('Rich text'),
+        'label' => 'Rich text',
+        'contentType' => FieldtypeTextarea::contentTypeHTML,
+        'htmlOptions' => [FieldtypeTextarea::htmlLinkAbstract], // Keep internal links working when target Pages move.
         'rows' => 8,
         'columnWidth' => 100,
         'textformatters' => [],
         'toolbar' => 'bold italic | bullist numlist | link',
     ],
-    'text_email' => [
+    'email' => [
         'type' => 'email',
-        'label' => __('Email address'),
+        'label' => 'Email address',
         'columnWidth' => 50,
     ],
-    'text_website' => [
+    'website' => [
         'type' => 'url',
-        'label' => __('Website'),
+        'label' => 'Website',
         'columnWidth' => 50,
         'noRelative' => 1,
     ],
-    'text_hidden' => [
+    'hidden' => [
         'type' => 'hidden',
         'value' => 'example-token',
     ],
-    'text_icon' => [
+    'icon' => [
         'type' => 'icon',
-        'label' => __('Icon'),
+        'label' => 'Icon',
         'columnWidth' => 50,
     ],
-    'text_translation' => [
+    'translation' => [
         'type' => 'text',
-        'label' => __('Optional multilingual heading'),
-        'useLanguages' => 'auto',
+        'label' => 'Translated heading',
+        'useLanguages' => true, // Requires LanguageSupport and LanguageSupportFields.
         'textformatters' => ['TextformatterEntities'],
         'columnWidth' => 50,
     ],

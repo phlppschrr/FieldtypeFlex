@@ -9,6 +9,7 @@ Start with [README.md](README.md) for installation and a complete example; see t
 - [Page references](#page-references)
 - [Native compatibility limits](#limits-of-native-compatibility)
 - [Definitions](#definitions)
+- [Objects](#objects)
 - [Rows](#rows)
 - [File and Image properties](#file-and-image-properties)
 - [Selectors](#selectors)
@@ -49,6 +50,7 @@ Individual properties retain types appropriate to their definitions. **The Page'
 | Page reference (`derefAsPage=1`) | `Page` or `false` | Same, with unpublished pages omitted | Page ID or `false` |
 | Page reference (`derefAsPage=2`) | `Page` or `NullPage` | Same, with unpublished pages omitted | Page ID or `0` |
 | Multilingual text | `LanguagesPageFieldValue` | Current-language `string`, formatted by configured Textformatters | Map keyed by language ID |
+| `object` | `FlexValue` | `FlexValue` with formatted child properties | `object:1` envelope |
 | `rows` | `FlexRows` containing `FlexRow` | Visible rows, formatted leaf values | `rows:1` envelope |
 | File / Image | `FlexFiles` / `FlexImages` | Collection, compatible `Pagefile` / `Pageimage`, or `null` | Media metadata envelope |
 
@@ -164,12 +166,20 @@ Flex reuses native Inputfields and selected Fieldtype behavior, with these bound
 
 | Area | Difference |
 | --- | --- |
-| Text / HTML | Native URL sleep/wakeup and optional link abstraction apply to HTML text. Image markup QA and `$page->links()` / `MarkupQA::findLinks()` integration are unsupported. Configure Textformatters explicitly for HTML text escaping. |
+| Text / HTML | Declared HTML text supports native URL sleep/wakeup and optional internal link abstraction. Image markup QA is unsupported. Configure Textformatters explicitly when escaping plain text for HTML output. |
+| Incoming HTML links | Automatic `$target->links()` discovery does not include Flex fields. Direct `MarkupQA::findLinks()` calls are incomplete for Flex; see below. |
 | Integer / Float / Datetime | Integer/Float preserve explicit zero. Invalid numbers/dates raise `WireException` rather than using permissive native conversion or blank fallback. |
 | Checkbox / Toggle | Custom checkbox scalars are supported. Toggle supports native `formatType` output modes; custom integer option keys remain supported. |
 | Choices | Values are raw keys, not native FieldtypeOptions objects or option IDs. |
 | File / Image | Compatible objects use Flex-owned storage; see [media restrictions](#adding-saving-and-ownership). |
 | Objects / Rows / layout | Objects return a fixed `FlexValue`; Rows are not Repeater Pages. Ordinary fieldsets and Markup have no stored value. |
+
+Internal link abstraction keeps outgoing HTML links working when targets move or are renamed.
+This does not register Flex fields with native backlink discovery. A direct
+`MarkupQA::findLinks()` call with an explicit Flex field name can find links in
+searchable root or visible Row HTML, but it is not a complete Flex backlink API:
+links present only in hidden Rows or custom File/Image HTML can be missed because
+they do not participate in whole-field text-search candidates.
 
 ## Definitions
 
@@ -481,7 +491,7 @@ $block->notes->addRow('note', ['text' => 'A note']);
 $page->save('content');
 ```
 
-The example assumes the nested `sections → blocks → notes` schema in [examples/08-rows.php](examples/08-rows.php). Paths for schema lookup and selectors include each type, for example `sections.section.blocks.text.heading`.
+The example assumes the nested `sections → blocks → notes` schema in [examples/07-rows.php](examples/07-rows.php). Paths for schema lookup and selectors include each type, for example `sections.section.blocks.text.heading`.
 
 Native [[InputfieldWrapper]] definitions use InputfieldFlexRows instead of the array/JSON type keyword. Each type's `children` accepts an array or native wrapper, including nested InputfieldFlexRows:
 
@@ -598,7 +608,7 @@ $page->of(true);
 echo $page->content->gallery->first()->copyright;
 ```
 
-Supported inputs are Text, Textarea (plain or HTML), TinyMCE, Hidden, Page, Email, URL, Integer, Float, Select, Radios, SelectMultiple, Checkboxes, AsmSelect, Checkbox, Toggle, Datetime and TextTags, grouped with ordinary fieldsets if needed. Markup displays editor content without storing a value. Leaves share one metadata scope per file. Their values follow the [Flex value types](#value-types): raw keys/lists, numeric zero, timestamps and multilingual text. Labels, defaults, native settings, compatible `inheritField`, `required`, `showIf` and `requiredIf` apply. Rows, nested media and unsupported third-party inputs are rejected in `customFields`.
+Supported inputs are Text, Textarea (plain or HTML), TinyMCE, Hidden, Page, Email, URL, Integer, Float, Select, Radios, SelectMultiple, Checkboxes, AsmSelect, Checkbox, Toggle, Datetime and TextTags, grouped with ordinary fieldsets if needed. Markup displays editor content without storing a value. Leaves share one metadata scope per file. Their values follow the [Flex value types](#value-types): raw keys/lists, numeric zero, timestamps and multilingual text. Labels, defaults, native settings, compatible `inheritField`, `required`, `showIf` and `requiredIf` apply. Objects, Rows, nested media and unsupported third-party inputs are rejected in `customFields`.
 
 TinyMCE uses the existing native rich-text and language pipeline, including inline mode. Pending editor content survives image refreshes and the existing single-file replacement. Its upload destination remains a regular ProcessWire Image field. Page metadata uses native `InputfieldSelect` (default) or `InputfieldAsmSelect`; other Page selection widgets are rejected. The [Page-reference value rules](#value-types) apply: `derefAsPage` selects Page/PageArray, selections store IDs, and mutations on an unformatted original's PageArray are saved with the file or owning field. Reference containers are independent in copies and formatted views. Page metadata has no SQL selectors or Page-reference traversal.
 
@@ -782,7 +792,7 @@ External sources must be rendered native value inputs. Rows, fieldsets, File/Ima
 
 The source Field must use the same Inputfield type (here, Textarea configured for TinyMCE). Flex copies Inputfield settings, compatible FieldtypeText/FieldtypeFile `textformatters` and Textarea `contentType`/`htmlOptions`, never source values or storage. Local settings override inherited ones; an explicit formatter list replaces the inherited list, including `[]`.
 
-TinyMCE's native `settingsField` is separate from `inheritField`. See [text inputs](examples/03-text.php), [numbers/dates](examples/04-numbers-dates.php) and [advanced settings](examples/07-advanced.php) for prerequisites and examples.
+TinyMCE's native `settingsField` is separate from `inheritField`. See [text inputs](examples/03-text.php), [numbers/dates](examples/04-numbers-dates.php) and [advanced settings](examples/08-advanced.php) for prerequisites and examples.
 
 ### Textformatters
 

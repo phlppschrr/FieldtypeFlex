@@ -15,7 +15,7 @@ if(!is_file($browserFiles . '/flex-hero.png')) {
 }
 file_put_contents($browserFiles . '/flex-download.txt', 'Disposable Flex upload fixture');
 $definitions = $wire->config->paths->templates . 'flex-fields/structured.php';
-copy(dirname(__DIR__) . '/examples/08-rows.php', $definitions);
+copy(dirname(__DIR__) . '/examples/07-rows.php', $definitions);
 $type = $wire->modules->get('FieldtypeFlex');
 $field = $wire->fields->get('flex_content');
 if(!$field) {

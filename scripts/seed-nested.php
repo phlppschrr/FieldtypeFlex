@@ -7,7 +7,7 @@ $directory = $wire->config->paths->templates . 'flex-fields/';
 if(!is_dir($directory)) {
 	mkdir($directory, 0755, true);
 }
-copy(dirname(__DIR__) . '/examples/08-rows.php', $directory . 'nested.php');
+copy(dirname(__DIR__) . '/examples/07-rows.php', $directory . 'nested.php');
 $fields = [];
 foreach(['flex_nested', 'flex_nested_extra'] as $name) {
 	$field = $wire->fields->get($name);

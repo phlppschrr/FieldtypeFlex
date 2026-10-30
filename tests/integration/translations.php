@@ -29,10 +29,6 @@ $translationSources = [
 	'src/FlexRows.php'            => ['Maximum repeatable item count reached', 'Invalid Flex row ID'],
 	'src/FlexValue.php'           => ["Invalid date for Flex '%s'"],
 	'src/InputfieldFlexMedia.php' => ['Rotate 90°', 'Flip vertically'],
-	'examples/03-text.php' => ['Heading', 'Summary'],
-	'examples/05-choices.php' => ['Germany', 'Austria'],
-	'examples/08-rows.php' => ['Text', 'Section'],
-	'examples/manifest.php' => ['Basic PHP array', 'Kitchen Sink'],
 ];
 
 try {
@@ -71,13 +67,19 @@ try {
 	$setTranslation((new \ReflectionMethod(InputfieldFlexRows::class, 'getModuleInfo'))->getFileName(), 'Repeatable native inputs inside Flex', 'Wiederholbare Eingaben');
 	$same('Wiederholbare Eingaben', InputfieldFlexRows::getModuleInfo()['summary'], 'row module summary is translated');
 
-	$setTranslation($translationRoot . '/examples/05-choices.php', 'Germany', 'Deutschland');
-	$translatedOptions = require $translationRoot . '/examples/05-choices.php';
-	$same('Deutschland', $translatedOptions['choice_country']['options']['DE'], 'included native choice definitions use their source textdomain');
-
-	$setTranslation($translationRoot . '/examples/08-rows.php', 'Text', 'Textbaustein');
+	$setTranslation(__FILE__, 'Text', 'Textbaustein');
 	$translatedRowsField = $createField('flex_translated_rows', []);
-	$translatedRowsDefs = new FlexFieldDefs($translatedRowsField, $page, require $translationRoot . '/examples/08-rows.php');
+	$translatedRowsDefs = new FlexFieldDefs($translatedRowsField, $page, [
+		'blocks' => [
+			'type' => 'rows',
+			'types' => [
+				'text' => [
+					'label' => __('Text', __FILE__),
+					'children' => ['heading' => ['type' => 'text']],
+				],
+			],
+		],
+	]);
 	$translatedRowsValue = new FlexValue($page, $translatedRowsField, $translatedRowsDefs);
 	$translatedRow = $translatedRowsValue->blocks->addRow('text');
 	$same('Textbaustein', $translatedRow->rowTypeLabel(), 'runtime type label uses the translation resolved by the native PHP definition');

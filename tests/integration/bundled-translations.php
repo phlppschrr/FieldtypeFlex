@@ -10,7 +10,7 @@ $root = dirname(__DIR__, 2);
 $previousLanguage = $wire->user->language;
 $languageFiles = $wire->modules->getModuleLanguageFiles('FieldtypeFlex');
 $same(['de', 'es', 'fr'], array_keys($languageFiles), 'module discovers all three bundled languages');
-$sources = array_merge(glob($root . '/*.module.php'), glob($root . '/src/*.php'), glob($root . '/examples/*.php'));
+$sources = array_merge(glob($root . '/*.module.php'), glob($root . '/src/*.php'));
 $placeholders = static function(string $text): array {
 	preg_match_all('/%(?:\d+\$)?[sdf]|\{\w+\}/', $text, $matches);
 	sort($matches[0]);
@@ -50,7 +50,7 @@ foreach($languageFiles as $code => $csvFile) {
 		}
 		$same([], $errors, "$code translations match native hashes, paths and placeholders without duplicates");
 		$missing = array_diff_key($phrases, $rows);
-		$same([], $missing, "$code covers every runtime and example phrase");
+		$same([], $missing, "$code covers every runtime phrase");
 		$same(count($phrases), count($rows), "$code has no obsolete translations");
 		$same(count($rows), $wire->languages->importTranslationsFile($testLanguage, $csvFile, true), "$code imports with the native module translation API");
 		$wire->user->language = $testLanguage;

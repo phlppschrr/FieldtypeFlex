@@ -1,61 +1,70 @@
 <?php namespace ProcessWire;
 
-/**
- * Single/multiple Page references and File/Image collections.
- * Adjust findPagesSelector to the Pages that editors should be able to select.
- */
+/** Page references and media with per-image metadata. Adapt selectors to your Page tree. */
 return [
-    'ref_primary' => [
+    'primary_page' => [
         'type' => 'page',
-        'label' => __('Primary page'),
+        'label' => 'Primary page',
         'inputfield' => 'InputfieldSelect',
-        'derefAsPage' => 2,
+        'derefAsPage' => 2, // Return a Page or NullPage rather than a collection.
         'findPagesSelector' => 'parent=1',
         'labelFieldName' => 'title',
         'columnWidth' => 50,
     ],
-    'ref_related' => [
+    'related_pages' => [
         'type' => 'page',
-        'label' => __('Related pages'),
+        'label' => 'Related pages',
         'inputfield' => 'InputfieldAsmSelect',
-        'derefAsPage' => 0,
+        'derefAsPage' => 0, // Return a PageArray, preserving the selected order.
         'findPagesSelector' => 'parent=1',
         'labelFieldName' => 'title',
         'columnWidth' => 50,
     ],
-    'media_cover' => [
-        'type' => 'image',
-        'textformatters' => ['TextformatterEntities'],
-        'label' => __('Cover image'),
-        'extensions' => 'jpg jpeg gif png',
-        'maxFiles' => 1,
-        'columnWidth' => 50,
+    'show_credits' => [
+        'type' => 'checkbox',
+        'label' => 'Show image credits',
+        'value' => 1,
     ],
-    'media_gallery' => [
+    'cover' => [
         'type' => 'image',
+        'label' => 'Cover image',
         'textformatters' => ['TextformatterEntities'],
-        'label' => __('Image gallery'),
         'extensions' => 'jpg jpeg gif png',
-        'customFields' => [
-            'description' => ['type' => 'textarea'],
-            'tags' => ['type' => 'TextTags'],
-            'copyright' => ['type' => 'text', 'textformatters' => ['TextformatterEntities']],
-            'year' => ['type' => 'integer'],
-            'decorative' => ['type' => 'checkbox'],
-            'credit' => ['type' => 'text', 'showIf' => 'decorative=0'],
-            'body' => ['type' => 'TinyMCE'],
-            'photographer' => ['type' => 'page', 'inputfield' => 'InputfieldSelect', 'derefAsPage' => 2, 'parent_id' => 1],
-        ],
+        'maxFiles' => 1, // Formatted reads return a single Pageimage (or null).
+    ],
+    'gallery' => [
+        'type' => 'image',
+        'label' => 'Image gallery',
+        'textformatters' => ['TextformatterEntities'],
+        'extensions' => 'jpg jpeg gif png',
         'maxFiles' => 10,
-        'outputFormat' => 1,
-        'columnWidth' => 50,
+        'outputFormat' => 1, // Always return a collection, even with one image.
+        'customFields' => [ // Each image has its own metadata values.
+            'description' => ['type' => 'textarea', 'label' => 'Description'], // Customize the native description input.
+            'tags' => ['type' => 'TextTags', 'label' => 'Tags'], // Edit the native tags, not a separate property.
+            'copyright' => [
+                'type' => 'text', 'label' => 'Copyright', 'columnWidth' => 50,
+                'textformatters' => ['TextformatterEntities'],
+            ],
+            'year' => ['type' => 'integer', 'label' => 'Year', 'columnWidth' => 50],
+            'decorative' => ['type' => 'checkbox', 'label' => 'Decorative image'],
+            'credit' => [
+                'type' => 'text', 'label' => 'Photo credit',
+                'showIf' => 'decorative=0, parent.show_credits=1', // Local image metadata and the containing Flex value.
+                'textformatters' => ['TextformatterEntities'],
+            ],
+            'body' => ['type' => 'TinyMCE', 'label' => 'Image notes'],
+            'photographer' => [
+                'type' => 'page', 'label' => 'Photographer',
+                'inputfield' => 'InputfieldSelect', 'derefAsPage' => 2, 'parent_id' => 1,
+            ],
+        ],
     ],
-    'media_downloads' => [
+    'downloads' => [
         'type' => 'file',
+        'label' => 'Downloads',
         'textformatters' => ['TextformatterEntities'],
-        'label' => __('Downloads'),
         'extensions' => 'pdf txt zip',
         'maxFiles' => 5,
-        'columnWidth' => 100,
     ],
 ];

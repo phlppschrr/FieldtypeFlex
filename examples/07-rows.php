@@ -11,64 +11,64 @@
 return [
 	'heading'   => [
 		'type'  => 'text',
-		'label' => __('Content heading'),
+		'label' => 'Content heading',
 	],
 	'hero'      => [
 		'type'     => 'image',
 		'textformatters' => ['TextformatterEntities'],
-		'label'    => __('Hero image'),
+		'label'    => 'Hero image',
 		'maxFiles' => 1,
 	],
 	'downloads' => [
 		'type'       => 'file',
 		'textformatters' => ['TextformatterEntities'],
-		'label'      => __('Downloads'),
+		'label'      => 'Downloads',
 		'extensions' => 'pdf txt zip',
 		'maxFiles'   => 5,
 	],
+	'notes_enabled' => [
+		'type' => 'checkbox',
+		'label' => 'Enable editorial notes',
+	],
 	'slides'    => [
 		'type'        => 'rows',
-		'label'       => __('Slides'),
+		'label'       => 'Slides',
 		'maxItems'    => 20,
 		'rowCollapse' => FieldtypeFlex::ROW_COLLAPSE_EXISTING,
-		'addRowLabel' => __('Add slide'),
+		'addRowLabel' => 'Add slide',
 		'types'       => [
 			'item' => [
-				'label'    => __('Slide'),
-				'rowTitle' => '#n: {heading}',
+				'label'    => 'Slide',
+				'rowTitle' => '#n: {heading}', // Row number and live heading.
 				'children' => [
 					'heading' => [
 						'type'     => 'text',
-						'label'    => __('Slide heading'),
+						'label'    => 'Slide heading',
 						'required' => true,
 					],
 					'image'   => [
 						'type'     => 'image',
 						'textformatters' => ['TextformatterEntities'],
-						'label'    => __('Slide image'),
+						'label'    => 'Slide image',
 						'maxFiles' => 1,
 					],
 					'body'    => [
 						'type'     => 'TinyMCE',
-						'label'    => __('Slide text'),
+						'label'    => 'Slide text',
 						'lazyMode' => 0,
 					],
 					'summary' => [
 						'type'         => 'text',
-						'label'        => __('Summary'),
-						'useLanguages' => 'auto',
-					],
-					'price'   => [
-						'type'  => 'float',
-						'label' => __('Price'),
+						'label'        => 'Summary',
+						'useLanguages' => true, // Requires LanguageSupport and LanguageSupportFields.
 					],
 					'enabled' => [
 						'type'  => 'checkbox',
-						'label' => __('Enable link'),
+						'label' => 'Enable link',
 					],
 					'link'    => [
 						'type'   => 'url',
-						'label'  => __('Link'),
+						'label'  => 'Link',
 						'showIf' => 'enabled=1',
 					],
 				],
@@ -77,21 +77,22 @@ return [
 	],
 	'facts'     => [
 		'type'        => 'rows',
-		'label'       => __('Facts'),
+		'label'       => 'Facts',
 		'rowCollapse' => FieldtypeFlex::ROW_COLLAPSE_EXISTING,
-		'addRowLabel' => __('Add fact'),
+		'rowLazyLoad' => true, // Load closed simple row bodies on opening; rich text/media types render directly.
+		'addRowLabel' => 'Add fact',
 		'types'       => [
 			'item' => [
-				'label'    => __('Fact'),
+				'label'    => 'Fact',
 				'rowTitle' => '_{@type}_ {heading}',
 				'children' => [
 					'heading' => [
 						'type'  => 'text',
-						'label' => __('Fact'),
+						'label' => 'Fact',
 					],
 					'number'  => [
 						'type'  => 'integer',
-						'label' => __('Number'),
+						'label' => 'Number',
 					],
 				],
 			],
@@ -99,54 +100,54 @@ return [
 	],
 	'blocks'    => [
 		'type'        => 'rows',
-		'label'       => __('Content blocks'),
+		'label'       => 'Content blocks',
 		'maxItems'    => 20,
 		'rowCollapse' => FieldtypeFlex::ROW_COLLAPSE_EXISTING,
-		'addRowLabel' => __('Add block'),
+		'addRowLabel' => 'Add block',
 		'types'       => [
 			'text'  => [
-				'label'    => __('Text'),
+				'label'    => 'Text',
 				'rowTitle' => '#n: {heading}',
 				'children' => [
 					'heading' => [
 						'type'     => 'text',
-						'label'    => __('Heading'),
+						'label'    => 'Heading',
 						'required' => true,
 					],
 					'body'    => [
 						'type'     => 'TinyMCE',
-						'label'    => __('Body'),
+						'label'    => 'Body',
 						'lazyMode' => 0,
 					],
 				],
 			],
 			'image' => [
-				'label'    => __('Image'),
+				'label'    => 'Image',
 				'rowTitle' => '#n: {caption}',
 				'children' => [
 					'image'   => [
 						'type'     => 'image',
 						'textformatters' => ['TextformatterEntities'],
-						'label'    => __('Image'),
+						'label'    => 'Image',
 						'maxFiles' => 1,
 					],
 					'caption' => [
 						'type'  => 'text',
-						'label' => __('Caption'),
+						'label' => 'Caption',
 					],
 				],
 			],
 			'quote' => [
-				'label'    => __('Quote'),
+				'label'    => 'Quote',
 				'rowTitle' => '#n: {quote}',
 				'children' => [
 					'quote'  => [
 						'type'  => 'textarea',
-						'label' => __('Quote'),
+						'label' => 'Quote',
 					],
 					'author' => [
 						'type'  => 'text',
-						'label' => __('Author'),
+						'label' => 'Author',
 					],
 				],
 			],
@@ -155,50 +156,56 @@ return [
 
 	'sections' => [
 		'type'        => 'rows',
-		'label'       => __('Sections'),
-		'addRowLabel' => __('Add section'),
+		'label'       => 'Sections',
+		'addRowLabel' => 'Add section',
 		'rowCollapse' => FieldtypeFlex::ROW_EXPAND_ALL,
 		'types'       => [
 			'section' => [
-				'label'    => __('Section'),
-				'rowTitle' => '[{@path}] / _{heading}_',
+				'label'    => 'Section',
+				'rowTitle' => '[{@path}] / _{heading}_', // Muted ancestor types and a heading badge.
 				'children' => [
 					'heading' => [
 						'type'     => 'text',
-						'label'    => __('Section heading'),
+						'label'    => 'Section heading',
 						'required' => true,
+					],
+					'show_notes' => [
+						'type' => 'checkbox',
+						'label' => 'Show notes in this section',
+						'showIf' => 'root.notes_enabled=1', // Read the root Flex property from this section row.
 					],
 					'blocks'  => [
 						'type'        => 'rows',
-						'label'       => __('Blocks'),
-						'addRowLabel' => __('Add block'),
+						'label'       => 'Blocks',
+						'addRowLabel' => 'Add block',
 						'rowCollapse' => FieldtypeFlex::ROW_EXPAND_ALL,
 						'types'       => [
 							'text'  => [
-								'label'    => __('Text'),
+								'label'    => 'Text',
 								'rowTitle' => '[{@path}] / _{heading}_',
 								'children' => [
 									'heading' => [
 										'type'  => 'text',
-										'label' => __('Block heading'),
+										'label' => 'Block heading',
 									],
 									'body'    => [
 										'type'  => 'TinyMCE',
-										'label' => __('Body'),
+										'label' => 'Body',
 									],
 									'notes'   => [
 										'type'        => 'rows',
-										'label'       => __('Notes'),
-										'addRowLabel' => __('Add note'),
+										'label'       => 'Notes',
+										'addRowLabel' => 'Add note',
 										'rowCollapse' => FieldtypeFlex::ROW_EXPAND_ALL,
+										'showIf' => 'parent.show_notes=1, root.notes_enabled=1', // The containing section and the Flex root must both enable notes.
 										'types'       => [
 											'note' => [
-												'label'    => __('Note'),
+												'label'    => 'Note',
 												'rowTitle' => '{text}',
 												'children' => [
 													'text' => [
 														'type'  => 'text',
-														'label' => __('Note text'),
+														'label' => 'Note text',
 													],
 												],
 											],
@@ -207,17 +214,17 @@ return [
 								],
 							],
 							'image' => [
-								'label'    => __('Image'),
+								'label'    => 'Image',
 								'rowTitle' => '{caption}',
 								'children' => [
 									'caption' => [
 										'type'  => 'text',
-										'label' => __('Caption'),
+										'label' => 'Caption',
 									],
 									'image'   => [
 										'type'     => 'image',
 										'textformatters' => ['TextformatterEntities'],
-										'label'    => __('Image'),
+										'label'    => 'Image',
 										'maxFiles' => 1,
 									],
 								],

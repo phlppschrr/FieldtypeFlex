@@ -81,12 +81,12 @@ if(!$showcase) {
 		$template->fieldgroup->save();
 	}
 	$page->showcase = [
-		'text_translation' => [
+		'translation' => [
 			'default' => 'English summary',
 			'de' => 'Deutsche Zusammenfassung',
 		],
-		'text_body' => '<p>Rich text from <strong>FieldtypeFlex</strong>.</p>',
-		'text_heading' => 'Open source compound fields',
+		'body' => '<p>Rich text from <strong>FieldtypeFlex</strong>.</p>',
+		'heading' => 'Open source compound fields',
 	];
 	$page->save('showcase');
 }

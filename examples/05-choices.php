@@ -2,53 +2,53 @@
 
 /**
  * Single and multiple choice controls. Values contain option keys; optionLabel()
- * returns a display label. Translate labels while keeping stored option keys stable.
+ * returns a display label. Keep stored option keys stable when changing display labels.
  */
 return [
-    'choice_country' => [
+    'country' => [
         'type' => 'select',
-        'label' => __('Country'),
+        'label' => 'Country',
         'options' => [
-            'DE' => __('Germany'),
-            'AT' => __('Austria'),
+            'DE' => 'Germany',
+            'AT' => 'Austria',
         ],
         'columnWidth' => 50,
     ],
-    'choice_priority' => [
+    'priority' => [
         'type' => 'radios',
-        'label' => __('Priority'),
+        'label' => 'Priority',
         'options' => [
-            'low' => __('Low'),
-            'medium' => __('Medium'),
-            'high' => __('High'),
+            'low' => 'Low',
+            'medium' => 'Medium',
+            'high' => 'High',
         ],
         'columnWidth' => 50,
     ],
-    'choice_features' => [
+    'features' => [
         'type' => 'checkboxes',
-        'label' => __('Features'),
+        'label' => 'Features',
         'options' => [
-            'design' => __('Design'),
-            'code' => __('Code'),
-            'docs' => __('Documentation'),
+            'design' => 'Design',
+            'code' => 'Code',
+            'docs' => 'Documentation',
         ],
         'columnWidth' => 50,
     ],
-    'choice_topics' => [
+    'topics' => [
         'type' => 'SelectMultiple',
-        'label' => __('Topics'),
+        'label' => 'Topics',
         'options' => ['php' => 'PHP', 'cms' => 'CMS', 'api' => 'API'],
         'columnWidth' => 50,
     ],
-    'choice_ordered' => [
+    'ordered' => [
         'type' => 'AsmSelect',
-        'label' => __('Ordered choices'),
+        'label' => 'Ordered choices',
         'options' => ['a' => 'Alpha', 'b' => 'Beta', 'c' => 'Gamma'],
         'columnWidth' => 50,
     ],
-    'choice_tags' => [
+    'tags' => [
         'type' => 'TextTags',
-        'label' => __('Tags'),
+        'label' => 'Tags',
         'options' => ['alpha' => 'Alpha', 'beta' => 'Beta', 'gamma' => 'Gamma'],
         'columnWidth' => 50,
     ],

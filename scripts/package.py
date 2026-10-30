@@ -16,7 +16,7 @@ REQUIRED = {
     'API.md', 'LICENSE', 'README.md', 'FieldtypeFlex.module.php',
     'InputfieldFlex.module.php', 'InputfieldFlexRows.module.php',
     'FieldtypeFlex.js', 'FieldtypeFlex.css',
-    'src/FlexValue.php', 'examples/manifest.php', 'languages/de.csv',
+    'src/FlexValue.php', 'examples/README.md', 'languages/de.csv',
     'languages/fr.csv', 'languages/es.csv',
 }
 EXCLUDED = ('.dev/', '.ddev/', '.github/', 'scripts/', 'tests/', 'AGENTS.md', 'FieldtypeFlex.test.php')

@@ -1,4 +1,4 @@
-# Installation archives retain documentation and the runtime example catalog.
+# Installation archives retain documentation and configuration examples.
 /.ddev/ export-ignore
 /.github/ export-ignore
 /scripts/ export-ignore

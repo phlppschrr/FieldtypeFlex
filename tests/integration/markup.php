@@ -61,6 +61,36 @@ $before = $value->rawArray();
 $page->save($name);
 $stored = $type->storage()->persisted($page, $f);
 $same($asleep, $stored['body'], 'Flex storage matches native Textarea bytes');
+// Native backlink discovery must not be confused with HTML URL/link transforms.
+$same([$id], array_values($second->links('id=' . $id, $native->name)->explode('id')), 'native Page links discovers the saved HTML Textarea reference');
+$same([], array_values($second->links('id=' . $id, $name)->explode('id')), 'native Page links does not discover the same reference through a Flex field');
+$nativeQa = new MarkupQA($page, $native);
+$same([$id], array_values($nativeQa->findLinks($second, [$native->name])->explode('id')), 'native MarkupQA discovers the Textarea backlink');
+$flexQa = new MarkupQA($page, $f);
+$same([$id], array_values($flexQa->findLinks($second, [$name])->explode('id')), 'explicit native MarkupQA can discover searchable root HTML in a Flex field');
+$backlinkField = $createField('flex_markup_backlinks', [
+	'blocks' => ['type' => 'rows', 'types' => ['block' => ['children' => ['body' => $html]]]],
+	'attachment' => $media,
+]);
+$backlinkName = $backlinkField->name;
+$backlinks = $page->getUnformatted($backlinkName);
+$hiddenLink = $backlinks->blocks->addRow('block', ['body' => $input]);
+$hiddenLink->setHidden(true);
+$page->save($backlinkName);
+$backlinkQa = new MarkupQA($page, $backlinkField);
+$assert(str_contains(json_encode($type->storage()->persisted($page, $backlinkField)), 'data-pwid=' . $second->id), 'hidden-only backlink fixture stores an abstracted link');
+$same([], array_values($backlinkQa->findLinks($second, [$backlinkName])->explode('id')), 'native MarkupQA misses a link present only in a hidden Flex Row');
+$hiddenLink->setHidden(false);
+$page->save($backlinkName);
+$wire->pages->uncacheAll();
+$same([$id], array_values($backlinkQa->findLinks($second, [$backlinkName])->explode('id')), 'native MarkupQA can find the same Flex Row link when it participates in whole-field search');
+$backlinks->blocks->removeRow($hiddenLink->rowId());
+$backlinks->attachment->add($fixture);
+$backlinks->attachment->first()->body = $input;
+$page->save($backlinkName);
+$wire->pages->uncacheAll();
+$assert(str_contains(json_encode($type->storage()->persisted($page, $backlinkField)), 'data-pwid=' . $second->id), 'custom-media-only backlink fixture stores an abstracted link');
+$same([], array_values($backlinkQa->findLinks($second, [$backlinkName])->explode('id')), 'native MarkupQA misses a link present only in custom file HTML');
 foreach(['editor', 'inherited'] as $property) $same($asleep, $stored[$property], "$property stores native abstracted HTML");
 foreach(['plain', 'text'] as $property) $same($input, $stored[$property], "$property is not transformed");
 $assert(!str_contains($stored['overridden'], 'data-pwid='), 'explicit empty htmlOptions overrides inherited link abstraction');

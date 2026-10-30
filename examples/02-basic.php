@@ -4,13 +4,13 @@
 return [
     'title' => [
         'type' => 'text',
-        'label' => __('Title'),
+        'label' => 'Title',
         'required' => true,
         'columnWidth' => 50,
     ],
     'email' => [
         'type' => 'email',
-        'label' => __('Email'),
+        'label' => 'Email',
         'columnWidth' => 50,
     ],
 ];

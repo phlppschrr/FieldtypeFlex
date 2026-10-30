@@ -2,40 +2,47 @@
 
 /** Number/state controls and localized date/time editors, also usable as Row children. */
 return [
-    'number_quantity' => [
+    'quantity' => [
         'type' => 'integer',
-        'label' => __('Quantity'),
+        'label' => 'Quantity',
         'min' => 0,
         'columnWidth' => 33,
     ],
-    'number_price' => [
+    'price' => [
         'type' => 'float',
-        'label' => __('Price'),
-        'precision' => 2,
+        'label' => 'Price',
+        'precision' => 2, // Round values to two decimal places.
         'columnWidth' => 33,
     ],
-    'number_toggle' => [
+    'toggle' => [
         'type' => 'Toggle',
-        'label' => __('Enabled state'),
+        'label' => 'Enabled state',
         'columnWidth' => 34,
     ],
-    'number_confirmed' => [
+    'confirmed' => [
         'type' => 'checkbox',
-        'label' => __('Confirmed'),
+        'label' => 'Confirmed',
         'columnWidth' => 50,
     ],
-    'number_date' => [
+    'status' => [
+        'type' => 'Toggle',
+        'label' => 'Publication status',
+        'options' => [0 => 'Draft', 1 => 'Published', 2 => 'Archived'],
+        'formatType' => 2, // Formatted reads return the label; storage keeps the integer key.
+        'columnWidth' => 50,
+    ],
+    'date' => [
         'type' => 'datetime',
-        'label' => __('Start date'),
+        'label' => 'Start date',
         'inputType' => 'text',
         'datepicker' => InputfieldDatetime::datepickerFocus,
         'dateInputFormat' => 'd.m.Y',
         'dateOutputFormat' => 'd.m.Y',
         'columnWidth' => 50,
     ],
-    'number_datetime' => [
+    'datetime' => [
         'type' => 'datetime',
-        'label' => __('Start date and time'),
+        'label' => 'Start date and time',
         'inputType' => 'text',
         'datepicker' => InputfieldDatetime::datepickerFocus,
         'dateInputFormat' => 'Y-m-d',

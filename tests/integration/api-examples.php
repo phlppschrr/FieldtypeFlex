@@ -63,7 +63,7 @@ $schema = $base + $objectSchema + $rowSchema + $mediaSchema + $inheritSchema + $
 	'appearance' => ['type' => 'select', 'label' => 'Appearance & style', 'options' => ['featured' => 'Featured & selected']],
 	'starts_on' => ['type' => 'datetime', 'dateInputFormat' => 'd.m.Y', 'dateOutputFormat' => 'd.m.Y'],
 ];
-$nestedReference = require dirname(__DIR__, 2) . '/examples/08-rows.php';
+$nestedReference = require dirname(__DIR__, 2) . '/examples/07-rows.php';
 $schema['sections'] = $nestedReference['sections'];
 $apiField = $createField('flex_api_examples', $schema);
 $name = $apiField->name;
