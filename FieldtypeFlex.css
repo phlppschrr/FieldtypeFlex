@@ -26,6 +26,7 @@
     align-items: center;
     gap: .25rem;
     padding: 0 .5rem;
+    border-radius: inherit;
 }
 .AdminThemeUikitOriginal .flex-row-bar {
     color: #fff;
@@ -176,6 +177,7 @@
    Hover/focus restores the controls; the open body always stays fully readable. */
 .flex-row.InputfieldStateCollapsed > .flex-row-header {
     opacity: .9;
+    border-radius: var(--radius-xl, 0);
 }
 .flex-row.flex-row-hidden > .flex-row-header {
     opacity: .5;
