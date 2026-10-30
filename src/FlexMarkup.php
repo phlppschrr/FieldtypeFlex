@@ -53,7 +53,9 @@ class FlexMarkup {
 	public static function sleep(Page $page, Field $field, FlexFieldDefs $schema, array $raw): array {
 		foreach($schema->properties() as $name => $definition) {
 			if(!array_key_exists($name, $raw)) continue;
-			if($definition['kind'] === 'rows') {
+			if($definition['kind'] === 'object') {
+				$raw[$name]['values'] = self::sleep($page, $field, $definition['schema'], $raw[$name]['values']);
+			} else if($definition['kind'] === 'rows') {
 				foreach($raw[$name]['items'] ?? [] as $index => $row) {
 					$children = $definition['types'][$row['type']]['schema'] ?? null;
 					if($children && isset($row['values'])) {

@@ -107,7 +107,7 @@ Unknown ordinary property reads return `null`; unknown writes throw `WireExcepti
 
 `hasValue()` checks canonical content regardless of formatting or row visibility. Empty strings, `null`, `false`, empty collections, `NullPage` and unchecked checkboxes are empty. Numeric `0` and string `'0'` otherwise count as content, as does whitespace. Any populated language or row leaf counts, including retained unknown row properties; row identity alone does not. Unknown property names themselves return false. Media entries count without checking files on disk. Native required validation still applies to individual editor inputs.
 
-`isChanged()` includes nested Rows, PageArrays, language values and media; a direct property name limits the check. Read helpers do not mark changes.
+`isChanged()` includes nested Objects, Rows, PageArrays, language values and media; a direct property name limits the check. Read helpers do not mark changes.
 
 Page-formatted values are cloned views. Reacquire `$page->content` after `$page->of(false)` before editing: retained formatted values stay formatted. `getUnformatted()` bypasses one property's output conversion, but does not make the value or its nested objects writable. Setters require both the value and owning Page to be unformatted.
 
@@ -169,7 +169,7 @@ Flex reuses native Inputfields and selected Fieldtype behavior, with these bound
 | Checkbox / Toggle | Custom checkbox scalars are supported. Toggle supports native `formatType` output modes; custom integer option keys remain supported. |
 | Choices | Values are raw keys, not native FieldtypeOptions objects or option IDs. |
 | File / Image | Compatible objects use Flex-owned storage; see [media restrictions](#adding-saving-and-ownership). |
-| Rows / layout | Rows are not Repeater Pages. Ordinary fieldsets and Markup have no stored value. |
+| Objects / Rows / layout | Objects return a fixed `FlexValue`; Rows are not Repeater Pages. Ordinary fieldsets and Markup have no stored value. |
 
 ## Definitions
 
@@ -208,9 +208,9 @@ return [
 ];
 ```
 
-PHP files return a property array or `InputfieldWrapper`; JSON uses an object keyed by property name (empty `[]` is also accepted). `type` defaults to `text` and selects a native ProcessWire Inputfield (`text` means `InputfieldText`) or Flex's own structure type `rows`. The default label is derived from the property name. Property keys are stored names: they must begin with a letter or underscore and contain only ASCII letters, digits and underscores. `data`, `pages_id` and `count` are reserved.
+PHP files return a property array or `InputfieldWrapper`; JSON uses an object keyed by property name (empty `[]` is also accepted). `type` defaults to `text` and selects a native ProcessWire Inputfield (`text` means `InputfieldText`) or Flex's structure types `object` and `rows`. The default label is derived from the property name. Property keys are stored names: they must begin with a letter or underscore and contain only ASCII letters, digits and underscores. `data`, `pages_id` and `count` are reserved.
 
-An ordinary `fieldset` groups native inputs, but its `children` remain **flat properties in the containing value**. A `rows` property introduces a separate typed collection and data scope. See [Rows](#rows).
+An ordinary `fieldset` groups native inputs, but its `children` remain **flat properties in the containing value**. An `object` introduces one fixed child scope; a `rows` property introduces a typed collection. See [Objects](#objects) and [Rows](#rows).
 
 ### Evaluation and schema inspection
 
@@ -243,6 +243,47 @@ A field without a definition may initially be empty. If an automatic definition 
 Unknown properties, nested data and owned media **always survive ordinary saves**. Use [maintenance](#maintenance-apis) to apply bulk renames or explicitly remove unknown keys. Prefer complete definitions for all Page/role contexts and native collapsed/Locked input states; dynamically omitted properties complicate orphan discovery.
 
 <a id="repeatable-rows-and-native-media"></a>
+
+## Objects
+
+`type => 'object'` declares one fixed, named `FlexValue` with a `children` schema.
+The editor uses a native fieldset; there are no add/remove controls, row IDs or
+row types. Objects can contain further Objects, Rows and File/Image properties.
+Ordinary fieldsets continue to keep their children flat.
+
+```php
+// Fixed object definition.
+'link' => [
+    'type' => 'object',
+    'label' => 'Link',
+    'children' => [
+        'label' => ['type' => 'text'],
+        'url' => ['type' => 'url'],
+    ],
+],
+```
+
+Read `$page->content->link->url`. With Page output formatting disabled, edit
+that property or assign a property map: `$page->content->link = ['url' => '/about/']`.
+Map assignment replaces the Object value and applies child defaults to omitted
+known properties; editing individual leaves retains other values. The Object
+always exists, including when empty. Use `$page->content->hasValue('link')` to
+check its content rather than PHP object truthiness. Raw exports represent each Object as `{"_flex":"object:1","values":{…}}`;
+use a plain property map for ordinary assignment. Unknown stored children
+survive ordinary saves. Child renames and explicit maintenance work recursively.
+
+Child values use the usual formatting, language, change-tracking and copy rules.
+Names are local to their Object. Native fieldset presentation settings apply to
+the group; child validation and dependencies use native Inputfields. Bare
+conditions address siblings; `parent.enabled=1` addresses the containing Object
+or Row, and `root.enabled=1` addresses the Flex root. Objects inside Rows render
+eagerly; eligible Rows inside Objects can enable their usual lazy loading.
+
+Selectors use property paths, for example `content.link.label=Contact` or
+`content.blocks.text.link.label=Contact`. Fixed Object scalar leaves can be sorted;
+repeated Row leaves remain ambiguous. Counts and count sorts address collections inside Objects, for example `content.section.blocks.count`. Objects themselves have no collection `count` selector. `FlexRows::find()` also accepts Object leaf paths such as `link.label=Contact`.
+Objects are not supported inside per-file `customFields`.
+
 
 ## Rows
 

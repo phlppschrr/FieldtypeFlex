@@ -62,6 +62,20 @@ The integration runner uses the same command in CI and local development. The po
 
 The CI workflow runs the integration suite and the available WireTests contract across its configured ProcessWire, PHP and database matrix. Its pinned core references are in scripts/processwire-3.0.259-ref.txt and scripts/processwire-ref.txt.
 
+## Fixed Object verification
+
+`ddev flex-test objects` covers fixed child schemas, scoped native processing,
+formatting/read guards, unknown data, multilingual values, mixed Object/Row
+selectors and numeric sorting, media ownership/copies/selective saves, raw
+rename/cleanup and transaction rollback. The API example suite executes the
+Object definition from API.md. Ordinary fieldsets must remain flat.
+
+For browser checks, save an Object containing another Object and Rows whose
+children contain an Object. Change a checkbox controlling a child through
+`parent`, duplicate a Row with unsaved Object values, save and independently
+read canonical values and row identities. Inspect browser warnings/errors.
+Objects use native fieldsets and require no additional JavaScript or CSS.
+
 ## Browser checks
 
 Changes to Page Edit inputs need a real browser save in the fixture. Verify the submitted values after reload and check the browser console for application errors. For `rows` or media changes, include nested rows, TinyMCE, sorting or duplication

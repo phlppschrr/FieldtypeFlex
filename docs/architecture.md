@@ -71,7 +71,13 @@ Flex field writes with an active Languages API refresh that installation metadat
 Reads never write metadata or canonical JSON. The next field save persists scalar
 text, also within nested rows. There is no bulk migration or uninstall hook.
 
-Ordinary fieldsets organize the editor and flatten their leaf properties into the current schema. The explicit Flex structure type `rows` has a mandatory types map. It resolves
+Ordinary fieldsets organize the editor and flatten their leaf properties into the current schema.
+The `object` structure owns a child schema and reuses FlexValue at a fixed property
+address, rendered with a native fieldset. Objects have no row identity or type.
+Their canonical `object:1` envelope holds a `values` map, including an empty JSON
+object. Schema-free walkers recognize this envelope to retain unknown descendants,
+media ownership and nested Rows. Object steps do not create row projection records;
+the nearest containing Row remains the projection parent. The explicit Flex structure type `rows` has a mandatory types map. It resolves
 directly to `InputfieldFlexRows`, also used to declare collections in native
 wrapper trees. Ordinary `fieldset` definitions resolve to `InputfieldFieldset`
 and never introduce a collection. Editor inputs are fresh copies with runtime

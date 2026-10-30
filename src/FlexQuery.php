@@ -36,18 +36,31 @@ class FlexQuery extends Wire {
 	}
 
 	private function property(Field $field, string $name): array {
-		if(!preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/D', $name)) {
+		if(!preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*$/D', $name)) {
 			throw new PageFinderSyntaxException($this->_('Invalid Flex selector property'));
 		}
 		$def = $this->type->getDefinitions($field)->property($name);
 		if(!$def) {
 			throw new PageFinderSyntaxException(sprintf($this->_('Unknown Flex selector property: %1$s.%2$s. Page-dependent schemas must expose queryable properties without a page context.'), $field->name, $name));
 		}
+		$def['jsonPath'] = $this->objectPath($this->type->getDefinitions($field), $name);
 		return $def;
+	}
+
+	/** Translate declared object scopes to canonical JSON keys. */
+	private function objectPath(FlexFieldDefs $schema, string $name): string {
+		$path = [];
+		foreach(explode('.', $name) as $part) {
+			$path[] = $part;
+			$def = $schema->property($part);
+			if(($def['kind'] ?? '') === 'object') { $path[] = 'values'; $schema = $def['schema']; }
+		}
+		return implode('.', $path);
 	}
 
 	private function expression(Field $field, string $table, string $name, array $def): array {
 		$table = $this->wire()->database->escapeTable($table);
+		$name = str_replace('.', '"."', $def['jsonPath'] ?? $name);
 		$path = '$."' . $name . '"';
 		if($def['languages']) {
 			$language = $this->wire()->user->language ?: $this->wire()->languages->getDefault();
@@ -88,19 +101,25 @@ class FlexQuery extends Wire {
 			$subfield = $this->selectorPath($query, $subfield);
 		}
 		$root = explode('.', $subfield, 2)[0];
+		$schema = $this->type->getDefinitions($field);
+		$remaining = explode('.', $subfield);
+		while(($schema->property($remaining[0])['kind'] ?? '') === 'object' && count($remaining) > 1) {
+			$schema = $schema->property(array_shift($remaining))['schema'];
+			$root .= '.' . $remaining[0];
+		}
 		$rootDef = $subfield === 'data' ? null : $this->property($field, $root);
-		if($rootDef && $rootDef['kind'] === 'page' && str_contains($subfield, '.')) {
-			return $this->matchPage($query, $subfield, $operator, $value, $rootDef);
+		if($rootDef && $rootDef['kind'] === 'page' && $subfield !== $root) {
+			return $this->matchPage($query, $subfield, $operator, $value, $rootDef, $root);
 		}
 		if($rootDef && $rootDef['kind'] === 'rows') {
 			return $this->matchRows($query, $subfield, $operator, $value);
 		}
 		if($rootDef && in_array($rootDef['kind'], ['file', 'image'], true)) {
 			$parts = explode('.', $subfield);
-			$count = $this->mediaCount($field, $parts[0]);
-			if(count($parts) === 1 && $value === '' && in_array($operator, ['=', '!='], true)) {
+			$count = $this->mediaCount($field, $root);
+			if($subfield === $root && $value === '' && in_array($operator, ['=', '!='], true)) {
 				$query->where("$count" . ($operator === '=' ? '=0' : '>0'));
-			} else if($parts === [$parts[0], 'count'] && is_numeric($value)) {
+			} else if($subfield === $root . '.count' && is_numeric($value)) {
 				$query->where($this->compare($query, $count, $operator, 0 + $value, self::NUMBER_OPERATORS));
 			} else {
 				throw new PageFinderSyntaxException($this->_('Use a Flex media count or blank selector'));
@@ -191,8 +210,8 @@ class FlexQuery extends Wire {
 	}
 
 	/** Delegate target semantics to PageFinder, retaining native custom-subfield inclusion. */
-	private function matchPage($query, string $path, string $operator, $value, array $def) {
-		[$property, $target] = explode('.', $path, 2);
+	private function matchPage($query, string $path, string $operator, $value, array $def, string $property) {
+		$target = substr($path, strlen($property) + 1);
 		if(!$this->pageTarget($target)) {
 			throw new PageFinderSyntaxException($this->_('Unsupported Flex Page-reference target field'));
 		}
@@ -316,9 +335,17 @@ class FlexQuery extends Wire {
 		if(!preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/D', $parts[0]) || !isset($schema[$parts[0]])) {
 			throw new PageFinderSyntaxException(sprintf($this->_('Unknown row property: %s'), $name));
 		}
-		$def = $schema[$parts[0]];
+		$jsonParts = [];
+		while(($schema[$parts[0]]['kind'] ?? '') === 'object' && count($parts) > 1) {
+			$part = array_shift($parts);
+			$jsonParts[] = $part; $jsonParts[] = 'values';
+			$schema = $schema[$part]['schema']->properties();
+		}
+		$def = $schema[$parts[0]] ?? null;
+		if(!$def) throw new PageFinderSyntaxException(__('Unknown object property'));
+		$def['jsonPath'] = implode('.', array_merge($jsonParts, [$parts[0]]));
 		if(in_array($def['kind'], ['file', 'image'], true)) {
-			$path = $this->wire()->database->quote('$."' . $parts[0] . '"."items"');
+			$path = $this->wire()->database->quote('$."' . str_replace('.', '"."', $def['jsonPath']) . '"."items"');
 			$count = "COALESCE(JSON_LENGTH(JSON_EXTRACT($alias.data,$path)),0)";
 			if(count($parts) === 1 && $value === '' && in_array($operator, ['=', '!='], true)) {
 				return "$count" . ($operator === '=' ? '=0' : '>0');
@@ -340,7 +367,7 @@ class FlexQuery extends Wire {
 
 	private function mediaCount(Field $field, string $name): string {
 		$table = $this->wire()->database->escapeTable($field->table);
-		$path = $this->wire()->database->quote('$."' . $name . '"."items"');
+		$path = $this->wire()->database->quote('$."' . str_replace('.', '"."', $this->objectPath($this->type->getDefinitions($field), $name)) . '"."items"');
 		return "COALESCE((SELECT JSON_LENGTH(JSON_EXTRACT(flex_media.data,$path)) FROM `$table` AS flex_media WHERE flex_media.pages_id=pages.id),0)";
 	}
 
@@ -391,6 +418,9 @@ class FlexQuery extends Wire {
 			}
 			$parts = explode('.', $prefix === '' ? $fields[0] : substr($fields[0], strlen($prefix)));
 			$name = array_shift($parts);
+			while(($defs->property($name)['kind'] ?? '') === 'object' && $parts) {
+				$name .= '.' . array_shift($parts);
+			}
 			$def = $defs->property($name);
 			$rows = ($def['kind'] ?? '') === 'rows';
 			if($rows && ($parts[0] ?? '') === '_type') throw new PageFinderSyntaxException('Flex @ selectors use explicit row types, not collection _type predicates');
@@ -430,6 +460,11 @@ class FlexQuery extends Wire {
 		$schema = null;
 		do {
 			$name = array_shift($parts);
+			while(($defs->property($name)['kind'] ?? '') === 'object' && $parts) {
+				$defs = $defs->property($name)['schema'];
+				$prefix .= $name . '.';
+				$name = array_shift($parts);
+			}
 			$definition = $defs->property($name);
 			if(!$definition || $definition['kind'] !== 'rows') {
 				throw new PageFinderSyntaxException(sprintf($this->_('Unknown repeatable path: %s'), $path));
@@ -447,7 +482,7 @@ class FlexQuery extends Wire {
 			}
 			$alias = 'flex_row_' . ++$this->rowAlias;
 			$nodes[] = ['alias' => $alias, 'path' => $schemaPath, 'type' => $type];
-			if($type !== '' && $parts && ($schema->property($parts[0])['kind'] ?? '') === 'rows') {
+			if($type !== '' && $parts && $this->pathKind($schema, $parts) === 'rows') {
 				$defs = $schema;
 				$prefix = $schemaPath . '.' . $type . '.';
 				continue;
@@ -521,7 +556,7 @@ class FlexQuery extends Wire {
 				$choices = [];
 				$childName = explode('.', $fields[0], 2)[0];
 				foreach($selector->values(true) as $choice) {
-					if(($schema->property($childName)['kind'] ?? '') === 'rows') {
+					if($this->pathKind($schema, explode('.', $fields[0])) === 'rows') {
 						$choices[] = $this->rowsPredicate($query, $fields[0], $selector->operator, $choice, $schema, $schemaPath . '.' . $type . '.', $alias);
 					} else {
 						$choices[] = $this->rowLeaf($query, $fields[0], $schema->properties(), $selector->operator, $choice, $alias);
@@ -533,6 +568,16 @@ class FlexQuery extends Wire {
 			$predicate = implode(' AND ', $conditions);
 		}
 		return ($negate ? 'NOT ' : '') . "EXISTS (SELECT 1 $from AND ($predicate))";
+	}
+
+	/** Find the next structural node after fixed object scopes. */
+	private function pathKind(FlexFieldDefs $schema, array $parts): string {
+		while($parts) {
+			$def = $schema->property(array_shift($parts));
+			if(($def['kind'] ?? '') !== 'object') return $def['kind'] ?? '';
+			$schema = $def['schema'];
+		}
+		return 'object';
 	}
 
 	private function compare($query, string $expression, string $operator, $value, array $allowed): string {
@@ -583,14 +628,19 @@ class FlexQuery extends Wire {
 			return '`' . $this->wire()->database->escapeTable($table) . '`.`search` ' . ($desc ? 'DESC' : 'ASC');
 		}
 		$parts = explode('.', $subfield);
+		$schema = $this->type->getDefinitions($field);
+		while(($schema->property($parts[0])['kind'] ?? '') === 'object' && count($parts) > 1) {
+			$schema = $schema->property(array_shift($parts))['schema'];
+		}
+		$def = $schema->property($parts[0]);
 		if(count($parts) > 1) {
-			$def = $this->property($field, $parts[0]);
-			if($parts !== [$parts[0], 'count'] || !in_array($def['kind'], ['rows', 'file', 'image'], true)) {
+			if($parts !== [$parts[0], 'count'] || !$def || !in_array($def['kind'], ['rows', 'file', 'image'], true)) {
 				throw new PageFinderSyntaxException($this->_('Repeated leaf sorting is ambiguous; sort the set count'));
 			}
-			$subfield = $parts[0];
+			$subfield = substr($subfield, 0, -6);
 		}
 		$def = $this->property($field, $subfield);
+		if($def['kind'] === 'object') throw new PageFinderSyntaxException($this->_('Sorting multi-selection Flex properties is ambiguous'));
 		if(in_array($def['kind'], ['file', 'image'], true)) {
 			return $this->mediaCount($field, $subfield) . ($desc ? ' DESC' : ' ASC');
 		}
@@ -628,6 +678,10 @@ class FlexQuery extends Wire {
 		$discover = function(FlexFieldDefs $defs, bool $root = true) use (&$discover, $page, &$targetInfo, $inspection): array {
 			$subfields = [];
 			foreach($defs->properties() as $name => $def) {
+				if($def['kind'] === 'object') {
+					$subfields[$name] = ['name' => $name, 'label' => $def['input']->label ?: $name, 'input' => 'text', 'operators' => [], 'options' => [], 'subfields' => $discover($def['schema'], $root)];
+					continue;
+				}
 				if($def['kind'] === 'rows') {
 					$children = [];
 					$typeOptions = ['""' => $this->_('No rows')];

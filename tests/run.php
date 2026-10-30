@@ -6,6 +6,7 @@ if(PHP_SAPI !== 'cli') {
 }
 
 $suites = [
+	'objects' => ['objects.php'],
 	'compatibility' => ['native-compatibility.php', 'native-selectors.php'],
 	'values' => ['values.php'],
 	'definitions' => ['definitions.php', 'definition-sources.php', 'examples.php'],

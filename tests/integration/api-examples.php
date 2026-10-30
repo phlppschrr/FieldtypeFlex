@@ -8,7 +8,9 @@ if(PHP_SAPI !== 'cli' || !isset($same, $createField)) {
 // Execute the actual reference snippets in the existing disposable suite fixture.
 $api = file_get_contents(dirname(__DIR__, 2) . '/API.md');
 preg_match_all('/```php\n(.*?)```/s', $api, $matches);
-$same(31, count($matches[1]), 'all API PHP examples have an execution context');
+$same(32, count($matches[1]), 'all API PHP examples have an execution context');
+$objectExamples = array_values(array_filter($matches[1], static fn($code) => str_starts_with($code, '// Fixed object definition.')));
+$matches[1] = array_values(array_filter($matches[1], static fn($code) => !in_array($code, $objectExamples, true)));
 $metadataExamples = array_values(array_filter($matches[1], static fn($code) => str_starts_with($code, '// Per-file metadata definition.') || str_starts_with($code, '// Existing image in the gallery.')));
 $matches[1] = array_values(array_filter($matches[1], static fn($code) => !in_array($code, $metadataExamples, true)));
 $blocks = array_combine(range(1, count($matches[1])), $matches[1]);
@@ -55,7 +57,8 @@ $mediaSchema = $snippet($fragment($blocks[14]))['result'];
 $renameSchema = $snippet($fragment($blocks[7]))['result'];
 $inheritSchema = $snippet($fragment(str_replace('rich_text_source', $sourceField->name, $blocks[20])))['result'];
 $metadataSchema = $snippet($fragment($metadataExamples[0]))['result'];
-$schema = $base + $rowSchema + $mediaSchema + $inheritSchema + $metadataSchema + [
+$objectSchema = $snippet($fragment($objectExamples[0]))['result'];
+$schema = $base + $objectSchema + $rowSchema + $mediaSchema + $inheritSchema + $metadataSchema + [
 	'summary' => ['type' => 'text'],
 	'appearance' => ['type' => 'select', 'label' => 'Appearance & style', 'options' => ['featured' => 'Featured & selected']],
 	'starts_on' => ['type' => 'datetime', 'dateInputFormat' => 'd.m.Y', 'dateOutputFormat' => 'd.m.Y'],
@@ -67,6 +70,7 @@ $name = $apiField->name;
 $page->of(false);
 $page->$name = ['heading' => 'A & B', 'appearance' => 'featured', 'starts_on' => '2026-10-18'];
 $value = $page->get($name);
+$assert($value->link instanceof FlexValue, 'API object definition exposes a fixed FlexValue');
 $row = $value->blocks->addRow('text', ['heading' => 'Introduction', 'body' => '<p>ProcessWire</p>']);
 $page->save($name);
 $context = compact('page', 'modules', 'fields', 'row') + ['field' => $apiField, 'pages' => $wire->pages];

@@ -442,3 +442,10 @@ Remove selected properties,Eliminar propiedades seleccionadas,,site/modules/Fiel
 Remove unknown properties,Eliminar propiedades desconocidas,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,ae954b0c7015b11cee91c3c6a5c97759
 Resolve reported errors and run a new check. Previously applied changes are retained.,Corrija los errores indicados y repita la comprobación. Se conservan los cambios ya aplicados.,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,09f71ff47c3f0416523b9a769f724d78
 Stored addresses,Direcciones guardadas,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,245be0b36ae2aef28ddc359295e6604f
+Objects are not supported in customFields,Los objetos no se admiten en customFields,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,b5b3e01b9436fcb22a2f5f02c5db6174
+Object children must be definitions or a wrapper,Los campos hijos del objeto deben ser definiciones o un contenedor,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,80e7ac5e23155ad0f6ed60ea40c3d3e6
+Object value must be a property map,El valor del objeto debe ser un mapa de propiedades,,site/modules/FieldtypeFlex/src/FlexValue.php,cd2b38aa6589727c2aae511000d5330a
+Invalid stored object envelope,Estructura de objeto almacenada no válida,,site/modules/FieldtypeFlex/src/FlexValue.php,7daa26f98654d383bec9a7ba3ebb5291
+Invalid stored object envelope,Estructura de objeto almacenada no válida,,site/modules/FieldtypeFlex/src/FlexMaintenance.php,7daa26f98654d383bec9a7ba3ebb5291
+Unknown object property,Propiedad de objeto desconocida,,site/modules/FieldtypeFlex/src/FlexQuery.php,ffc24754af6b0c65a53330da804c161c
+Invalid retained Flex object,Objeto Flex conservado no válido,,site/modules/FieldtypeFlex/src/FlexPath.php,5e57fdb11b51b32f54dace15821d3508

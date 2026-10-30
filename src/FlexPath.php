@@ -56,30 +56,28 @@ final class FlexPath {
 	 * @param FlexValue $root Root field value.
 	 * @param string $address Property or collection instance address.
 	 * @param callable|null $loadRow Optional authenticated draft row loader.
+	 * @param callable|null $checkObject Optional access check on traversed object inputs.
 	 * @return array{FlexValue,string}
 	 * @internal
 	 */
-	public static function resolve(FlexValue $root, string $address, ?callable $loadRow = null): array {
+	public static function resolve(FlexValue $root, string $address, ?callable $loadRow = null, ?callable $checkObject = null): array {
 		$parts = explode('.', $address);
-		if(count($parts) % 2 !== 1) {
-			throw new WireException(__('Invalid Flex instance address'));
-		}
+		if($address === '') throw new WireException(__('Invalid Flex instance address'));
 		$parent = $root;
-		$prefix = '';
 		while(count($parts) > 1) {
-			$set = array_shift($parts);
+			$name = array_shift($parts);
+			$definition = $parent->definitions()->property($name);
+			if(($definition['kind'] ?? '') === 'object') {
+				if($checkObject) $checkObject($definition['input']);
+				$parent = $parent->getUnformatted($name);
+				continue;
+			}
 			$id = array_shift($parts);
-			$definition = $parent->definitions()->property($set);
-			if(!$definition || $definition['kind'] !== 'rows' || !preg_match('/^[a-f0-9]{32}$/D', $id)) {
-				throw new WireException(sprintf(__('Invalid Flex row address: %s'), $address));
-			}
-			$setAddress = $prefix . $set;
-			$row = $loadRow ? $loadRow($setAddress, $id, $parent, $definition) : $parent->getUnformatted($set)->getById($id);
-			if(!$row instanceof FlexRow) {
-				throw new WireException(sprintf(__('Flex row no longer exists: %s'), $setAddress . '.' . $id));
-			}
+			if(($definition['kind'] ?? '') !== 'rows' || !preg_match('/^[a-f0-9]{32}$/D', $id ?? '') || !$parts) throw new WireException(sprintf(__('Invalid Flex row address: %s'), $address));
+			$setAddress = ($parent->address() === '' ? '' : $parent->address() . '.') . $name;
+			$row = $loadRow ? $loadRow($setAddress, $id, $parent, $definition) : $parent->getUnformatted($name)->getById($id);
+			if(!$row instanceof FlexRow) throw new WireException(sprintf(__('Flex row no longer exists: %s'), $address));
 			$parent = $row;
-			$prefix = $setAddress . '.' . $id . '.';
 		}
 		$leaf = $parts[0];
 		if(!preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/D', $leaf)) {
@@ -98,12 +96,14 @@ final class FlexPath {
 	 */
 	public static function &rawProperty(array &$raw, string $address) {
 		$parts = explode('.', $address);
-		if(count($parts) % 2 !== 1) {
-			throw new WireException(__('Invalid Flex instance address'));
-		}
+		if($address === '') throw new WireException(__('Invalid Flex instance address'));
 		$scope =& $raw;
 		while(count($parts) > 1) {
 			$set = array_shift($parts);
+			if(($scope[$set]['_flex'] ?? '') === FlexStorage::OBJECT_FORMAT) {
+				$scope =& $scope[$set]['values'];
+				continue;
+			}
 			$id = array_shift($parts);
 			$found = false;
 			if(($scope[$set]['_flex'] ?? '') === FlexStorage::ROWS_FORMAT) {
@@ -115,9 +115,8 @@ final class FlexPath {
 					}
 				}
 			}
-			if(!$found) {
-				throw new WireException(sprintf(__('Flex row no longer exists: %s'), $address));
-			}
+			if(!$parts) throw new WireException(__('Invalid Flex instance address'));
+			if(!$found) throw new WireException(sprintf(__('Flex row no longer exists: %s'), $address));
 		}
 		if(!array_key_exists($parts[0], $scope)) {
 			throw new WireException(sprintf(__('Flex property no longer exists: %s'), $address));
@@ -135,11 +134,16 @@ final class FlexPath {
 	 * @return \Generator
 	 * @internal
 	 */
-	public static function rows(array $raw, string $prefix = '', string $schema = '', int $depth = 0): \Generator {
+	public static function rows(array $raw, string $prefix = '', string $schema = '', int $depth = 0, string $parent = ''): \Generator {
 		if($depth > 64) {
 			throw new WireException(__('Flex tree exceeds the traversal safety limit'));
 		}
 		foreach($raw as $name => $value) {
+			if(is_array($value) && ($value['_flex'] ?? '') === FlexStorage::OBJECT_FORMAT) {
+				if(!isset($value['values']) || !is_array($value['values']) || ($value['values'] && array_is_list($value['values']))) throw new WireException(__('Invalid retained Flex object'));
+				yield from self::rows($value['values'], $prefix . $name . '.', $schema . $name . '.', $depth, $parent);
+				continue;
+			}
 			if(!is_array($value) || ($value['_flex'] ?? '') !== FlexStorage::ROWS_FORMAT) {
 				continue;
 			}
@@ -161,13 +165,13 @@ final class FlexPath {
 					'set'     => $set,
 					'schema'  => $schemaPath,
 					'address' => $address,
-					'parent'  => rtrim($prefix, '.'),
+					'parent'  => $parent,
 					'depth'   => $depth + 1,
 					'ordinal' => $ordinal,
 					'row'     => $row,
 					'data'    => $data,
 				];
-				yield from self::rows($row['values'], $address . '.', $schemaPath . '.' . $row['type'] . '.', $depth + 1);
+				yield from self::rows($row['values'], $address . '.', $schemaPath . '.' . $row['type'] . '.', $depth + 1, $address);
 			}
 		}
 	}

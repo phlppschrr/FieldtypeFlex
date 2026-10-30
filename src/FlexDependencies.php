@@ -5,19 +5,32 @@ final class FlexDependencies {
 	/** Reconstruct ancestor scopes for standalone AJAX add/duplicate input trees. */
 	public static function ancestors(FlexRow $row, FlexValue $root, string $inputName, string $draft): array {
 		$ancestors = [];
-		$parts = explode('.', $row->address());
-		array_splice($parts, -2);
 		$owner = $root;
-		for($level = 0; ; $level += 2) {
-			$inputs = $owner->definitions()->getInputfields($owner, FlexPath::inputPrefix($inputName, $owner->address()), $draft, $root, null, $inputName, $ancestors);
+		$target = FlexPath::rowSet($row);
+		while(true) {
+			$inputs = $owner->definitions()->getInputfields($owner, FlexPath::inputPrefix($inputName, $owner->address()), $draft, $root, null, $inputName, $ancestors, self::parentAddress($owner));
 			array_unshift($ancestors, $inputs);
-			if($level >= count($parts)) break;
-			$address = implode('.', array_slice($parts, 0, $level + 2)) . '._dependency';
-			[$owner] = FlexPath::resolve($root, $address, $draft === '' ? null : static function($set, $id) use ($root, $draft) {
-				return $root->ownerField()->type->admin()->row($draft, $set, $id, $root);
-			});
+			$relative = $owner->address() === '' ? $target : substr($target, strlen($owner->address()) + 1);
+			$parts = explode('.', $relative);
+			if(count($parts) < 2) break;
+			$name = array_shift($parts);
+			if($owner->definitions()->property($name)['kind'] === 'object') {
+				$owner = $owner->getUnformatted($name);
+			} else {
+				$id = array_shift($parts);
+				$set = ($owner->address() === '' ? '' : $owner->address() . '.') . $name;
+				$owner = $draft === '' ? $owner->getUnformatted($name)->getById($id) : $root->ownerField()->type->admin()->row($draft, $set, $id, $root);
+			}
 		}
+
 		return $ancestors;
+	}
+
+	/** Parent scope follows object properties or complete row identities. */
+	public static function parentAddress(FlexValue $value): ?string {
+		if($value->address() === '') return null;
+		$parts = explode('.', $value->address());
+		return implode('.', array_slice($parts, 0, $value instanceof FlexRow ? -2 : -1));
 	}
 
 	/** Resolve a selector field, leaving comparison syntax and values to the core. */
@@ -34,7 +47,7 @@ final class FlexDependencies {
 			$address = '';
 			if($scope === 'parent') {
 				if($parentAddress === null && !$value instanceof FlexRow) throw self::error($field, __('A parent dependency requires a Flex row'));
-				$address = $parentAddress ?? implode('.', array_slice(explode('.', $value->address()), 0, -2));
+				$address = $parentAddress ?? self::parentAddress($value);
 			}
 			return FlexPath::inputPrefix($inputName, $address) . $path;
 		}

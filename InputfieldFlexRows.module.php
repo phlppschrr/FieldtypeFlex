@@ -217,6 +217,10 @@ class InputfieldFlexRows extends Inputfield {
 		$labels = [];
 		while(count($parts) > 1) {
 			$set = array_shift($parts);
+			if($owner->definitions()->property($set)['kind'] === 'object') {
+				$owner = $owner->getUnformatted($set);
+				continue;
+			}
 			$id = array_shift($parts);
 			$rows = $owner->getUnformatted($set);
 			if(!$rows instanceof FlexRows) break;

@@ -22,6 +22,8 @@ require_once __DIR__ . '/src/FlexMedia.php';
 // This is the upstream-recommended compatibility path for cores without CliModule.
 /** Structured ProcessWire values with native inputs, typed rows and owned media. */
 class FieldtypeFlex extends Fieldtype implements ConfigurableModule, FieldtypeHasFiles, FieldtypeHasPagefiles, FieldtypeHasPageimages {
+	/** Full sort paths carried past core’s two-part field parsing. */
+	private array $flexSortPaths = [];
 	/** Existing rows start collapsed; newly added rows start open. */
 	public const ROW_COLLAPSE_EXISTING = 0;
 	/** Existing and newly added rows start collapsed. */
@@ -343,7 +345,9 @@ class FieldtypeFlex extends Fieldtype implements ConfigurableModule, FieldtypeHa
 		$walk = function(FlexValue $value) use (&$walk, &$files): void {
 			foreach($value->definitions()->properties() as $name => $definition) {
 				$item = $value->getUnformatted($name);
-				if($item instanceof FlexRows) {
+				if($item instanceof FlexValue) {
+					$walk($item);
+				} else if($item instanceof FlexRows) {
 					foreach($item as $row) {
 						$walk($row);
 					}
@@ -555,7 +559,8 @@ class FieldtypeFlex extends Fieldtype implements ConfigurableModule, FieldtypeHa
 			if($selector->field !== 'sort') {
 				continue;
 			}
-			foreach($selector->values() as $value) {
+			$sortValues = $selector->values();
+			foreach($sortValues as $index => $value) {
 				$parts = explode('.', trim((string) $value, '-+'));
 				if(count($parts) < 3) {
 					continue;
@@ -564,11 +569,23 @@ class FieldtypeFlex extends Fieldtype implements ConfigurableModule, FieldtypeHa
 				if(!$field || !$field->type instanceof self) {
 					continue;
 				}
-				$definition = $this->getDefinitions($field)->property($parts[1]);
-				if(count($parts) !== 3 || $parts[2] !== 'count' || !$definition || !in_array($definition['kind'], ['rows', 'file', 'image'], true)) {
+				$schema = $this->getDefinitions($field);
+				$fixedParts = array_slice($parts, 1);
+				while(($schema->property($fixedParts[0])['kind'] ?? '') === 'object' && count($fixedParts) > 1) {
+					$schema = $schema->property(array_shift($fixedParts))['schema'];
+				}
+				$leaf = $schema->property($fixedParts[0]);
+				$scalar = count($fixedParts) === 1 && $leaf && !in_array($leaf['kind'], ['object', 'rows', 'file', 'image'], true) && !$leaf['multiple'];
+				$count = count($fixedParts) === 2 && $fixedParts[1] === 'count' && $leaf && in_array($leaf['kind'], ['rows', 'file', 'image'], true);
+				if(!$scalar && !$count) {
 					throw new PageFinderSyntaxException($this->_('Sort only a Flex collection count; repeated leaf sorting is ambiguous'));
 				}
+				$path = implode('.', array_slice($parts, 1));
+				$alias = '_flexsort_' . hash('sha256', $path);
+				$this->flexSortPaths[$alias] = $path;
+				$sortValues[$index] = (str_starts_with((string) $value, '-') || str_ends_with((string) $value, '-') ? '-' : '') . $field->name . '.' . $alias;
 			}
+			$selector->value = count($sortValues) === 1 ? reset($sortValues) : $sortValues;
 		}
 	}
 
@@ -1229,7 +1246,7 @@ class FieldtypeFlex extends Fieldtype implements ConfigurableModule, FieldtypeHa
 	 * @return string
 	 */
 	public function getMatchQuerySort(Field $field, $query, $table, $subfield, $desc) {
-		return (new FlexQuery($this))->sort($field, $query, $table, $subfield, $desc);
+		return (new FlexQuery($this))->sort($field, $query, $table, $this->flexSortPaths[$subfield] ?? $subfield, $desc);
 	}
 
 	/**

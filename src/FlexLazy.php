@@ -40,6 +40,7 @@ final class FlexLazy {
 			$effective['editable'] = $input->editable();
 			if(method_exists($input, 'getOptions')) $effective['options'] = $plain($input->getOptions());
 			$properties[$name] = [$plain($definition['settings']), $effective];
+			if($definition['kind'] === 'object') $properties[$name]['schema'] = self::signature($definition['schema']);
 			foreach($definition['types'] ?? [] as $type => $entry) $properties[$name]['types'][$type] = self::signature($entry['schema']);
 			if($definition['customFields'] ?? null) $properties[$name]['customFields'] = self::signature($definition['customFields']);
 		}
@@ -97,6 +98,7 @@ final class FlexLazy {
 		}
 		$walk = function(FlexValue $owner) use (&$walk, &$data, $input, $root, $token, $admin, $draft, $name, $postedScopes): void {
 			foreach($owner->definitions()->properties() as $property => $definition) {
+				if($definition['kind'] === 'object') $walk($owner->getUnformatted($property));
 				if($definition['kind'] !== 'rows') continue;
 				$set = ($owner->address() === '' ? '' : $owner->address() . '.') . $property;
 				$present = FlexPath::controlName($name, $set, 'present');

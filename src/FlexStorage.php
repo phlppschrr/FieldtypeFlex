@@ -4,6 +4,7 @@
  */
 class FlexStorage extends Wire {
 	public const ROWS_FORMAT = 'rows:1';
+	public const OBJECT_FORMAT = 'object:1';
 	public const FILES_FORMAT = 'files:1';
 	public const IMAGES_FORMAT = 'images:1';
 	private static int $savepoint = 0;
@@ -274,7 +275,9 @@ class FlexStorage extends Wire {
 			$result = [];
 			$envelope = in_array($value['_flex'] ?? '', [self::ROWS_FORMAT, self::FILES_FORMAT, self::IMAGES_FORMAT], true);
 			foreach($value as $key => $item) {
-				if($envelope && $key === 'items') {
+				if(($value['_flex'] ?? '') === self::OBJECT_FORMAT && $key === 'values') {
+					$result[$key] = (object) $convert($item, $depth + 1);
+				} else if($envelope && $key === 'items') {
 					$items = [];
 					foreach($item as $index => $entry) {
 						$map = [];
@@ -325,6 +328,10 @@ class FlexStorage extends Wire {
 		$terms = [];
 		$walk = static function($value) use (&$walk, &$terms): void {
 			if(is_array($value)) {
+				if(($value['_flex'] ?? '') === self::OBJECT_FORMAT) {
+					$walk($value['values']);
+					return;
+				}
 				if(($value['_flex'] ?? '') === FlexStorage::ROWS_FORMAT) {
 					foreach($value['items'] as $row) {
 						if(!FlexPath::rowHidden($row)) $walk($row['values']);

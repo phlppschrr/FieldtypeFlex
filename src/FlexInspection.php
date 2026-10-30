@@ -119,6 +119,7 @@ final class FlexInspection {
 						$walk($typeDefinition['schema'], $schema, $rowPath . '.');
 					}
 				}
+				if(($definition['kind'] ?? '') === 'object') $walk($definition['schema'], $schema, $path . '.');
 				if($definition['customFields'] ?? null) $walk($definition['customFields'], $schema, $path . '.');
 			}
 		};

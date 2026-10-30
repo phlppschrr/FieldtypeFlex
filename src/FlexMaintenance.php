@@ -203,8 +203,12 @@ final class FlexMaintenance extends Wire {
 
 	/** Reject malformed retained envelopes before generic encoders can issue PHP warnings. */
 	private function validateEnvelopes(array $raw): void {
-		$media = static function(array $scope, string $prefix): void {
+		$media = static function(array $scope, string $prefix) use (&$media): void {
 			foreach($scope as $name => $value) {
+				if(is_array($value) && ($value['_flex'] ?? '') === FlexStorage::OBJECT_FORMAT) {
+					if(!isset($value['values']) || !is_array($value['values'])) throw new WireException(__('Invalid stored object envelope'));
+					$media($value['values'], $prefix . $name . '.');
+				}
 				if(!is_array($value) || !in_array($value['_flex'] ?? '', [FlexStorage::FILES_FORMAT, FlexStorage::IMAGES_FORMAT], true)) continue;
 				if(!FlexMedia::validEnvelope($value, $value['_flex'])) {
 					throw new WireException('Invalid stored media envelope at ' . $prefix . $name);
@@ -233,6 +237,7 @@ final class FlexMaintenance extends Wire {
 		foreach($edits as $edit) {
 			$scope = $document;
 			foreach($edit['containers'] as $container) {
+				if($container['kind'] === 'object') { $scope = $scope->{$container['property']}->values; continue; }
 				$found = false;
 				foreach($scope->{$container['property']}->items as $item) {
 					if($item->id === $container['id']) { $scope = $item->values; $found = true; break; }
@@ -256,6 +261,7 @@ final class FlexMaintenance extends Wire {
 		foreach($defs->properties() as $name => $def) {
 			$item = ['kind' => $def['kind'], 'renamedFrom' => $def['renamedFrom']];
 			foreach($def['types'] ?? [] as $key => $type) $item['types'][$key] = $this->schema($type['schema']);
+			if($def['kind'] === 'object') $item['schema'] = $this->schema($def['schema']);
 			if($def['customFields'] ?? null) $item['customFields'] = $this->schema($def['customFields']);
 			$schema[$name] = $item;
 		}
@@ -307,6 +313,11 @@ final class FlexMaintenance extends Wire {
 					$meta['values'] = $this->walk($meta['values'], $metadataDocument, $def['customFields'], "$path.", "$patchLocation.{$meta['id']}.", "$storedSchema$storedName.", "$location.{$meta['id']}.", $operation, $paths, $issues, $orphans, $renames, array_merge($containers, [['property' => $name, 'id' => $meta['id'], 'kind' => 'media']]));
 				}
 				unset($meta);
+			}
+			if($def['kind'] === 'object') {
+				$childDocument = $document->{$storedName}->values ?? null;
+				if(($value['_flex'] ?? '') !== FlexStorage::OBJECT_FORMAT || !$childDocument instanceof \stdClass) throw new WireException(__('Invalid stored object envelope'));
+				$value['values'] = $this->walk($value['values'], $childDocument, $def['schema'], "$path.", "$patchLocation.", "$storedSchema$storedName.", "$location.", $operation, $paths, $issues, $orphans, $renames, array_merge($containers, [['property' => $name, 'kind' => 'object']]));
 			}
 			if($def['kind'] !== 'rows') continue;
 			if(!is_array($value) || ($value['_flex'] ?? '') !== FlexStorage::ROWS_FORMAT) {

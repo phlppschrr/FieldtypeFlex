@@ -382,27 +382,32 @@ class FlexRows extends WireArray implements \JsonSerializable {
 		}
 		$operators = ['=', '!='];
 		if($name !== '_type') {
-			$parts = explode('.', $name);
-			if(!preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*(?:\.count)?$/D', $name)) {
+			if(!preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*$/D', $name)) {
 				throw new WireException('Invalid FlexRows::find() property path');
 			}
+			$count = str_ends_with($name, '.count');
+			$path = $count ? substr($name, 0, -6) : $name;
 			$definitions = [];
 			foreach($types as $type) {
-				$def = $this->definition['types'][$type]['schema']->property($parts[0]);
+				$schema = $this->definition['types'][$type]['schema'];
+				$steps = explode('.', $path);
+				while(count($steps) > 1 && ($schema->property($steps[0])['kind'] ?? '') === 'object') $schema = $schema->property(array_shift($steps))['schema'];
+				$def = count($steps) === 1 ? $schema->property($steps[0]) : null;
 				if($def) $definitions[] = $def;
 			}
 			if(!$definitions) throw new WireException('Unknown FlexRows::find() property: ' . $name);
 			foreach($definitions as $def) {
+				if($def['kind'] === 'object') throw new WireException('Select an object leaf');
 				$countable = in_array($def['kind'], ['file', 'image', 'rows'], true);
-				if(count($parts) > 1 && !$countable) throw new WireException('Use .count only on Flex media or rows');
+				if($count && !$countable) throw new WireException('Use .count only on Flex media or rows');
 				$allowed = $countable || $def['multiple'] ? ['=', '!='] : ['=', '!=', '*=', '%=', '^=', '$=', '%^=', '%$=', '~=', '~|='];
-				if(count($parts) > 1 || in_array($def['kind'], ['integer', 'float', 'date', 'page'], true) && !$def['multiple']) {
+				if($count || in_array($def['kind'], ['integer', 'float', 'date', 'page'], true) && !$def['multiple']) {
 					$allowed = ['=', '!=', '>', '>=', '<', '<='];
 				}
 				if(!in_array($selector->operator, $allowed, true)) throw new WireException('Unsupported FlexRows::find() operator');
 				foreach($selector->values(true) as $value) {
-					if(count($parts) === 1 && $countable && $value !== '') throw new WireException('Use a FlexRows media/rows count or blank selector');
-					if((count($parts) > 1 || in_array($def['kind'], ['integer', 'float', 'date', 'page'], true) && $value !== '') && !is_numeric($value)) {
+					if(!$count && $countable && $value !== '') throw new WireException('Use a FlexRows media/rows count or blank selector');
+					if(($count || in_array($def['kind'], ['integer', 'float', 'date', 'page'], true) && $value !== '') && !is_numeric($value)) {
 						throw new WireException('Numeric FlexRows selectors require a number');
 					}
 				}
@@ -416,7 +421,10 @@ class FlexRows extends WireArray implements \JsonSerializable {
 	private function findValue(FlexRow $item, string $property) {
 		if($property === '_type') return $item->rowType();
 		$parts = explode('.', $property);
-		if(!$item->hasProperty($parts[0])) return count($parts) > 1 ? 0 : '';
+		while(count($parts) > 1 && ($item->definitions()->property($parts[0])['kind'] ?? '') === 'object') {
+			$item = $item->getUnformatted(array_shift($parts));
+		}
+		if(!$item->definitions()->property($parts[0])) return str_ends_with($property, '.count') ? 0 : '';
 		// Row counts/blank checks describe the current view; scalar comparisons use raw leaves.
 		$value = $item->definitions()->property($parts[0])['kind'] === 'rows'
 			? $item->get($parts[0]) : $item->getUnformatted($parts[0]);

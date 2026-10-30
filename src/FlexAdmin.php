@@ -145,7 +145,7 @@ class FlexAdmin extends Wire {
 				$this->editableInput($definition['input']);
 			}
 			return $this->loadRow($token, $address, $id, $owner, substr($address, strrpos('.' . $address, '.')));
-		});
+		}, $editable ? fn($input) => $this->editableInput($input) : null);
 		$definition = $parent->definitions()->property($name);
 		if(!$definition || $definition['kind'] !== 'rows') {
 			throw new WireException($this->_('Unknown repeatable set'));
@@ -183,13 +183,17 @@ class FlexAdmin extends Wire {
 			$draft = $this->draft($token);
 			$draft['rows'][$set][$row->rowId()]['values'] = $row->rawArray();
 			$this->put($token, $draft);
-			foreach($row as $item) {
-				if($item instanceof FlexRows) {
-					foreach($item as $child) {
-						$this->registerRow($token, FlexPath::rowSet($child), $child);
+			$children = function(FlexValue $owner) use (&$children, $token): void {
+				foreach($owner as $item) {
+					if($item instanceof FlexValue) $children($item);
+					if($item instanceof FlexRows) {
+						foreach($item as $child) {
+							$this->registerRow($token, FlexPath::rowSet($child), $child);
+						}
 					}
 				}
-			}
+			};
+			$children($row);
 		} catch(\Throwable $error) {
 			$this->put($token, $before);
 			throw $error;
@@ -222,7 +226,7 @@ class FlexAdmin extends Wire {
 		[$parent, $leaf] = FlexPath::resolve($value, $address, function($set, $id, $owner, $definition) use ($token, $value) {
 			$this->editableInput($definition['input']);
 			return $this->loadRow($token, $set, $id, $owner, substr($set, strrpos('.' . $set, '.')));
-		});
+		}, fn($input) => $this->editableInput($input));
 		$prefix = FlexPath::inputPrefix($draft['input'], $parent->address());
 		$definition = $parent->definitions()->property($leaf);
 		if(!$definition || !in_array($definition['kind'], ['file', 'image'], true)) {
@@ -268,7 +272,9 @@ class FlexAdmin extends Wire {
 		$walk = function(array $raw, FlexFieldDefs $defs, string $prefix) use (&$walk, $draft): array {
 			foreach($defs->properties() as $name => $definition) {
 				$address = $prefix . $name;
-				if($definition['kind'] === 'rows') {
+				if($definition['kind'] === 'object') {
+					$raw[$name]['values'] = $walk($raw[$name]['values'], $definition['schema'], $address . '.');
+				} else if($definition['kind'] === 'rows') {
 					foreach($raw[$name]['items'] ?? [] as $n => $row) {
 						$schema = $defs->rowType($name, $row['type'])['schema'];
 						$raw[$name]['items'][$n]['values'] = $walk($row['values'], $schema, $address . '.' . $row['id'] . '.');
@@ -300,6 +306,10 @@ class FlexAdmin extends Wire {
 		}
 		$walk = function(array $raw, FlexFieldDefs $defs, string $prefix) use (&$walk, $draft): array {
 			foreach($defs->properties() as $name => $definition) {
+				if($definition['kind'] === 'object') {
+					$raw[$name]['values'] = $walk($raw[$name]['values'], $definition['schema'], $prefix . $name . '.');
+					continue;
+				}
 				if($definition['kind'] !== 'rows') {
 					continue;
 				}

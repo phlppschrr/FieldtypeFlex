@@ -416,8 +416,9 @@ class FlexFieldDefs extends Wire {
 				throw new WireException(sprintf($this->_("Flex property '%s' must be an array"), $name));
 			}
 			$isRows = ($settings['type'] ?? '') === 'rows';
+			$isObject = ($settings['type'] ?? '') === 'object';
 			$this->validateStructureSettings($settings, $isRows);
-			$class = $isRows ? 'InputfieldFlexRows' : $this->resolveType((string) ($settings['type'] ?? 'text'));
+			$class = $isRows ? 'InputfieldFlexRows' : ($isObject ? 'InputfieldFieldset' : $this->resolveType((string) ($settings['type'] ?? 'text')));
 			if(!$isRows && $class === 'InputfieldFlexRows') {
 				throw new WireException($this->_('Declare a Rows collection with type rows'));
 			}
@@ -473,7 +474,15 @@ class FlexFieldDefs extends Wire {
 			$input->_flex_property = $name;
 			$this->resolveMetadataLanguages($name, $input, $settings);
 			$this->resolveLanguages($input);
-			if($isRows) {
+			if($isObject) {
+				if($this->mediaSettings !== null) throw new WireException(__('Objects are not supported in customFields'));
+				if(!empty($settings['inheritField'])) throw new WireException($this->_('inheritField requires a native Inputfield type'));
+				$children = $settings['children'] ?? null;
+				if(!is_array($children) && !$children instanceof InputfieldWrapper) throw new WireException(__('Object children must be definitions or a wrapper'));
+				$this->register($name, $input, $settings);
+				$this->properties[$name]['kind'] = 'object';
+				$this->properties[$name]['schema'] = new self($this->flexField, $this->flexPage, $children, $this->depth + 1);
+			} else if($isRows) {
 				$this->registerRows($name, $input, $settings);
 			} else if($input instanceof InputfieldWrapper) {
 				$children = $settings['children'] ?? [];
@@ -796,7 +805,7 @@ class FlexFieldDefs extends Wire {
 				'name'         => $name,
 				'label'        => (string) $input->label,
 				'type'         => $input->className(),
-				'kind'         => $isRows ? 'rows' : ($input instanceof InputfieldWrapper ? 'fieldset' : ($definition['kind'] ?? 'markup')),
+				'kind'         => ($definition['kind'] ?? '') === 'object' ? 'object' : ($isRows ? 'rows' : ($input instanceof InputfieldWrapper ? 'fieldset' : ($definition['kind'] ?? 'markup'))),
 				'required'     => (bool) $input->required,
 				'showIf'       => (string) $input->showIf,
 				'requiredIf'   => (string) $input->requiredIf,
@@ -819,6 +828,8 @@ class FlexFieldDefs extends Wire {
 						'children'     => $typeDefinition['schema']->structure(),
 					];
 				}
+			} else if(($definition['kind'] ?? '') === 'object') {
+				$node['children'] = $definition['schema']->structure();
 			} else if($definition['customFields'] ?? null) {
 				$node['customFields'] = $definition['customFields']->structure();
 			} else if($input instanceof InputfieldWrapper) {
@@ -843,6 +854,7 @@ class FlexFieldDefs extends Wire {
 		if(count($parts) === 1) {
 			return $def;
 		}
+		if($def && $def['kind'] === 'object') return $def['schema']->property(substr($name, strlen($parts[0]) + 1));
 		if($def && ($def['customFields'] ?? null)) return $def['customFields']->property(substr($name, strlen($parts[0]) + 1));
 		return $def && $def['kind'] === 'rows' && count($parts) === 3 && isset($def['types'][$parts[1]])
 			? $def['types'][$parts[1]]['schema']->property($parts[2]) : null;
@@ -901,13 +913,20 @@ class FlexFieldDefs extends Wire {
 		if(!$ancestors && $value instanceof FlexRow && $root) {
 			$ancestors = FlexDependencies::ancestors($value, $root, $inputName, $draft);
 		}
-		$copy = function(InputfieldWrapper $source) use (&$copy, $value, $prefix, $draft, $root, $base, $inputName, $parentAddress): InputfieldWrapper {
+		$copy = function(InputfieldWrapper $source) use (&$copy, $value, $prefix, $draft, $root, $base, $inputName, $parentAddress, $ancestors): InputfieldWrapper {
 			$target = $this->wire(new InputfieldWrapper());
 			foreach($source->children() as $original) {
 				$input = $this->copyInput($original);
 				$name = (string) $original->_flex_property;
 				$definition = $this->properties[$name] ?? null;
-				if($definition && $definition['kind'] === 'rows') {
+				if($definition && $definition['kind'] === 'object') {
+					$input->value = '';
+					$object = $value ? $value->getUnformatted($name) : null;
+					$address = ($value && $value->address() !== '' ? $value->address() . '.' : '') . $name;
+					$input->flexObjectPrefix = FlexPath::inputPrefix($inputName, $address);
+					$children = $definition['schema']->getInputfields($object, $input->flexObjectPrefix, $draft, $root ?: $value, $base, $inputName, $ancestors, $value ? $value->address() : '');
+					foreach($children->children() as $child) $input->add($child);
+				} else if($definition && $definition['kind'] === 'rows') {
 					$input->definition = $definition;
 					$input->setName = $value && $value->address() !== '' ? $value->address() . '.' . $name : $name;
 					$input->flexRoot = $root ?: $value;
@@ -966,7 +985,7 @@ class FlexFieldDefs extends Wire {
 						$input->set($key, (string) $selectors);
 					}
 				}
-				if($value && isset($this->properties[$name])) {
+				if($value && isset($this->properties[$name]) && $definition['kind'] !== 'object') {
 					$v = $value->getUnformatted($name);
 					if($v instanceof LanguagesPageFieldValue) {
 						$v->setToInputfield($input);

@@ -1461,7 +1461,9 @@ class FlexMedia extends Wire {
 		$value->prepareUnknownMedia();
 		foreach($value->definitions()->properties() as $name => $definition) {
 			$item = $value->getUnformatted($name);
-			if($item instanceof FlexRows) {
+			if($item instanceof FlexValue) {
+				$this->prepare($item);
+			} else if($item instanceof FlexRows) {
 				foreach($item as $row) {
 					$this->prepare($row);
 				}
@@ -1509,7 +1511,9 @@ class FlexMedia extends Wire {
 	public function setDraft(FlexValue $value, string $token): void {
 		foreach($value->definitions()->properties() as $name => $definition) {
 			$item = $value->getUnformatted($name);
-			if($item instanceof FlexRows) {
+			if($item instanceof FlexValue) {
+				$this->setDraft($item, $token);
+			} else if($item instanceof FlexRows) {
 				foreach($item as $row) {
 					$this->setDraft($row, $token);
 				}
@@ -1534,7 +1538,9 @@ class FlexMedia extends Wire {
 		$walk = function(FlexValue $item) use (&$walk, $metadata): void {
 			foreach($item->definitions()->properties() as $name => $definition) {
 				$child = $item->getUnformatted($name);
-				if($child instanceof FlexRows) {
+				if($child instanceof FlexValue) {
+					$walk($child);
+				} else if($child instanceof FlexRows) {
 					foreach($child as $row) {
 						$walk($row);
 					}
@@ -1564,7 +1570,9 @@ class FlexMedia extends Wire {
 				continue;
 			}
 			$address = $prefix === '' ? $name : "$prefix.$name";
-			if(($value['_flex'] ?? '') === FlexStorage::ROWS_FORMAT) {
+			if(($value['_flex'] ?? '') === FlexStorage::OBJECT_FORMAT) {
+				$records = array_merge($records, self::records($value['values'], $address));
+			} else if(($value['_flex'] ?? '') === FlexStorage::ROWS_FORMAT) {
 				foreach($value['items'] as $row) {
 					$records = array_merge($records, self::records($row['values'], "$address.{$row['id']}"));
 				}

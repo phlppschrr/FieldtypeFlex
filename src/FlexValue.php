@@ -167,7 +167,9 @@ class FlexValue extends WireData implements \JsonSerializable {
 					continue;
 				}
 				$address = $prefix === '' ? (string) $name : "$prefix.$name";
-				if(($item['_flex'] ?? '') === FlexStorage::ROWS_FORMAT) {
+				if(($item['_flex'] ?? '') === FlexStorage::OBJECT_FORMAT) {
+					$walk($item['values'], $address);
+				} else if(($item['_flex'] ?? '') === FlexStorage::ROWS_FORMAT) {
 					foreach($item['items'] as &$row) {
 						$walk($row['values'], "$address.{$row['id']}");
 					}
@@ -202,6 +204,7 @@ class FlexValue extends WireData implements \JsonSerializable {
 		FlexPath::validate($this->rawArray(), $this->flexField);
 		foreach($this->definitions->properties() as $name => $definition) {
 			$item = $this->getUnformatted($name);
+			if($item instanceof FlexValue) $item->validateTree($minimum);
 			if($item instanceof FlexRows) {
 				$item->checkLimit($minimum);
 				foreach($item as $row) {
@@ -231,7 +234,9 @@ class FlexValue extends WireData implements \JsonSerializable {
 				}
 				$sourceAddress = $from === '' ? (string) $name : "$from.$name";
 				$targetAddress = $to === '' ? (string) $name : "$to.$name";
-				if(($item['_flex'] ?? '') === FlexStorage::ROWS_FORMAT) {
+				if(($item['_flex'] ?? '') === FlexStorage::OBJECT_FORMAT) {
+					$item['values'] = $walk($item['values'], $sourceAddress, $targetAddress);
+				} else if(($item['_flex'] ?? '') === FlexStorage::ROWS_FORMAT) {
 					foreach($item['items'] as &$row) {
 						$oldId = $row['id'];
 						$row['id'] = bin2hex(random_bytes(16));
@@ -279,7 +284,7 @@ class FlexValue extends WireData implements \JsonSerializable {
 			$this->formatted = $formatted;
 			$this->rawRead = false;
 			foreach($this->data as $value) {
-				if($value instanceof FlexRows) {
+				if($value instanceof FlexRows || $value instanceof FlexValue) {
 					$value->of($formatted);
 				} else if($value instanceof Pagefiles) {
 					$value->formatted($formatted);
@@ -297,6 +302,7 @@ class FlexValue extends WireData implements \JsonSerializable {
 	 */
 	public function getUnformatted(string $name) {
 		$value = parent::get($name);
+		if($this->formatted && $value instanceof FlexValue) return $value->unformattedView();
 		if($this->formatted && $value instanceof FlexRows) return $value->unformattedCollection();
 		if($this->formatted && $value instanceof Pagefiles) return $value->unformattedCollection();
 		return ($this->definitions->property($name)['kind'] ?? '') === 'date' && $value !== '' ? strtotime($value) : $value;
@@ -473,6 +479,10 @@ class FlexValue extends WireData implements \JsonSerializable {
 			}
 			return false;
 		}
+		if($value instanceof FlexValue) {
+			foreach($value->definitions()->properties() as $name => $definition) if($value->hasValue($name)) return true;
+			return $this->containsContent($value->unknown);
+		}
 		if($value instanceof Pagefiles) {
 			return count($value) > 0;
 		}
@@ -480,7 +490,8 @@ class FlexValue extends WireData implements \JsonSerializable {
 			return count($value) > 0;
 		}
 		if(is_array($value)) {
-			// Retained collections count their leaves, never row identity metadata.
+			// Retained containers count content, never structural metadata.
+			if(($value['_flex'] ?? '') === FlexStorage::OBJECT_FORMAT) $value = $value['values'];
 			if(($value['_flex'] ?? '') === FlexStorage::ROWS_FORMAT) {
 				$value = array_column($value['items'], 'values');
 			}
@@ -589,7 +600,7 @@ class FlexValue extends WireData implements \JsonSerializable {
 				continue;
 			}
 			if(
-				($value instanceof LanguagesPageFieldValue || $value instanceof PageArray || $value instanceof FlexRows || $value instanceof Pagefiles)
+				($value instanceof LanguagesPageFieldValue || $value instanceof PageArray || $value instanceof FlexRows || $value instanceof FlexValue || $value instanceof Pagefiles)
 				&& $value->isChanged()
 			) {
 				return true;
@@ -606,7 +617,7 @@ class FlexValue extends WireData implements \JsonSerializable {
 	 */
 	public function resetTrackChanges($trackChanges = true) {
 		foreach($this->data as $value) {
-			if($value instanceof LanguagesPageFieldValue || $value instanceof PageArray || $value instanceof FlexRows || $value instanceof Pagefiles) {
+			if($value instanceof LanguagesPageFieldValue || $value instanceof PageArray || $value instanceof FlexRows || $value instanceof FlexValue || $value instanceof Pagefiles) {
 				$value->resetTrackChanges($trackChanges);
 			}
 		}
@@ -620,7 +631,7 @@ class FlexValue extends WireData implements \JsonSerializable {
 	 */
 	public function __clone() {
 		foreach($this->data as $name => $value) {
-			if($value instanceof LanguagesPageFieldValue || $value instanceof PageArray || $value instanceof FlexRows || $value instanceof Pagefiles) {
+			if($value instanceof LanguagesPageFieldValue || $value instanceof PageArray || $value instanceof FlexRows || $value instanceof FlexValue || $value instanceof Pagefiles) {
 				$this->data[$name] = clone $value;
 			}
 		}
@@ -708,6 +719,7 @@ class FlexValue extends WireData implements \JsonSerializable {
 	 */
 	public function encodeProperty(string $name, $value) {
 		$definition = $this->definitions->property($name);
+		if($value instanceof FlexValue) return ['_flex' => FlexStorage::OBJECT_FORMAT, 'values' => $value->rawArray()];
 		if($definition['kind'] === 'page' && $this->flexPage->template) {
 			$field = $this->pageReferenceField($name);
 			$ids = $this->wire()->modules->get('FieldtypePage')->sleepValue($this->flexPage, $field, $value);
@@ -794,6 +806,20 @@ class FlexValue extends WireData implements \JsonSerializable {
 		if(in_array($def['kind'], ['file', 'image'], true)) {
 			$class = $def['kind'] === 'image' ? FlexImages::class : FlexFiles::class;
 			return new $class($this->flexPage, $this->flexField, $this->flexAddress === '' ? $name : "$this->flexAddress.$name", $def, $value);
+		}
+		if($def['kind'] === 'object') {
+			$address = $this->flexAddress === '' ? $name : "$this->flexAddress.$name";
+			$source = $value instanceof FlexValue ? $value : null;
+			$raw = $source ? $source->rawArray() : $value;
+			if(is_array($raw) && ($raw['_flex'] ?? '') === FlexStorage::OBJECT_FORMAT) {
+				if(!isset($raw['values']) || !is_array($raw['values'])) throw new WireException(__('Invalid stored object envelope'));
+				$raw = $raw['values'];
+			}
+			if($raw === '' || $raw === null) $raw = [];
+			if(!is_array($raw) || ($raw && array_is_list($raw))) throw new WireException(__('Object value must be a property map'));
+			$object = new self($this->flexPage, $this->flexField, $def['schema'], $raw, $address);
+			if($source && ($source->ownerPage() !== $this->flexPage || $source->address() !== $address || !$source->belongsTo($this->flexPage, $this->flexField))) $object->copyValuesFrom($source);
+			return $object;
 		}
 		if($def['kind'] === 'rows') {
 			if($value instanceof FlexRows && $value->belongsTo($this->flexPage, $this->flexField, $this->flexAddress === '' ? $name : "$this->flexAddress.$name")) {

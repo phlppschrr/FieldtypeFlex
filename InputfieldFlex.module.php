@@ -302,6 +302,13 @@ class InputfieldFlex extends Inputfield {
 	public static function applyInputs(FlexValue $value, InputfieldWrapper $form, string $prefix): void {
 		foreach($value->definitions()->properties() as $name => $def) {
 			$child = $form->getChildByName($prefix . $name);
+			if($def['kind'] === 'object') {
+				if($child instanceof InputfieldWrapper) {
+					$object = $value->getUnformatted($name);
+					self::applyInputs($object, $child, $child->flexObjectPrefix);
+				}
+				continue;
+			}
 			if(!$child || !$child->isChanged()) {
 				continue;
 			}
