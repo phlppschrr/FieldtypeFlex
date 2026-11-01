@@ -286,7 +286,8 @@ file objects whose initialization could create/rename directories. Original prob
 use guarded normal/secure/extended and journal paths; custom native path hooks leave
 the check explicitly incomplete. No diagnostics handler repairs or collects. Native
 completion cleanup remains independent and may still run when the PHP process ends.
-API.md defines categories, skipped work, output framing and exit precedence.
+The CLI report contract in [development.md](development.md#cli-operation-and-report-contract)
+defines categories, skipped work, output framing and exit precedence.
 
 ## Optional lazy Row bodies
 

@@ -281,3 +281,114 @@ with native FieldtypePage and check mutable reference-container isolation.
 
 Keep temporary scripts and browser fixtures under the ignored .dev/ directory.
 Remove registered test modules, Fields and Pages after verification.
+
+## CLI operation and report contract
+
+The [API maintenance reference](../API.md#maintenance-apis) covers everyday usage.
+Run `php index.php flex --help` from the ProcessWire root for command options.
+Native dispatch requires a supporting core: the pinned 3.0.259 lacks it; PHP and
+Admin maintenance remain available. Refresh module metadata after CLI updates.
+
+### Selection, batching and writes
+
+- `--page=ID` selects exactly one assigned owner, including hidden/unpublished Pages
+  and Repeater items. Missing owner/assignment is an error (exit 2). An assigned
+  field without storage returns `stored=false`, `checked=0`; stored empty JSON is
+  checked normally. Schema inspection evaluates the Page even without storage.
+- `--page` excludes `--all`, `--after` and `--limit`. Otherwise one bounded batch is
+  selected unless `--all` advances batches automatically. `--limit` bounds each
+  batch (1–1000, default 100), not the run; `--after` starts after an owner ID.
+- Numeric options require decimal integers without signs or leading zeros (`0`
+  is valid for `--after` only). Unknown/repeated/inapplicable options fail;
+  distinct `--path` selections may repeat. `--dry-run` and `--apply` conflict.
+- Rename/cleanup preview by default. Apply creates and validates a fresh preview;
+  an earlier terminal dry-run is not an approval token. Cleanup requires unique
+  type-qualified schema paths, never concrete Row IDs. `--details` adds orphan
+  owner IDs and concrete addresses.
+- Each owner commits independently. All-runs stop after the first batch with
+  errors/skipped checks; earlier successful owners remain applied. Repair failures
+  and resume the same operation with `--all --after=RESUME_ID`, using
+  `resumeAfterPageId`, not the examination cursor `lastPageId`.
+- Scans are not global snapshots. Before dropping `renamedFrom`, complete the
+  migration from zero and repeat a full successful preview with no pending renames.
+
+### Reports and output
+
+PHP maintenance arrays contain `fieldId`, `operation`, `paths`, `checked`,
+`changed`, `unchanged`, `wouldChange`, `pages`, `properties`, `renames`, `conflicts`,
+`errors`, `findings`, `skippedChecks`, `retryPageIds`, `resumeAfterPageId`,
+`afterPageId`, `lastPageId`, `complete`, `success` and `finished`.
+`pages` contains opaque preview tokens; pass the checked batch unchanged to apply.
+Errors/conflicts identify `pageId`, `path`, `message`; rename entries add `from`,
+`to` and concrete `address`. Schema paths select properties; addresses locate
+individual Row/media occurrences. `findings`/`skippedChecks` are empty for PHP
+rename/orphan/cleanup operations; CLI checks populate them.
+
+`complete` means the selected owner range was exhausted. `finished` additionally
+requires no errors or skipped checks. Warnings alone do not fail a complete check.
+`retryPageIds` identifies failures; `resumeAfterPageId` safely precedes them.
+
+`rename`, `orphans` and `cleanup` default to JSON; inspection commands default to
+readable text. `--json` emits one object. With `--all --json`, JSON-Lines contains
+`record="batch"` objects and a final `record="summary"`. Without `--json`, all-runs
+retain the command's batch format and add a summary. Progress/adapter diagnostics
+go to stderr; a failed stream may lack its summary. Ignore blank lines and check
+exit status: 0 success/warnings, 1 known errors, 2 request/adapter failure,
+3 incomplete check without known errors. Known errors take precedence.
+
+### Inspection boundaries
+
+`schema` and `lint` use discovery/NullPage unless `--page` supplies context. Dynamic
+schemas are checked only in that context. Lint warnings do not change exit status;
+missing/invalid definitions do. Diagnostics contain `code`, `severity`, `path`,
+`property`, `setting`, `message`. Codes: `row_title_unresolved`,
+`dependency_expression_invalid`, `dependency_path_invalid`,
+`dependency_target_unknown`. External native dependencies remain context-dependent.
+
+Check findings contain stable `category`, `severity`, `field`, `fieldId`, `pageId`,
+`path`, `address`, and a value-free `message`. Empty paths denote owner/field-level
+findings. Categories: `owner`, `canonical_json`, `definition`, `envelope`,
+`schema_data`, `row_schema`, `rename_conflict`, `pending_rename`,
+`search_projection`, `row_projection`, `media_reference`, `media_unreferenced`,
+`media_original`, `derived_unavailable`. Custom file-path hooks/unavailable roots
+can skip original checks; invalid data/query failures can prevent further checks.
+Checks cover selected stored owners, not global filesystem, cross-field, version
+or staging inventories. They do not verify file bytes, optional variations or
+complete index definitions. Concurrent writes may require another check.
+Skipped work is explicit, not proof of consistency. Whole-field search checks
+compare content counts rather than order because database JSON objects can reorder;
+Row projections still verify identities, order and payloads. Regression coverage
+is in `tests/integration/maintenance-cli.php`; the comparison rationale is beside
+`FlexInspection::checkDerived()`.
+
+Status reports versions, CLI availability, required columns/InnoDB engines, media
+journal/expiry counts and cleanup cursor. Missing storage/wrong engines fail;
+pending counts are normal. It neither cleans nor audits full indexes. The cursor
+is not completion progress; `lastCleanup=unknown` claims no last-run success/time.
+Read-only command handlers do not prevent independent process-end media collection.
+
+## HTML link compatibility
+
+Outgoing HTML URL sleep/wakeup and link abstraction are independent of native
+backlink discovery. Automatic `Page::links()` does not register Flex fields.
+The pinned 3.0.259 accepts an explicit Flex field in
+`$target->links($selector, $fieldName)`; the pinned newer core restricts it to
+Textarea fields. Direct `MarkupQA::findLinks()` with an explicit Flex field can
+find searchable root/visible-Row HTML, but misses links found only in hidden Rows
+or custom File/Image HTML because those are absent from whole-field candidates.
+These are compatibility observations, not a complete backlink API. The executable
+specification is `tests/integration/markup.php` (`ddev flex-test formatting`).
+
+## Lazy Row eligibility
+
+`rowLazyLoad => true` enables deferred bodies only for eligible closed existing
+Rows. Text, Textarea, Email, URL, Integer, Float, Checkbox, Select, SelectMultiple,
+Checkboxes and Radios are eligible, optionally grouped in ordinary fieldsets.
+Rich text, media, dates, Page references, multilingual/custom inputs, nested
+structures, native AJAX collapse modes and nonzero custom unchecked checkbox
+values render directly. Expanded/new/error Rows render directly as well. Nested
+collections can opt in independently for eligible children. Deferred loading
+reduces initial input construction/DOM size, not hydration or save-time validation.
+Only boolean true enables it; failures block saving until Retry succeeds, and
+schema/revision changes require reloading. The full-editor fallback is
+`flex_eager=1`. See [verification](#lazy-row-verification).
