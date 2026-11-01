@@ -1,7 +1,10 @@
 <?php namespace ProcessWire;
 
+require_once __DIR__ . '/src/FlexBridge.php';
+
 /** Atomic repeatable set; every leaf is a fresh native Inputfield. */
-class InputfieldFlexRows extends Inputfield {
+class InputfieldFlexRows extends Inputfield implements BridgeComponent {
+	use FlexBridgeComponent;
 	private array $rowInputs = [];
 	private array $removedRows = [];
 	private ?array $renderRows = null;
@@ -61,7 +64,7 @@ class InputfieldFlexRows extends Inputfield {
 	 */
 	public function renderReady(?Inputfield $parent = null, $renderValueMode = false) {
 		$loaded = parent::renderReady($parent, $renderValueMode);
-		$this->wire()->modules->get('JqueryUI');
+		if(!is_a($this->wire()->adminTheme, __NAMESPACE__ . '\\AdminThemeBridge')) $this->wire()->modules->get('JqueryUI');
 		$rows = $this->value;
 		$existingIds = [];
 		if($rows instanceof FlexRows) {

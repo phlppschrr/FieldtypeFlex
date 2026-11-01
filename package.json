@@ -1,0 +1,13 @@
+{
+  "name": "fieldtype-flex",
+  "private": true,
+  "scripts": {
+    "build": "tsc -p tsconfig.json && tsc -p tsconfig.maintenance.json",
+    "check": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.maintenance.json --noEmit",
+    "test": "npm run build && node tests/js/row-title-parts.cjs && node --test tests/js/*.test.cjs"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "jsdom": "26.1.0"
+  }
+}

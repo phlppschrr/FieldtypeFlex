@@ -1,80 +1,403 @@
-(function($) {
-    'use strict';
-    function preserveSelectorPaths() {
-        var selector = window.InputfieldSelector;
-        if(!selector || selector.flexPathsPreserved) return;
-        var change = selector.changeAny;
-        // Older core assumes every multi-dot path ends in a synthetic `.id`.
-        // Keep the native builder, compensating only while that trimming exists.
-        if(!/\.substring\(0,\s*[\w$.]+\.lastIndexOf\(["']\.["']\)\)/.test(String(change))) return;
-        var active = false;
-        selector.changeAny = function($item) {
-            if(active) return change.apply(this, arguments);
-            var fields = ProcessWire.config.FieldtypeFlexSelectorFields || [], adjusted = [];
-            $item.closest('.InputfieldSelector').find('.select-subfield option:selected').each(function() {
-                var path = this.value.split('.');
-                if(path.length !== 3 || fields.indexOf(path[0]) < 0) return;
-                adjusted.push([this, this.value]);
-                this.value += '.__flex_terminal';
-            });
-            active = true;
-            try {
-                return change.apply(this, arguments);
-            } finally {
-                adjusted.forEach(function(item) { item[0].value = item[1]; });
-                active = false;
+"use strict";
+var FieldtypeFlex;
+(function (FieldtypeFlex) {
+    FieldtypeFlex.controlSelector = 'input, select, textarea, button';
+    function all(scope, selector) {
+        return Array.from(scope.querySelectorAll(selector));
+    }
+    FieldtypeFlex.all = all;
+    function one(scope, selector) {
+        const element = scope.querySelector(selector);
+        if (!element)
+            throw new Error('Missing Flex element: ' + selector);
+        return element;
+    }
+    FieldtypeFlex.one = one;
+    function closest(element, selector) {
+        const parent = element.closest(selector);
+        if (!parent)
+            throw new Error('Missing Flex parent: ' + selector);
+        return parent;
+    }
+    FieldtypeFlex.closest = closest;
+    function attr(element, name) { return element.getAttribute(name) || ''; }
+    FieldtypeFlex.attr = attr;
+    function ready(callback) {
+        if (document.readyState === 'loading')
+            document.addEventListener('DOMContentLoaded', callback, { once: true });
+        else
+            callback();
+    }
+    FieldtypeFlex.ready = ready;
+    function value(control) {
+        if (control instanceof HTMLSelectElement && control.multiple)
+            return Array.from(control.selectedOptions, option => option.value);
+        return control.value;
+    }
+    FieldtypeFlex.value = value;
+    function setValue(control, value) {
+        if (control instanceof HTMLSelectElement && Array.isArray(value)) {
+            Array.from(control.options).forEach(option => option.selected = value.includes(option.value));
+        }
+        else
+            control.value = Array.isArray(value) ? value.join(',') : value;
+    }
+    FieldtypeFlex.setValue = setValue;
+    // Match successful form controls, including fieldset disabling and CRLF encoding.
+    // Files and submit buttons are deliberately excluded, as in native AJAX forms.
+    function serialize(scope) {
+        const controls = scope instanceof HTMLFormElement ? Array.from(scope.elements) : all(scope, FieldtypeFlex.controlSelector);
+        return controls.flatMap(element => {
+            if (!(element instanceof HTMLInputElement || element instanceof HTMLSelectElement || element instanceof HTMLTextAreaElement))
+                return [];
+            if (!element.name || element.matches(':disabled') || /^(file|submit|button|image|reset)$/i.test(element.type))
+                return [];
+            if (element instanceof HTMLInputElement && /^(checkbox|radio)$/i.test(element.type) && !element.checked)
+                return [];
+            const values = element instanceof HTMLSelectElement
+                ? Array.from(element.selectedOptions).filter(option => !option.disabled && !(option.parentElement instanceof HTMLOptGroupElement && option.parentElement.disabled)).map(option => option.value)
+                : [element.value];
+            return values.map(item => [element.name, item.replace(/\r?\n/g, '\r\n')]);
+        });
+    }
+    FieldtypeFlex.serialize = serialize;
+    function trustedHTML(html) {
+        return window.ProcessWireAdminTheme?.trusted.html(html) ?? html;
+    }
+    FieldtypeFlex.trustedHTML = trustedHTML;
+    function setHTML(scope, html) { scope.innerHTML = trustedHTML(html); }
+    FieldtypeFlex.setHTML = setHTML;
+    function insertHTML(scope, where, html) { scope.insertAdjacentHTML(where, trustedHTML(html)); }
+    FieldtypeFlex.insertHTML = insertHTML;
+    function parseHTML(html) {
+        const template = document.createElement('template');
+        template.innerHTML = trustedHTML(html.trim());
+        return one(template.content, '*');
+    }
+    FieldtypeFlex.parseHTML = parseHTML;
+    // Native Inputfields can return inline configuration scripts in AJAX markup.
+    // template/innerHTML keep them inert; execute them once after insertion, as before.
+    async function activateScripts(scope, response) {
+        if (window.ProcessWireAdminTheme) {
+            await window.ProcessWireAdminTheme.runScripts(scope, { legacy: FieldtypeFlex.needsLegacy(scope), nonce: response?.headers?.get('X-Bridge-Nonce') || '' });
+            return;
+        }
+        all(scope, 'script').forEach(inert => {
+            if (inert.type && !/^(text|application)\/javascript$/.test(inert.type) && inert.type !== 'module')
+                return;
+            const script = document.createElement('script');
+            Array.from(inert.attributes).forEach(attribute => script.setAttribute(attribute.name, attribute.value));
+            script.textContent = inert.textContent;
+            script.async = false;
+            inert.replaceWith(script);
+        });
+    }
+    FieldtypeFlex.activateScripts = activateScripts;
+    function change(control, value) {
+        control.value = value;
+        control.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    FieldtypeFlex.change = change;
+    function delegate(name, selector, callback) {
+        document.addEventListener(name, event => {
+            if (!(event.target instanceof Element))
+                return;
+            const element = event.target.closest(selector);
+            if (element)
+                callback(event, element);
+        });
+    }
+    FieldtypeFlex.delegate = delegate;
+})(FieldtypeFlex || (FieldtypeFlex = {}));
+// Admin integration: Bridge public APIs, with the classic ProcessWire stack as fallback.
+var FieldtypeFlex;
+(function (FieldtypeFlex) {
+    FieldtypeFlex.classic = {
+        async setup(scope) {
+            if (window.ProcessWireAdminTheme) {
+                if (FieldtypeFlex.needsLegacy(scope))
+                    await window.Bridge?.legacy.load();
+                window.ProcessWireAdminTheme.legacy.initElement(scope);
+                await FieldtypeFlex.classic.initMedia(scope);
+                return;
             }
-        };
-        selector.flexPathsPreserved = true;
-    }
-    preserveSelectorPaths();
-    $(preserveSelectorPaths);
-    function message(key, fallback) {
-        var config = window.ProcessWire && ProcessWire.config && ProcessWire.config.FieldtypeFlex;
-        return config && config[key] ? config[key] : fallback;
-    }
-    function namedMessage(key, fallback, name) {
-        return message(key, fallback).replace('{name}', name);
-    }
-    function rows($set) {
-        return $set.children('.flex-rows-items').children('.flex-row[data-flex-row]');
-    }
-    function activeRows($set) {
-        return rows($set).not('.flex-row-remove-pending');
-    }
-    function removalState($row, removed) {
-        var $body = $row.children('.flex-row-content');
-        $row.toggleClass('flex-row-remove-pending', removed);
-        $row.children('.flex-row-header').toggleClass('ui-state-error', removed);
-        $row.children('.flex-row-remove-value').val(removed ? '1' : '0');
-        $row.children('.flex-row-remove-mirror').remove();
-        if(removed) {
-            // Keep successful native transport values for recovery/undo, while excluding
-            // removed controls from browser validation. Originals remain in the DOM.
-            $body.find(':input').serializeArray().forEach(function(item) {
-                $('<input type="hidden" class="flex-row-remove-mirror">').attr('name', item.name).val(item.value).appendTo($row);
+            const $ = window.jQuery;
+            if (!$)
+                return;
+            if (window.Inputfields)
+                window.Inputfields.init($(scope));
+            else
+                window.InputfieldsInit?.($(scope));
+            const inputs = FieldtypeFlex.all(scope, '.Inputfield');
+            if (scope.matches('.Inputfield'))
+                inputs.unshift(scope);
+            inputs.forEach(input => $(input).trigger('reloaded'));
+        },
+        async initMedia(scope) {
+            if (!FieldtypeFlex.nativeBridge() || window.Bridge?.contract !== '1')
+                return;
+            const fields = FieldtypeFlex.all(scope, '[data-flex-media]');
+            if (scope instanceof HTMLElement && scope.matches('[data-flex-media]'))
+                fields.unshift(scope);
+            await Promise.all(fields.map(field => window.Bridge.files.init(field, FieldtypeFlex.attr(field, 'data-flex-media') === 'image' ? 'image' : 'file')));
+        },
+        toggle(row, open) {
+            if (FieldtypeFlex.nativeBridge() && window.Bridge?.contract === '1') {
+                if (open)
+                    window.Bridge.Inputfields.open(row);
+                else
+                    window.Bridge.Inputfields.close(row);
+                return;
+            }
+            if (window.jQuery && window.Inputfields?.toggle)
+                window.Inputfields.toggle(window.jQuery(row), open, 0);
+            else {
+                row.classList.toggle('InputfieldStateCollapsed', !open);
+                row.dispatchEvent(new Event(open ? 'opened' : 'closed', { bubbles: true }));
+            }
+        },
+        events(reloaded, toggled, tinyChanged, mediaRefresh) {
+            document.addEventListener('reloaded', event => {
+                if (event.target instanceof HTMLElement && event.target.matches('.Inputfield'))
+                    reloaded(event.target);
             });
-            $body.find(':input').each(function() {
-                if($(this).data('flexRemoveDisabled') === undefined) $(this).data('flexRemoveDisabled', this.disabled);
-                this.disabled = true;
+            ['opened', 'closed'].forEach(name => document.addEventListener(name, event => {
+                if (event.target instanceof HTMLElement && event.target.matches('.flex-row'))
+                    toggled(event.target, name === 'opened');
+            }));
+            document.addEventListener('change', event => {
+                if (event.target instanceof HTMLElement && event.target.matches('.InputfieldTinyMCE[data-flex-label-property]'))
+                    tinyChanged(event.target);
             });
-        } else {
-            $body.find(':input').each(function() {
-                var before = $(this).data('flexRemoveDisabled');
-                if(before !== undefined) { this.disabled = before; $(this).removeData('flexRemoveDisabled'); }
+            // Upstream custom events are jQuery-only. Bind when a legacy child loads the stack.
+            let bound = false;
+            const bindLegacy = () => {
+                const $ = window.jQuery;
+                if (!$ || bound)
+                    return;
+                bound = true;
+                $(document).on('reloaded.flexRows', '.Inputfield', function (event) {
+                    if (!event.originalEvent && event.target === this)
+                        reloaded(event.target);
+                });
+                $(document).on('opened.flexRows closed.flexRows', '.flex-row', function (event) {
+                    if (!event.originalEvent && event.target === this)
+                        toggled(event.target, event.type === 'opened');
+                });
+                $(document).on('change.flexRows', '.InputfieldTinyMCE[data-flex-label-property]', function (event) {
+                    if (!event.originalEvent && event.target === this)
+                        tinyChanged(event.target);
+                });
+                $(document).on('flexMediaRefresh.flexRows', (_event, draft, path) => {
+                    if (typeof draft === 'string' && typeof path === 'string')
+                        mediaRefresh(draft, path);
+                });
+            };
+            bindLegacy();
+            document.addEventListener('pw-legacy-loaded', bindLegacy);
+            document.addEventListener('flexMediaRefresh', event => {
+                const detail = event.detail;
+                if (detail)
+                    mediaRefresh(detail.draft, detail.path);
+            });
+        },
+        added(row) {
+            if (window.jQuery)
+                window.jQuery(document).trigger('flexRowAdded', [window.jQuery(row)]);
+            else
+                document.dispatchEvent(new CustomEvent('flexRowAdded', { detail: { row } }));
+        },
+        saveReady(scope) {
+            if (window.jQuery)
+                FieldtypeFlex.all(scope, '.InputfieldTinyMCE').forEach(input => window.jQuery(input).trigger('saveReady'));
+        },
+        destroyEditors(scope) {
+            if (window.jQuery)
+                window.InputfieldTinyMCE?.destroyEditorsIn(window.jQuery(scope));
+        },
+        initInline(editor) { window.InputfieldTinyMCE?.init(editor, 'flex.mediaMetadata'); },
+        closeDialog() {
+            if (FieldtypeFlex.nativeBridge())
+                window.Bridge?.dialog.close();
+            else
+                window.jQuery?.('iframe.ui-dialog-content').dialog('close');
+        },
+        confirm(message, callback) {
+            if (window.ProcessWireAdminTheme) {
+                void window.Bridge?.confirm(message, callback);
+                return;
+            }
+            if (window.ProcessWire?.confirm)
+                window.ProcessWire.confirm(message, callback);
+            else if (window.confirm(message))
+                callback();
+        },
+        preserveSelectorPaths() {
+            const selector = window.InputfieldSelector;
+            if (!selector || selector.flexPathsPreserved)
+                return;
+            const original = selector.changeAny;
+            if (!/\.substring\(0,\s*[\w$.]+\.lastIndexOf\(["']\.["']\)\)/.test(String(original)))
+                return;
+            let active = false;
+            selector.changeAny = function (item) {
+                if (active)
+                    return original.call(this, item);
+                const fields = window.ProcessWire?.config.FieldtypeFlexSelectorFields || [];
+                const adjusted = [];
+                FieldtypeFlex.all(FieldtypeFlex.closest(item[0], '.InputfieldSelector'), '.select-subfield option:checked').forEach(option => {
+                    const path = option.value.split('.');
+                    if (path.length !== 3 || !fields.includes(path[0]))
+                        return;
+                    adjusted.push([option, option.value]);
+                    option.value += '.__flex_terminal';
+                });
+                active = true;
+                try {
+                    return original.call(this, item);
+                }
+                finally {
+                    adjusted.forEach(([option, value]) => option.value = value);
+                    active = false;
+                }
+            };
+            selector.flexPathsPreserved = true;
+        }
+    };
+})(FieldtypeFlex || (FieldtypeFlex = {}));
+(function (FieldtypeFlex) {
+    function nativeBridge() { return !!window.ProcessWireAdminTheme && !window.ProcessWireAdminTheme.upstream(); }
+    FieldtypeFlex.nativeBridge = nativeBridge;
+    function needsLegacy(scope) {
+        const fields = FieldtypeFlex.all(scope, '.Inputfield[data-bridge-legacy]');
+        if (scope.matches('.Inputfield[data-bridge-legacy]'))
+            fields.unshift(scope);
+        return fields.some(field => window.ProcessWireAdminTheme?.legacy.needsStack(field));
+    }
+    FieldtypeFlex.needsLegacy = needsLegacy;
+})(FieldtypeFlex || (FieldtypeFlex = {}));
+var FieldtypeFlex;
+(function (FieldtypeFlex) {
+    const nativeSorts = new Map();
+    let observing = false;
+    // Element-only contract: replacing this adapter does not affect Row logic.
+    FieldtypeFlex.sortable = {
+        init(list, start, stop) {
+            if (window.ProcessWireAdminTheme) {
+                if (window.Bridge?.contract !== '1' || nativeSorts.has(list))
+                    return;
+                const state = { disabled: false };
+                nativeSorts.set(list, state);
+                void window.Bridge.sortable(list, {
+                    items: '.flex-row[data-flex-row]', handle: '.flex-row-sort',
+                    cancel: 'input, select, textarea, a, button:not(.flex-row-sort)', axis: 'y', threshold: 5,
+                    enabled: () => !state.disabled && list.isConnected, start, stop
+                }).then(destroy => {
+                    if (!list.isConnected) {
+                        destroy();
+                        nativeSorts.delete(list);
+                    }
+                    else
+                        state.destroy = destroy;
+                }).catch(error => { nativeSorts.delete(list); console.error('Flex sorting failed', error); });
+                if (!observing) {
+                    observing = true;
+                    window.ProcessWireAdminTheme.observe(() => nativeSorts.forEach((state, list) => {
+                        if (!list.isConnected) {
+                            state.destroy?.();
+                            nativeSorts.delete(list);
+                        }
+                    }));
+                }
+                return;
+            }
+            const $ = window.jQuery;
+            if (!$?.fn.sortable || $(list).hasClass('ui-sortable'))
+                return;
+            list.addEventListener('mousedown', event => {
+                if (event.target instanceof Element && event.target.closest('.flex-rows-items') === list)
+                    event.stopPropagation();
+            });
+            $(list).on('sortstart.flexRows sortstop.flexRows sortupdate.flexRows', event => {
+                if (event.target === list)
+                    event.stopPropagation();
+            }).sortable({
+                items: '> .flex-row[data-flex-row]', handle: '.flex-row-sort', cancel: ':input:not(.flex-row-sort), a',
+                axis: 'y', distance: 5, tolerance: 'pointer', placeholder: 'flex-row-placeholder',
+                start(_event, ui) { ui.placeholder.height(ui.item[0].getBoundingClientRect().height); start(ui.item[0]); },
+                stop(_event, ui) { stop(ui.item[0]); }
+            });
+        },
+        disabled(list, disabled) {
+            const state = nativeSorts.get(list);
+            if (state) {
+                state.disabled = disabled;
+                return;
+            }
+            const $ = window.jQuery;
+            if ($?.fn.sortable && $(list).hasClass('ui-sortable'))
+                $(list).sortable('option', 'disabled', disabled);
+        }
+    };
+})(FieldtypeFlex || (FieldtypeFlex = {}));
+var FieldtypeFlex;
+(function (FieldtypeFlex) {
+    const state = new WeakMap();
+    const disabledBeforeRemoval = new WeakMap();
+    const busyTrees = new WeakSet();
+    function rowState(row) {
+        let current = state.get(row);
+        if (!current) {
+            current = {};
+            state.set(row, current);
+        }
+        return current;
+    }
+    function message(key, fallback) { return window.ProcessWire?.config.FieldtypeFlex?.[key] || fallback; }
+    function errorMessage(error) { return error instanceof Error ? error.message : String(error); }
+    function rows(set) { return FieldtypeFlex.all(set, ':scope > .flex-rows-items > .flex-row[data-flex-row]'); }
+    function activeRows(set) { return rows(set).filter(row => !row.matches('.flex-row-remove-pending')); }
+    function removalState(row, removed) {
+        const body = FieldtypeFlex.one(row, ':scope > .flex-row-content');
+        row.classList.toggle('flex-row-remove-pending', removed);
+        FieldtypeFlex.one(row, ':scope > .flex-row-header').classList.toggle('ui-state-error', removed);
+        FieldtypeFlex.one(row, ':scope > .flex-row-remove-value').value = removed ? '1' : '0';
+        FieldtypeFlex.all(row, ':scope > .flex-row-remove-mirror').forEach(input => input.remove());
+        if (removed) {
+            FieldtypeFlex.serialize(body).forEach(([name, value]) => {
+                const mirror = document.createElement('input');
+                mirror.type = 'hidden';
+                mirror.className = 'flex-row-remove-mirror';
+                mirror.name = name;
+                mirror.value = value;
+                row.append(mirror);
             });
         }
-        var $button = $row.children('.flex-row-header').find('[data-flex-row-action="remove"]');
-        var label = $button.attr(removed ? 'data-flex-undo-label' : 'data-flex-remove-label');
-        $button.attr({'aria-pressed': removed ? 'true' : 'false', 'aria-label': label, title: label});
+        FieldtypeFlex.all(body, FieldtypeFlex.controlSelector).forEach(input => {
+            if (removed) {
+                if (!disabledBeforeRemoval.has(input))
+                    disabledBeforeRemoval.set(input, input.disabled);
+                input.disabled = true;
+            }
+            else if (disabledBeforeRemoval.has(input)) {
+                input.disabled = disabledBeforeRemoval.get(input);
+                disabledBeforeRemoval.delete(input);
+            }
+        });
+        const button = FieldtypeFlex.one(row, ':scope > .flex-row-header [data-flex-row-action="remove"]');
+        const label = FieldtypeFlex.attr(button, removed ? 'data-flex-undo-label' : 'data-flex-remove-label');
+        button.setAttribute('aria-pressed', String(removed));
+        button.setAttribute('aria-label', label);
+        button.title = label;
     }
-    function titleParts(format, values, number, type, path, cleanup) {
-        var parts = [];
-        format.split(/(\[[^\[\]]*\]|_\{[^{}]+\}_|\{[^{}]+\}|#n)/gi).filter(Boolean).forEach(function(part) {
-            if(part[0] === '[' && part.slice(-1) === ']') {
+    function titleParts(format, values, number, type, path, cleanup = true) {
+        const parts = [];
+        format.split(/(\[[^\[\]]*\]|_\{[^{}]+\}_|\{[^{}]+\}|#n)/gi).filter(Boolean).forEach(function (part) {
+            if (part[0] === '[' && part.slice(-1) === ']') {
                 var details = titleParts(part.slice(1, -1), values, number, type, path, false);
-                if(!details.length) details.push({text: '', badge: false, literal: false});
-                details.forEach(function(detail) {
+                if (!details.length)
+                    details.push({ text: '', badge: false, literal: false });
+                details.forEach(function (detail) {
                     detail.muted = true;
                     parts.push(detail);
                 });
@@ -82,545 +405,585 @@
             }
             var badge = part.slice(0, 2) === '_{' && part.slice(-2) === '}_';
             var token = badge ? part.slice(1, -1) : part, value = part, literal = false;
-            if(token.toLowerCase() === '#n') value = '#' + number;
-            else if(token[0] === '{' && token.slice(-1) === '}') {
+            if (token.toLowerCase() === '#n')
+                value = '#' + number;
+            else if (token[0] === '{' && token.slice(-1) === '}') {
                 value = '';
-                token.slice(1, -1).split('|').some(function(name) {
+                token.slice(1, -1).split('|').some(function (name) {
                     var candidate = name === '@type' ? type : (name === '@path' ? path : (Object.prototype.hasOwnProperty.call(values, name) ? values[name] : ''));
-                    if(String(candidate).trim() === '') return false;
+                    if (String(candidate).trim() === '')
+                        return false;
                     value = String(candidate);
                     return true;
                 });
-            } else literal = true;
-            parts.push({text: value, badge: badge, literal: literal});
+            }
+            else
+                literal = true;
+            parts.push({ text: value, badge: badge, literal: literal });
         });
-        if(cleanup === false) return parts;
-        parts.forEach(function(part, i) {
-            if(!part.literal || !/^[\s›|/:;,–—-]+$/.test(part.text)) return;
-            var before = parts.some(function(other, j) { return j < i && other.text.trim() !== '' && (!other.literal || !/^[\s›|/:;,–—-]+$/.test(other.text)); });
-            var after = parts.some(function(other, j) { return j > i && other.text.trim() !== '' && (!other.literal || !/^[\s›|/:;,–—-]+$/.test(other.text)); });
-            if(!before || !after) part.text = '';
+        if (cleanup === false)
+            return parts;
+        parts.forEach(function (part, i) {
+            if (!part.literal || !/^[\s›|/:;,–—-]+$/.test(part.text))
+                return;
+            var before = parts.some(function (other, j) { return j < i && other.text.trim() !== '' && (!other.literal || !/^[\s›|/:;,–—-]+$/.test(other.text)); });
+            var after = parts.some(function (other, j) { return j > i && other.text.trim() !== '' && (!other.literal || !/^[\s›|/:;,–—-]+$/.test(other.text)); });
+            if (!before || !after)
+                part.text = '';
         });
-        var separator = null, omitted = false;
-        parts.forEach(function(part, i) {
-            if(part.text === '') {
-                if(!part.literal) omitted = true;
+        let separator = null, omitted = false;
+        parts.forEach(function (part, i) {
+            if (part.text === '') {
+                if (!part.literal)
+                    omitted = true;
                 return;
             }
-            if(part.literal && /^[\s›|/:;,–—-]+$/.test(part.text)) {
-                if(separator !== null && omitted) parts[separator].text = '';
+            if (part.literal && /^[\s›|/:;,–—-]+$/.test(part.text)) {
+                if (separator !== null && omitted)
+                    parts[separator].text = '';
                 separator = i;
-            } else separator = null;
+            }
+            else
+                separator = null;
             omitted = false;
         });
         return parts;
     }
-    function rowTitle($row, index, path) {
-        var format = $row.attr('data-flex-label-format') || '';
-        var type = $row.attr('data-flex-type-label') || '';
-        var parts = titleParts(format, $row.data('flexLabelValues') || {}, index + 1, type, path);
-        if(!parts.some(function(part) { return part.text.trim() !== ''; })) {
-            parts = [{text: (format ? '' : type + ' ') + '#' + (index + 1), badge: false}];
-        }
-        if(!format) parts.unshift({text: type, badge: true}, {text: ' ', badge: false});
+    function rowTitle(row, index, path) {
+        const format = FieldtypeFlex.attr(row, 'data-flex-label-format'), type = FieldtypeFlex.attr(row, 'data-flex-type-label');
+        const values = rowState(row).labels ?? JSON.parse(FieldtypeFlex.attr(row, 'data-flex-label-values') || '{}');
+        let parts = titleParts(format, values, index + 1, type, path);
+        if (!parts.some(part => part.text.trim() !== ''))
+            parts = [{ text: (format ? '' : type + ' ') + '#' + (index + 1), badge: false }];
+        if (!format)
+            parts.unshift({ text: type, badge: true }, { text: ' ', badge: false });
         return parts;
     }
-    function contextPath($row) {
-        return $row.parents('.flex-row').get().reverse().map(function(ancestor) {
-            return $(ancestor).attr('data-flex-type-label') || '';
-        }).join(' › ');
+    function contextPath(row) {
+        const path = [];
+        for (let parent = row.parentElement?.closest('.flex-row'); parent; parent = parent.parentElement?.closest('.flex-row'))
+            path.unshift(FieldtypeFlex.attr(parent, 'data-flex-type-label'));
+        return path.join(' › ');
     }
-    function updateLabels($set) {
-        rows($set).each(function(index) {
-            var $row = $(this), $title = $row.children('.flex-row-header').find('.flex-row-title').empty();
-            rowTitle($row, index, contextPath($row)).forEach(function(part) {
-                if(!part.text) return;
-                if(part.badge || part.muted) {
-                    $('<span>').toggleClass('flex-row-type-badge', !!part.badge)
-                        .toggleClass('flex-row-deemphasized', !!part.muted).text(part.text).appendTo($title);
-                } else $title.append(document.createTextNode(part.text));
+    function updateLabels(set) {
+        rows(set).forEach((row, index) => {
+            const title = FieldtypeFlex.one(row, ':scope > .flex-row-header .flex-row-title');
+            title.replaceChildren();
+            rowTitle(row, index, contextPath(row)).forEach(part => {
+                if (!part.text)
+                    return;
+                if (part.badge || part.muted) {
+                    const span = document.createElement('span');
+                    span.classList.toggle('flex-row-type-badge', !!part.badge);
+                    span.classList.toggle('flex-row-deemphasized', !!part.muted);
+                    span.textContent = part.text;
+                    title.append(span);
+                }
+                else
+                    title.append(document.createTextNode(part.text));
             });
-            // Parent edits and reordering also update every descendant breadcrumb.
-            $row.children('.flex-row-content').find('.flex-rows').filter(function() {
-                return $(this).closest('.flex-row')[0] === $row[0];
-            }).each(function() { updateLabels($(this)); });
+            FieldtypeFlex.all(row, ':scope > .flex-row-content .flex-rows').filter(set => set.closest('.flex-row') === row).forEach(updateLabels);
         });
     }
-    function treeBusy($set) {
-        return !!$set.closest('.InputfieldFlex').data('flexTreeBusy');
+    function treeBusy(scope) { return busyTrees.has(FieldtypeFlex.closest(scope, '.InputfieldFlex')); }
+    function setTreeBusy(scope, busy) {
+        const tree = FieldtypeFlex.closest(scope, '.InputfieldFlex');
+        if (busy)
+            busyTrees.add(tree);
+        else
+            busyTrees.delete(tree);
+        tree.setAttribute('aria-busy', String(busy));
+        FieldtypeFlex.all(tree, '.flex-rows').forEach(updateActions);
+        const form = FieldtypeFlex.closest(tree, 'form');
+        if (!busy && !form.querySelector('.InputfieldFlex[aria-busy="true"], .flex-row[data-flex-load-failed="1"]'))
+            FieldtypeFlex.all(form, ':scope > .flex-form-request-error').forEach(error => error.remove());
     }
-    function setTreeBusy($set, busy) {
-        var $tree = $set.closest('.InputfieldFlex');
-        $tree.data('flexTreeBusy', busy).attr('aria-busy', busy ? 'true' : 'false');
-        $tree.find('.flex-rows').each(function() { updateActions($(this)); });
-        var $form = $tree.closest('form');
-        if(!busy && !$form.find('.InputfieldFlex[aria-busy="true"], .flex-row[data-flex-load-failed="1"]').length) $form.children('.flex-form-request-error').remove();
-    }
-    function updateActions($set) {
-        var count = activeRows($set).length, min = Number($set.attr('data-flex-min')) || 0;
-        var max = Number($set.attr('data-flex-max')) || 0, busy = treeBusy($set);
-        $set.children('.flex-row-add').prop('disabled', busy || (max > 0 && count >= max));
-        rows($set).each(function() {
-            var $header = $(this).children('.flex-row-header');
-            $header.find('.flex-row-toggle').prop('disabled', busy);
-            $header.find('[data-flex-row-action="duplicate"]').prop('disabled', busy || (max > 0 && count >= max));
-            $header.find('[data-flex-row-action="remove"]').prop('disabled', busy || (!$(this).hasClass('flex-row-remove-pending') && count <= min));
-            $header.find('.flex-row-sort').prop('disabled', busy || count < 2);
+    function updateActions(set) {
+        const count = activeRows(set).length, min = Number(FieldtypeFlex.attr(set, 'data-flex-min')) || 0, max = Number(FieldtypeFlex.attr(set, 'data-flex-max')) || 0, busy = treeBusy(set);
+        FieldtypeFlex.all(set, ':scope > .flex-row-add').forEach(button => button.disabled = busy || (max > 0 && count >= max));
+        rows(set).forEach(row => {
+            const header = FieldtypeFlex.one(row, ':scope > .flex-row-header');
+            FieldtypeFlex.one(header, '.flex-row-toggle').disabled = busy;
+            FieldtypeFlex.one(header, '[data-flex-row-action="duplicate"]').disabled = busy || (max > 0 && count >= max);
+            FieldtypeFlex.one(header, '[data-flex-row-action="remove"]').disabled = busy || (!row.matches('.flex-row-remove-pending') && count <= min);
+            FieldtypeFlex.one(header, '.flex-row-sort').disabled = busy || count < 2;
         });
-        var $list = $set.children('.flex-rows-items');
-        if($.fn.sortable && $list.hasClass('ui-sortable')) $list.sortable('option', 'disabled', busy || count < 2);
+        FieldtypeFlex.sortable.disabled(FieldtypeFlex.one(set, ':scope > .flex-rows-items'), busy || count < 2);
     }
-    function order($set) {
-        $set.children('.flex-rows-order').val(rows($set).map(function() { return $(this).attr('data-flex-row'); }).get().join(',')).trigger('change');
-        $set.closest('.InputfieldFlex').addClass('InputfieldStateChanged');
-        updateLabels($set);
-        updateActions($set);
+    function order(set) {
+        FieldtypeFlex.change(FieldtypeFlex.one(set, ':scope > .flex-rows-order'), rows(set).map(row => FieldtypeFlex.attr(row, 'data-flex-row')).join(','));
+        FieldtypeFlex.closest(set, '.InputfieldFlex').classList.add('InputfieldStateChanged');
+        updateLabels(set);
+        updateActions(set);
     }
-    function csrf() {
-        var $token = $('#ProcessPageEdit input._post_token');
-        return $token.length ? {name: $token.attr('name'), value: $token.val()} : null;
-    }
-    function teardown($row) {
-        if(!window.tinymce) return;
-        $row.find('textarea.InputfieldTinyMCEEditor').each(function() {
-            var editor = window.tinymce.get(this.id);
-            if(editor) {
+    function csrf() { return document.querySelector('#ProcessPageEdit input._post_token'); }
+    function teardown(row) {
+        if (!window.tinymce)
+            return;
+        FieldtypeFlex.all(row, 'textarea.InputfieldTinyMCEEditor').forEach(input => {
+            const editor = window.tinymce.get(input.id);
+            if (editor) {
                 editor.save();
-                // remove() also unregisters the editor, allowing the moved textarea to initialize again.
                 editor.remove();
             }
-            $(this).removeClass('InputfieldTinyMCELoaded InputfieldTinyMCELazy');
+            input.classList.remove('InputfieldTinyMCELoaded', 'InputfieldTinyMCELazy');
         });
     }
-    function setup($row) {
-        if(window.Inputfields) window.Inputfields.init($row);
-        else if(window.InputfieldsInit) window.InputfieldsInit($row);
-        $row.find('.Inputfield').addBack('.Inputfield').trigger('reloaded');
-    }
-    function syncToggle($row) {
-        $row.children('.flex-row-header').find('.flex-row-toggle').attr('aria-expanded', !$row.hasClass('InputfieldStateCollapsed'));
-    }
-    function openRow($row, open) {
-        if(window.Inputfields && window.Inputfields.toggle) {
-            window.Inputfields.toggle($row, open, 0);
-        } else {
-            $row.toggleClass('InputfieldStateCollapsed', !open).trigger(open ? 'opened' : 'closed');
-        }
-        syncToggle($row);
-    }
-    function loadRow($row) {
-        if($row.attr('data-flex-loaded') !== '0') return Promise.resolve(true);
-        if($row.data('flexLoadPromise')) return $row.data('flexLoadPromise');
-        var $set = $row.closest('.flex-rows'), $body = $row.children('.flex-row-content');
-        if(treeBusy($set)) return Promise.resolve(false);
-        var operation = (async function() {
-            setTreeBusy($set, true);
-            $body.find('.flex-row-load-status').text(message('loading', 'Loading…'));
-            $body.find('.flex-row-retry').prop('hidden', true);
+    function syncToggle(row) { FieldtypeFlex.one(row, ':scope > .flex-row-header .flex-row-toggle').setAttribute('aria-expanded', String(!row.matches('.InputfieldStateCollapsed'))); }
+    function openRow(row, open) { FieldtypeFlex.classic.toggle(row, open); syncToggle(row); }
+    function loadRow(row) {
+        if (FieldtypeFlex.attr(row, 'data-flex-loaded') !== '0')
+            return Promise.resolve(true);
+        if (rowState(row).load)
+            return rowState(row).load;
+        const set = FieldtypeFlex.closest(row, '.flex-rows'), body = FieldtypeFlex.one(row, ':scope > .flex-row-content');
+        if (treeBusy(set))
+            return Promise.resolve(false);
+        const operation = (async () => {
+            setTreeBusy(set, true);
+            FieldtypeFlex.one(body, '.flex-row-load-status').textContent = message('loading', 'Loading…');
+            FieldtypeFlex.one(body, '.flex-row-retry').hidden = true;
             try {
-                var data = new URLSearchParams();
-                data.set('flex_action', 'row-render');
-                data.set('flex_set', $set.attr('data-flex-set'));
-                data.set('flex_source', $row.attr('data-flex-row'));
-                data.set('flex_complete', $set.attr('data-flex-draft'));
-                var token = csrf();
-                if(token) data.set(token.name, token.value);
-                var response = await fetch($set.attr('data-flex-page-url'), {method: 'POST', credentials: 'same-origin',
-                    headers: {'X-Requested-With': 'XMLHttpRequest', 'X-FIELDNAME': $set.attr('data-flex-field'), 'X-FLEX-DRAFT': $set.attr('data-flex-draft')}, body: data});
-                var result = await response.json();
-                if(!response.ok || result.error) throw new Error(result.message || message('unableToLoad', 'Unable to load item'));
-                if(!$row[0].isConnected) return false;
-                var $new = $(result.html), $content = $new.children('.flex-row-content');
-                if($new.attr('data-flex-loaded') !== '1' || !$content.length) throw new Error(message('unableToLoad', 'Unable to load item'));
-                $body.empty().append($content.contents());
-                $row.attr('data-flex-loaded', '1').removeAttr('data-flex-load-failed');
-                setup($row);
-                if($row.hasClass('flex-row-remove-pending')) removalState($row, true);
+                const data = new URLSearchParams({ flex_action: 'row-render', flex_set: FieldtypeFlex.attr(set, 'data-flex-set'), flex_source: FieldtypeFlex.attr(row, 'data-flex-row'), flex_complete: FieldtypeFlex.attr(set, 'data-flex-draft') });
+                const token = csrf();
+                if (token)
+                    data.set(token.name, token.value);
+                const response = await fetch(FieldtypeFlex.attr(set, 'data-flex-page-url'), { method: 'POST', credentials: 'same-origin', headers: requestHeaders(set), body: data });
+                const result = await response.json();
+                if (!response.ok || result.error)
+                    throw new Error(result.message || message('unableToLoad', 'Unable to load item'));
+                if (!row.isConnected)
+                    return false;
+                const fresh = FieldtypeFlex.parseHTML(result.html), content = fresh.querySelector(':scope > .flex-row-content');
+                if (FieldtypeFlex.attr(fresh, 'data-flex-loaded') !== '1' || !content)
+                    throw new Error(message('unableToLoad', 'Unable to load item'));
+                body.replaceChildren(...content.childNodes);
+                await FieldtypeFlex.activateScripts(body, response);
+                row.setAttribute('data-flex-loaded', '1');
+                row.removeAttribute('data-flex-load-failed');
+                await FieldtypeFlex.classic.setup(row);
+                if (row.matches('.flex-row-remove-pending'))
+                    removalState(row, true);
                 return true;
-            } catch(error) {
-                $row.attr('data-flex-load-failed', '1');
-                $body.find('.flex-row-load-status').text(error instanceof SyntaxError ? message('unableToLoad', 'Unable to load item') : error.message);
-                $body.find('.flex-row-retry').prop('hidden', false);
+            }
+            catch (error) {
+                row.setAttribute('data-flex-load-failed', '1');
+                FieldtypeFlex.one(body, '.flex-row-load-status').textContent = error instanceof SyntaxError ? message('unableToLoad', 'Unable to load item') : errorMessage(error);
+                FieldtypeFlex.one(body, '.flex-row-retry').hidden = false;
                 return false;
-            } finally {
-                $row.removeData('flexLoadPromise');
-                setTreeBusy($set, false);
+            }
+            finally {
+                delete rowState(row).load;
+                setTreeBusy(set, false);
             }
         })();
-        $row.data('flexLoadPromise', operation);
+        rowState(row).load = operation;
         return operation;
     }
-    function moved($set, $row) {
-        var position = rows($set).index($row) + 1;
-        $set.children('.flex-rows-status').text(message('itemMoved', 'Item moved to position {position} of {count}')
-            .replace('{position}', position).replace('{count}', rows($set).length));
+    function requestHeaders(set) {
+        return { 'X-Requested-With': 'XMLHttpRequest', 'X-FIELDNAME': FieldtypeFlex.attr(set, 'data-flex-field'), 'X-FLEX-DRAFT': FieldtypeFlex.attr(set, 'data-flex-draft') };
     }
-    function initRows($context) {
-        $context.find('.flex-rows').addBack('.flex-rows').each(function() {
-            var $set = $(this), $list = $set.children('.flex-rows-items');
-            rows($set).each(function() {
-                var $row = $(this);
-                if($row.hasClass('flex-row-remove-pending') && !$row.data('flexRemovalReady')) {
-                    removalState($row, true);
-                    $row.data('flexRemovalReady', true);
+    function moved(set, row) {
+        FieldtypeFlex.one(set, ':scope > .flex-rows-status').textContent = message('itemMoved', 'Item moved to position {position} of {count}').replace('{position}', String(rows(set).indexOf(row) + 1)).replace('{count}', String(rows(set).length));
+    }
+    function initRows(context) {
+        const sets = FieldtypeFlex.all(context, '.flex-rows');
+        if (context instanceof HTMLElement && context.matches('.flex-rows'))
+            sets.unshift(context);
+        sets.forEach(set => {
+            rows(set).forEach(row => {
+                if (row.matches('.flex-row-remove-pending') && !rowState(row).removalReady) {
+                    removalState(row, true);
+                    rowState(row).removalReady = true;
                 }
-                if(!$row.hasClass('flex-row-remove-pending') && $row.find('.InputfieldStateError').length) openRow($row, true);
-                syncToggle($row);
+                if (!row.matches('.flex-row-remove-pending') && row.querySelector('.InputfieldStateError'))
+                    openRow(row, true);
+                syncToggle(row);
             });
-            if($.fn.sortable && !$list.hasClass('ui-sortable')) {
-                // Keep inner-row sort events away from any containing native Repeater.
-                $list.on('mousedown.flexRows', function(event) {
-                    if($(event.target).closest('.flex-rows-items')[0] === this) event.stopPropagation();
-                });
-                $list.on('sortstart.flexRows sortstop.flexRows sortupdate.flexRows', function(event) {
-                    if(event.target === this) event.stopPropagation();
-                }).sortable({
-                    items: '> .flex-row[data-flex-row]',
-                    handle: '.flex-row-sort',
-                    cancel: ':input:not(.flex-row-sort), a',
-                    axis: 'y',
-                    distance: 5,
-                    tolerance: 'pointer',
-                    placeholder: 'flex-row-placeholder',
-                    start: function(event, ui) {
-                        ui.placeholder.height(ui.item.outerHeight());
-                        teardown(ui.item);
-                    },
-                    stop: function(event, ui) {
-                        order($set);
-                        setup(ui.item);
-                        moved($set, ui.item);
-                    }
-                });
-            }
-            updateLabels($set);
-            updateActions($set);
+            FieldtypeFlex.sortable.init(FieldtypeFlex.one(set, ':scope > .flex-rows-items'), teardown, async (row) => { order(set); await FieldtypeFlex.classic.setup(row); moved(set, row); });
+            updateLabels(set);
+            updateActions(set);
         });
     }
-    document.addEventListener('submit', function(event) {
-        var form = event.target;
-        if(!form.matches('form[data-flex-max-input-vars]')) return;
-        var $pending = $(form).find('.InputfieldFlex[aria-busy="true"], .flex-row[data-flex-load-failed="1"]').filter(function() { return !$(this).closest('.flex-row-remove-pending').length; }).first();
-        if($pending.length) {
+    function formError(form, text, pending) {
+        let error = form.querySelector(':scope > .flex-form-limit-error');
+        if (!error) {
+            error = document.createElement('p');
+            error.className = 'flex-form-limit-error notice-error';
+            error.setAttribute('role', 'alert');
+            error.tabIndex = -1;
+            form.prepend(error);
+        }
+        error.classList.toggle('flex-form-request-error', pending);
+        error.textContent = text;
+        error.focus();
+    }
+    document.addEventListener('submit', event => {
+        const form = event.target;
+        if (!(form instanceof HTMLFormElement) || !form.matches('[data-flex-max-input-vars]'))
+            return;
+        const pending = FieldtypeFlex.all(form, '.InputfieldFlex[aria-busy="true"], .flex-row[data-flex-load-failed="1"]').find(item => !item.closest('.flex-row-remove-pending'));
+        if (pending) {
             event.preventDefault();
             event.stopImmediatePropagation();
-            var $error = $(form).children('.flex-form-limit-error');
-            if(!$error.length) $error = $('<p class="flex-form-limit-error notice-error" role="alert" tabindex="-1"></p>').prependTo(form);
-            $error.addClass('flex-form-request-error').text($pending.is('.flex-row') ? message('unableToLoad', 'Unable to load item') : message('requestPending', 'Wait for the current request to finish before saving.')).trigger('focus');
+            formError(form, pending.matches('.flex-row') ? message('unableToLoad', 'Unable to load item') : message('requestPending', 'Wait for the current request to finish before saving.'), true);
             return;
         }
-        var max = Number(form.getAttribute('data-flex-max-input-vars'));
-        if(max <= 0) return;
-        var count = event.submitter && event.submitter.name && !event.submitter.disabled ? 1 : 0;
-        for(var entry of new FormData(form).entries()) {
-            if(typeof entry[1] === 'string') count++;
-        }
-        if(count <= max) return;
+        const max = Number(FieldtypeFlex.attr(form, 'data-flex-max-input-vars'));
+        if (max <= 0)
+            return;
+        const submitter = event.submitter;
+        let count = submitter?.name && !submitter.disabled ? 1 : 0;
+        for (const [, value] of new FormData(form))
+            if (typeof value === 'string')
+                count++;
+        if (count <= max)
+            return;
         event.preventDefault();
         event.stopImmediatePropagation();
-        var $error = $(form).children('.flex-form-limit-error');
-        if(!$error.length) $error = $('<p class="flex-form-limit-error notice-error" role="alert" tabindex="-1"></p>').prependTo(form);
-        $error.removeClass('flex-form-request-error').text(message('inputVarsExceeded', 'This form contains {count} input values, exceeding PHP max_input_vars={max}.')
-            .replace('{count}', count).replace('{max}', max)).trigger('focus');
+        formError(form, message('inputVarsExceeded', 'This form contains {count} input values, exceeding PHP max_input_vars={max}.').replace('{count}', String(count)).replace('{max}', String(max)), false);
     }, true);
-    $(function() { initRows($(document)); });
-    $(document).on('reloaded.flexRows', '.Inputfield', function(event) { initRows($(event.target)); });
-    $(document).on('opened.flexRows closed.flexRows', '.flex-row', function(event) {
-        if(event.target !== this) return;
-        syncToggle($(this));
-        if(event.type === 'opened') loadRow($(this));
-    });
-    $(document).on('click', '.flex-row-retry', function(event) {
-        event.preventDefault();
-        loadRow($(this).closest('.flex-row'));
-    });
-    $(document).on('click', '.flex-row-toggle', function(event) {
-        event.preventDefault();
-        event.stopPropagation();
-        var $row = $(this).closest('.flex-row');
-        openRow($row, $row.hasClass('InputfieldStateCollapsed'));
-    });
-    $(document).on('keydown', '.flex-row-sort', function(event) {
-        if(!['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
-        event.preventDefault();
-        event.stopPropagation();
-        var $row = $(this).closest('.flex-row'), $set = $row.closest('.flex-rows');
-        if(treeBusy($set)) return;
-        var $target = event.key === 'ArrowUp' ? $row.prev('.flex-row') : $row.next('.flex-row');
-        if(event.key === 'Home') $target = rows($set).first();
-        if(event.key === 'End') $target = rows($set).last();
-        if(!$target.length || $target.is($row)) return;
-        teardown($row);
-        if(event.key === 'ArrowUp' || event.key === 'Home') $row.insertBefore($target); else $row.insertAfter($target);
-        order($set);
-        setup($row);
-        $row.children('.flex-row-header').find('.flex-row-sort').trigger('focus');
-        moved($set, $row);
-    });
-    $(document).on('input change', '[data-flex-label-property] :input', function() {
-        var $input = $(this), $property = $input.closest('[data-flex-label-property]');
-        var $row = $property.closest('.flex-row'), $set = $row.closest('.flex-rows');
-        if(!$row.length) return;
-        var kind = $property.attr('data-flex-label-kind');
-        // Descriptions, tags and Page-autocomplete search text are not the label value.
-        if(kind === 'file' || kind === 'image' || (kind === 'page' && !$input.is('select'))) return;
-        var value = $input.val();
-        if($input.is('select')) value = $input.find('option:selected').map(function() { return $(this).text(); }).get().join(', ');
-        else if($input.is(':checkbox, :radio')) {
-            var options = $property.data('flexLabelOptions') || {};
-            value = $property.find(':checked').map(function() {
-                return Object.prototype.hasOwnProperty.call(options, this.value) ? options[this.value] : this.value;
-            }).get().join(', ');
-        }
-        else if($input.is('[type="file"], [type="hidden"], button')) return;
-        // Decode text entities without parsing image/script elements or loading their resources.
-        var text = document.createElement('textarea');
-        text.innerHTML = String(value || '').replace(/<[^>]*>/g, '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        value = text.value.replace(/\s+/g, ' ').trim().slice(0, 160);
-        var values = $row.data('flexLabelValues') || {};
-        values[$property.attr('data-flex-label-property')] = value;
-        $row.data('flexLabelValues', values);
-        updateLabels($set);
-    });
-    $(document).on('change', '.InputfieldTinyMCE[data-flex-label-property]', function(event) {
-        if(event.target !== this || !window.tinymce) return;
-        $(this).find('textarea').each(function() {
-            var editor = window.tinymce.get(this.id);
-            if(editor) {
+    FieldtypeFlex.classic.preserveSelectorPaths();
+    FieldtypeFlex.ready(() => { FieldtypeFlex.classic.preserveSelectorPaths(); initRows(document); void FieldtypeFlex.classic.initMedia(document); });
+    document.addEventListener('pw-runtime-ready', () => { initRows(document); void FieldtypeFlex.classic.initMedia(document); });
+    FieldtypeFlex.classic.events(scope => { initRows(scope); void FieldtypeFlex.classic.initMedia(scope); }, (row, open) => { syncToggle(row); if (open)
+        void loadRow(row); }, scope => {
+        FieldtypeFlex.all(scope, 'textarea').forEach(input => {
+            const editor = window.tinymce?.get(input.id);
+            if (editor) {
                 editor.save();
-                $(this).trigger('input');
+                input.dispatchEvent(new Event('input', { bubbles: true }));
             }
         });
-    });
-    document.addEventListener('invalid', function(event) {
-        $(event.target).parents('.flex-row').each(function() { openRow($(this), true); });
-    }, true);
-    $(document).on('dblclick', '[data-flex-row-action="remove"]', function(event) {
+    }, (draft, path) => { void refreshMedia(draft, path); });
+    FieldtypeFlex.delegate('click', '.flex-row-retry', (event, button) => { event.preventDefault(); void loadRow(FieldtypeFlex.closest(button, '.flex-row')); });
+    FieldtypeFlex.delegate('click', '.flex-row-toggle', (event, button) => {
         event.preventDefault();
         event.stopPropagation();
-        var $button = $(this), $set = $button.closest('.flex-rows');
-        if($button.prop('disabled') || treeBusy($set)) return;
-        // The two preceding clicks restore the original state, just like native Repeaters.
-        var undo = $button.closest('.flex-row').hasClass('flex-row-remove-pending');
-        function applyAll() {
-            rows($set).each(function() {
-                var $row = $(this);
-                if($row.hasClass('flex-row-remove-pending') === undo) {
-                    // Reuse single-row handling, including minItems and input recovery.
-                    $row.children('.flex-row-header').find('[data-flex-row-action="remove"]').trigger('click');
-                }
-            });
-        }
-        if(undo) applyAll();
-        else ProcessWire.confirm(message('removeAll', 'Remove all items?'), applyAll);
+        const row = FieldtypeFlex.closest(button, '.flex-row');
+        openRow(row, row.matches('.InputfieldStateCollapsed'));
     });
-    $(document).on('click', '.flex-row-add, .flex-row-action', async function(event) {
+    FieldtypeFlex.delegate('keydown', '.flex-row-sort', async (event, button) => {
+        if (!['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key))
+            return;
         event.preventDefault();
         event.stopPropagation();
-        var $button = $(this), $set = $button.closest('.flex-rows'), $row = $button.closest('.flex-row');
-        if($button.prop('disabled') || treeBusy($set)) return;
-        var action = $button.hasClass('flex-row-add') ? 'add' : $button.attr('data-flex-row-action');
-        var $error = $set.children('.flex-rows-error').text('');
-        if(action === 'visibility') {
-            var hidden = !$row.hasClass('flex-row-hidden');
-            $row.toggleClass('flex-row-hidden', hidden);
-            $row.children('.flex-row-hidden-value').val(hidden ? '1' : '0').trigger('change');
-            var label = $button.attr(hidden ? 'data-flex-show-label' : 'data-flex-hide-label');
-            $button.attr({'aria-pressed': hidden ? 'true' : 'false', 'aria-label': label, title: label});
-            $button.find('i').toggleClass('fa-eye', !hidden).toggleClass('fa-eye-slash', hidden);
+        const row = FieldtypeFlex.closest(button, '.flex-row'), set = FieldtypeFlex.closest(row, '.flex-rows');
+        if (treeBusy(set))
             return;
-        }
-        if(action === 'remove') {
-            var removed = !$row.hasClass('flex-row-remove-pending');
-            if(window.tinymce) window.tinymce.triggerSave();
-            if(removed) openRow($row, false);
-            removalState($row, removed);
-            $row.data('flexRemovalReady', true);
-            order($set);
-            $button.trigger('focus');
+        let target = event.key === 'ArrowUp' ? row.previousElementSibling : row.nextElementSibling;
+        if (event.key === 'Home')
+            target = rows(set)[0];
+        if (event.key === 'End')
+            target = rows(set).slice(-1)[0];
+        if (!target?.matches('.flex-row') || target === row)
             return;
-        }
-        if(action === 'duplicate' && $row.attr('data-flex-loaded') === '0' && !(await loadRow($row))) return;
-        setTreeBusy($set, true);
-        updateActions($set);
-        try {
-            if(window.tinymce) window.tinymce.triggerSave();
-            var data = new URLSearchParams();
-            data.set('flex_action', action); data.set('flex_set', $set.attr('data-flex-set'));
-            data.set('flex_order', activeRows($set).map(function() { return $(this).attr('data-flex-row'); }).get().join(','));
-            var activeOrders = {};
-            $set.closest('.InputfieldFlex').find('.flex-rows').each(function() {
-                var $current = $(this);
-                if($current.closest('.flex-row-remove-pending').length) return;
-                activeOrders[$current.attr('data-flex-set')] = activeRows($current).map(function() { return $(this).attr('data-flex-row'); }).get();
-            });
-            data.set('flex_orders', JSON.stringify(activeOrders));
-            if(action === 'add') {
-                var type = $set.attr('data-flex-type') || $set.find('> .flex-row-type-control .flex-row-type').val();
-                data.set('flex_type', type);
-            } else if(action === 'duplicate') {
-                data.set('flex_source', $row.attr('data-flex-row'));
-                // Ancestor/Page dependencies need the same live values as a full save.
-                // Only the requested source row is applied by the duplicate handler.
-                $row.closest('form').serializeArray().forEach(function(item) {
-                    // ProcessPageEdit prioritizes POST id over the owner URL. Inside
-                    // a Repeater the full form id belongs to the main editor Page.
-                    if(item.name !== 'id') data.append(item.name, item.value);
-                });
-            }
-            var token = csrf();
-            if(token) data.set(token.name, token.value);
-            data.set('flex_complete', $set.attr('data-flex-draft'));
-            var response = await fetch($set.attr('data-flex-page-url'), {method: 'POST', credentials: 'same-origin',
-                headers: {'X-Requested-With': 'XMLHttpRequest', 'X-FIELDNAME': $set.attr('data-flex-field'), 'X-FLEX-DRAFT': $set.attr('data-flex-draft')}, body: data});
-            var result = await response.json();
-            if(!response.ok || result.error) throw new Error(result.message || message('unableToAdd', 'Unable to add item'));
-            if(!$set[0].isConnected) return;
-            var $new = $(result.html);
-            if(action === 'duplicate') $new.insertAfter($row); else $set.children('.flex-rows-items').append($new);
-            order($set);
-            setup($new);
-            initRows($set);
-            $new.children('.flex-row-header').find('.flex-row-toggle').trigger('focus');
-            $(document).trigger('flexRowAdded', [$new]);
-        } catch(error) { $error.text(error.message); }
-        finally {
-            setTreeBusy($set, false);
-            updateActions($set);
-        }
+        teardown(row);
+        if (event.key === 'ArrowUp' || event.key === 'Home')
+            target.before(row);
+        else
+            target.after(row);
+        order(set);
+        await FieldtypeFlex.classic.setup(row);
+        FieldtypeFlex.one(row, ':scope > .flex-row-header .flex-row-sort').focus();
+        moved(set, row);
     });
-    // Snapshot actual native controls, including unchecked and empty multi-value inputs.
-    // A single-file replacement explicitly transfers the addressed file's metadata;
-    // ordinary refreshes match full names containing the stable asset scope.
-    function mediaMetadata($scope) {
-        // Native saveReady also synchronizes inline TinyMCE's hidden transport input.
-        $scope.find('.InputfieldTinyMCE').trigger('saveReady');
-        var inline = $scope.find('.InputfieldTinyMCEEditor.InputfieldTinyMCEInline').map(function() {
-            return {id:this.id, suffix:this.id.split('__').slice(2).join('__'), html:$(this).html(), loaded:$(this).hasClass('InputfieldTinyMCELoaded'),
-                property:$(this).closest('[data-flex-metadata-property]').attr('data-flex-metadata-property')};
-        }).get();
-        var controls = $scope.find(':input').filter(function() {
-            return this.name && (/^(description[0-9]*|tags|focus)_/.test(this.name) || $(this).closest('[data-flex-metadata]').length);
-        }).map(function() {
-            return {name:this.name, value:$(this).val(), type:this.type, checked:this.checked,
-                property:$(this).closest('[data-flex-metadata-property]').attr('data-flex-metadata-property'),
-                suffix:this.name.split('__').slice(2).join('__'), native:(this.name.match(/^(description[0-9]*|tags)_/) || [])[1]};
-        }).get();
-        var errors = $scope.find('[data-flex-metadata-property].InputfieldStateError').map(function() {
-            return {id:this.id, property:$(this).attr('data-flex-metadata-property'),
-                markup:$(this).find('> .InputfieldContent > .InputfieldError').map(function() { return this.outerHTML; }).get().join('')};
-        }).get();
-        return {controls:controls, errors:errors, inline:inline};
+    function labelChanged(input) {
+        const property = input.closest('[data-flex-label-property]'), row = property?.closest('.flex-row');
+        if (!property || !row)
+            return;
+        const kind = FieldtypeFlex.attr(property, 'data-flex-label-kind');
+        if (kind === 'file' || kind === 'image' || (kind === 'page' && !(input instanceof HTMLSelectElement)))
+            return;
+        let label = FieldtypeFlex.value(input);
+        if (input instanceof HTMLSelectElement)
+            label = Array.from(input.selectedOptions, option => option.textContent).join(', ');
+        else if (input.matches('[type="checkbox"], [type="radio"]')) {
+            const options = JSON.parse(FieldtypeFlex.attr(property, 'data-flex-label-options') || '{}');
+            label = FieldtypeFlex.all(property, ':checked').map(option => Object.prototype.hasOwnProperty.call(options, option.value) ? options[option.value] : option.value).join(', ');
+        }
+        else if (input.matches('[type="file"], [type="hidden"], button'))
+            return;
+        const text = document.createElement('textarea');
+        FieldtypeFlex.setHTML(text, String(label || '').replace(/<[^>]*>/g, '').replace(/</g, '&lt;').replace(/>/g, '&gt;'));
+        const current = rowState(row);
+        current.labels ?? (current.labels = JSON.parse(FieldtypeFlex.attr(row, 'data-flex-label-values') || '{}'));
+        current.labels[FieldtypeFlex.attr(property, 'data-flex-label-property')] = text.value.replace(/\s+/g, ' ').trim().slice(0, 160);
+        updateLabels(FieldtypeFlex.closest(row, '.flex-rows'));
     }
-    function restoreMediaMetadata($scope, snapshot, replacement) {
-        snapshot.controls.forEach(function(item) {
-            $scope.find(':input').filter(function() {
-                var match = this.name === item.name;
-                if(replacement && item.property) match = $(this).closest('[data-flex-metadata-property]').attr('data-flex-metadata-property') === item.property && this.name.split('__').slice(2).join('__') === item.suffix;
-                else if(replacement && item.native) match = (this.name.match(/^(description[0-9]*|tags)_/) || [])[1] === item.native;
-                return match && (!/^(checkbox|radio)$/.test(item.type) || this.value === item.value);
-            }).each(function() {
-                if(/^(checkbox|radio)$/.test(item.type)) this.checked = item.checked;
-                else $(this).val(item.value);
+    ['input', 'change'].forEach(name => document.addEventListener(name, event => {
+        if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLButtonElement)
+            labelChanged(event.target);
+    }));
+    document.addEventListener('invalid', event => {
+        if (!(event.target instanceof Element))
+            return;
+        for (let row = event.target.closest('.flex-row'); row; row = row.parentElement?.closest('.flex-row') || null)
+            openRow(row, true);
+    }, true);
+    FieldtypeFlex.delegate('dblclick', '[data-flex-row-action="remove"]', (event, element) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const button = element, set = FieldtypeFlex.closest(button, '.flex-rows');
+        if (button.disabled || treeBusy(set))
+            return;
+        const undo = FieldtypeFlex.closest(button, '.flex-row').matches('.flex-row-remove-pending');
+        const apply = () => rows(set).forEach(row => { if (row.matches('.flex-row-remove-pending') === undo)
+            FieldtypeFlex.one(row, ':scope > .flex-row-header [data-flex-row-action="remove"]').click(); });
+        if (undo)
+            apply();
+        else
+            FieldtypeFlex.classic.confirm(message('removeAll', 'Remove all items?'), apply);
+    });
+    FieldtypeFlex.delegate('click', '.flex-row-add, .flex-row-action', (event, button) => { void rowAction(event, button); });
+    async function rowAction(event, button) {
+        event.preventDefault();
+        event.stopPropagation();
+        const set = FieldtypeFlex.closest(button, '.flex-rows'), row = button.closest('.flex-row');
+        if (button.disabled || treeBusy(set))
+            return;
+        const action = button.matches('.flex-row-add') ? 'add' : FieldtypeFlex.attr(button, 'data-flex-row-action');
+        const error = FieldtypeFlex.one(set, ':scope > .flex-rows-error');
+        error.textContent = '';
+        if (action === 'visibility' && row) {
+            const hidden = !row.matches('.flex-row-hidden');
+            row.classList.toggle('flex-row-hidden', hidden);
+            FieldtypeFlex.change(FieldtypeFlex.one(row, ':scope > .flex-row-hidden-value'), hidden ? '1' : '0');
+            const label = FieldtypeFlex.attr(button, hidden ? 'data-flex-show-label' : 'data-flex-hide-label');
+            button.setAttribute('aria-pressed', String(hidden));
+            button.setAttribute('aria-label', label);
+            button.title = label;
+            const icon = FieldtypeFlex.one(button, 'i');
+            icon.classList.toggle('fa-eye', !hidden);
+            icon.classList.toggle('fa-eye-slash', hidden);
+            return;
+        }
+        if (action === 'remove' && row) {
+            const removed = !row.matches('.flex-row-remove-pending');
+            window.tinymce?.triggerSave();
+            if (removed)
+                openRow(row, false);
+            removalState(row, removed);
+            rowState(row).removalReady = true;
+            order(set);
+            button.focus();
+            return;
+        }
+        if (action === 'duplicate' && row && FieldtypeFlex.attr(row, 'data-flex-loaded') === '0' && !(await loadRow(row)))
+            return;
+        setTreeBusy(set, true);
+        try {
+            window.tinymce?.triggerSave();
+            const data = new URLSearchParams({ flex_action: action, flex_set: FieldtypeFlex.attr(set, 'data-flex-set'), flex_order: activeRows(set).map(row => FieldtypeFlex.attr(row, 'data-flex-row')).join(',') });
+            const orders = {};
+            FieldtypeFlex.all(FieldtypeFlex.closest(set, '.InputfieldFlex'), '.flex-rows').forEach(current => {
+                if (!current.closest('.flex-row-remove-pending'))
+                    orders[FieldtypeFlex.attr(current, 'data-flex-set')] = activeRows(current).map(row => FieldtypeFlex.attr(row, 'data-flex-row'));
+            });
+            data.set('flex_orders', JSON.stringify(orders));
+            if (action === 'add')
+                data.set('flex_type', FieldtypeFlex.attr(set, 'data-flex-type') || FieldtypeFlex.one(set, ':scope > .flex-row-type-control .flex-row-type').value);
+            else if (action === 'duplicate' && row) {
+                data.set('flex_source', FieldtypeFlex.attr(row, 'data-flex-row'));
+                // A Repeater's owner URL must not be overridden by the main PageEdit id.
+                FieldtypeFlex.serialize(FieldtypeFlex.closest(row, 'form')).forEach(([name, value]) => { if (name !== 'id')
+                    data.append(name, value); });
+            }
+            const token = csrf();
+            if (token)
+                data.set(token.name, token.value);
+            data.set('flex_complete', FieldtypeFlex.attr(set, 'data-flex-draft'));
+            const response = await fetch(FieldtypeFlex.attr(set, 'data-flex-page-url'), { method: 'POST', credentials: 'same-origin', headers: requestHeaders(set), body: data });
+            const result = await response.json();
+            if (!response.ok || result.error)
+                throw new Error(result.message || message('unableToAdd', 'Unable to add item'));
+            if (!set.isConnected)
+                return;
+            const fresh = FieldtypeFlex.parseHTML(result.html);
+            if (action === 'duplicate' && row)
+                row.after(fresh);
+            else
+                FieldtypeFlex.one(set, ':scope > .flex-rows-items').append(fresh);
+            await FieldtypeFlex.activateScripts(fresh, response);
+            order(set);
+            await FieldtypeFlex.classic.setup(fresh);
+            initRows(set);
+            FieldtypeFlex.one(fresh, ':scope > .flex-row-header .flex-row-toggle').focus();
+            FieldtypeFlex.classic.added(fresh);
+        }
+        catch (problem) {
+            error.textContent = errorMessage(problem);
+        }
+        finally {
+            setTreeBusy(set, false);
+        }
+    }
+    function metadataProperty(element) { return element.closest('[data-flex-metadata-property]')?.getAttribute('data-flex-metadata-property') || ''; }
+    function nativeMetadataName(name) { return (name.match(/^(description[0-9]*|tags)_/) || [])[1] || ''; }
+    function mediaMetadata(scope) {
+        FieldtypeFlex.classic.saveReady(scope);
+        return {
+            inline: FieldtypeFlex.all(scope, '.InputfieldTinyMCEEditor.InputfieldTinyMCEInline').map(editor => ({ id: editor.id, suffix: editor.id.split('__').slice(2).join('__'), html: editor.innerHTML, loaded: editor.matches('.InputfieldTinyMCELoaded'), property: metadataProperty(editor) })),
+            controls: FieldtypeFlex.all(scope, FieldtypeFlex.controlSelector).filter(input => input.name && (/^(description[0-9]*|tags|focus)_/.test(input.name) || input.closest('[data-flex-metadata]'))).map(input => ({
+                name: input.name, value: FieldtypeFlex.value(input), type: input.type, checked: input instanceof HTMLInputElement && input.checked,
+                property: metadataProperty(input), suffix: input.name.split('__').slice(2).join('__'), native: nativeMetadataName(input.name)
+            })),
+            errors: FieldtypeFlex.all(scope, '[data-flex-metadata-property].InputfieldStateError').map(wrapper => ({ id: wrapper.id, property: FieldtypeFlex.attr(wrapper, 'data-flex-metadata-property'), markup: FieldtypeFlex.all(wrapper, ':scope > .InputfieldContent > .InputfieldError').map(error => error.outerHTML).join('') }))
+        };
+    }
+    function restoreMediaMetadata(scope, snapshot, replacement) {
+        snapshot.controls.forEach(item => {
+            FieldtypeFlex.all(scope, FieldtypeFlex.controlSelector).filter(input => {
+                let match = input.name === item.name;
+                if (replacement && item.property)
+                    match = metadataProperty(input) === item.property && input.name.split('__').slice(2).join('__') === item.suffix;
+                else if (replacement && item.native)
+                    match = nativeMetadataName(input.name) === item.native;
+                return match && (!/^(checkbox|radio)$/.test(item.type) || input.value === item.value);
+            }).forEach(input => {
+                if (input instanceof HTMLInputElement && /^(checkbox|radio)$/.test(item.type))
+                    input.checked = item.checked;
+                else
+                    FieldtypeFlex.setValue(input, item.value);
             });
         });
-        snapshot.errors.forEach(function(item) {
-            var $wrapper = $scope.find('[data-flex-metadata-property]').filter(function() {
-                return replacement ? $(this).attr('data-flex-metadata-property') === item.property : this.id === item.id;
+        snapshot.errors.forEach(item => {
+            FieldtypeFlex.all(scope, '[data-flex-metadata-property]').filter(wrapper => replacement ? FieldtypeFlex.attr(wrapper, 'data-flex-metadata-property') === item.property : wrapper.id === item.id).forEach(wrapper => {
+                wrapper.classList.add('InputfieldStateError', 'ui-state-error');
+                if (!wrapper.querySelector('.InputfieldError'))
+                    FieldtypeFlex.insertHTML(FieldtypeFlex.one(wrapper, ':scope > .InputfieldContent'), 'afterbegin', item.markup);
             });
-            $wrapper.addClass('InputfieldStateError ui-state-error');
-            if(!$wrapper.find('.InputfieldError').length) $wrapper.children('.InputfieldContent').prepend(item.markup);
         });
-        snapshot.inline.forEach(function(item) {
-            $scope.find('.InputfieldTinyMCEEditor.InputfieldTinyMCEInline').filter(function() {
-                return replacement ? $(this).closest('[data-flex-metadata-property]').attr('data-flex-metadata-property') === item.property && this.id.split('__').slice(2).join('__') === item.suffix : this.id === item.id;
-            }).each(function() {
-                $(this).html(item.html);
-                // Inline editors have no server-rendered input. Recreate TinyMCE's
-                // native transport even if the editor is never focused again.
-                if(item.loaded && window.InputfieldTinyMCE) window.InputfieldTinyMCE.init(this, 'flex.mediaMetadata');
+        snapshot.inline.forEach(item => {
+            FieldtypeFlex.all(scope, '.InputfieldTinyMCEEditor.InputfieldTinyMCEInline').filter(editor => replacement ? metadataProperty(editor) === item.property && editor.id.split('__').slice(2).join('__') === item.suffix : editor.id === item.id).forEach(editor => {
+                FieldtypeFlex.setHTML(editor, item.html);
+                // Recreate the native hidden transport even if this editor is never focused.
+                if (item.loaded)
+                    FieldtypeFlex.classic.initInline(editor);
             });
         });
     }
     async function upload(input, files) {
-        var $upload = $(input).closest('[data-flex-upload="1"]'), $field = $upload.closest('.Inputfield');
-        var token = csrf();
-        if(!files.length) return;
-        var $tree = $upload.closest('.InputfieldFlex');
-        if(treeBusy($upload)) { input.value = ''; return; }
-        setTreeBusy($upload, true);
+        const upload = FieldtypeFlex.closest(input, '[data-flex-upload="1"]'), field = FieldtypeFlex.closest(upload, '.Inputfield'), token = csrf();
+        if (!files.length)
+            return;
+        if (treeBusy(upload)) {
+            input.value = '';
+            return;
+        }
+        setTreeBusy(upload, true);
         input.disabled = true;
-        var $status = $('<p class="flex-upload-status" role="status"></p>').appendTo($upload);
+        const status = document.createElement('p');
+        status.className = 'flex-upload-status';
+        status.setAttribute('role', 'status');
+        upload.append(status);
         try {
-            for(var file of files) {
-                $status.text(namedMessage('uploading', 'Uploading {name}…', file.name));
-                var headers = {'X-Requested-With': 'XMLHttpRequest', 'X-FIELDNAME': $upload.attr('data-fieldname'),
-                    'X-FLEX-DRAFT': $upload.attr('data-flex-draft'), 'X-FLEX-PATH': $upload.attr('data-flex-path'), 'X-FILENAME': encodeURIComponent(file.name), 'Content-Type': 'application/octet-stream'};
-                if(token) headers['X-' + token.name] = token.value;
-                var response = await fetch($upload.attr('data-posturl'), {method:'POST', credentials:'same-origin', headers:headers, body:file});
-                var result = await response.json();
-                if(!response.ok || result.error) throw new Error(result.message || message('unableToUpload', 'Unable to upload file'));
-                if(!Array.isArray(result)) throw new Error(message('unableToUpload', 'Unable to upload file'));
-                for(var item of result) {
-                    if(item.error) throw new Error(item.message || message('unableToUpload', 'Unable to upload file'));
-                    var $list = $field.find('.InputfieldFileList').first();
-                    if(!$list.length) $list = $field.find('.InputfieldImageList').first();
-                    if(!$list.length) {
-                        $list = $('<ul></ul>').addClass($field.hasClass('InputfieldImage') ? 'InputfieldImageList gridImages ui-helper-clearfix' : 'InputfieldFileList ui-helper-clearfix');
-                        $list.insertBefore($upload);
-                        $field.find('.InputfieldFileListPlaceholder').remove();
+            for (const file of files) {
+                status.textContent = message('uploading', 'Uploading {name}…').replace('{name}', file.name);
+                const headers = { 'X-Requested-With': 'XMLHttpRequest', 'X-FIELDNAME': FieldtypeFlex.attr(upload, 'data-fieldname'), 'X-FLEX-DRAFT': FieldtypeFlex.attr(upload, 'data-flex-draft'), 'X-FLEX-PATH': FieldtypeFlex.attr(upload, 'data-flex-path'), 'X-FILENAME': encodeURIComponent(file.name), 'Content-Type': 'application/octet-stream' };
+                if (token)
+                    headers['X-' + token.name] = token.value;
+                const response = await fetch(FieldtypeFlex.attr(upload, 'data-posturl'), { method: 'POST', credentials: 'same-origin', headers, body: file });
+                const result = await response.json();
+                if (!response.ok || (!Array.isArray(result) && result.error))
+                    throw new Error((!Array.isArray(result) && result.message) || message('unableToUpload', 'Unable to upload file'));
+                if (!Array.isArray(result))
+                    throw new Error(message('unableToUpload', 'Unable to upload file'));
+                for (const item of result) {
+                    if (item.error)
+                        throw new Error(item.message || message('unableToUpload', 'Unable to upload file'));
+                    let list = field.querySelector('.InputfieldFileList') || field.querySelector('.InputfieldImageList');
+                    if (!list) {
+                        list = document.createElement('ul');
+                        list.className = field.matches('.InputfieldImage') ? 'InputfieldImageList gridImages ui-helper-clearfix' : 'InputfieldFileList ui-helper-clearfix';
+                        upload.before(list);
+                        FieldtypeFlex.all(field, '.InputfieldFileListPlaceholder').forEach(item => item.remove());
                     }
-                    var replacement = Number($field.find('.InputfieldFileMaxFiles, .InputfieldImageMaxFiles').first().val()) === 1;
-                    var metadata = replacement ? mediaMetadata($list) : null;
-                    if(replacement) {
-                        if(window.InputfieldTinyMCE) window.InputfieldTinyMCE.destroyEditorsIn($list);
-                        $list.children('li').remove();
+                    const replacement = Number(field.querySelector('.InputfieldFileMaxFiles, .InputfieldImageMaxFiles')?.value) === 1;
+                    const metadata = replacement ? mediaMetadata(list) : null;
+                    if (replacement) {
+                        FieldtypeFlex.classic.destroyEditors(list);
+                        FieldtypeFlex.all(list, ':scope > li').forEach(item => item.remove());
                     }
-                    var $item = $(item.markup).appendTo($list);
-                    if(metadata) restoreMediaMetadata($item, metadata, true);
+                    const fresh = FieldtypeFlex.parseHTML(item.markup);
+                    list.append(fresh);
+                    await FieldtypeFlex.activateScripts(fresh, response);
+                    if (metadata)
+                        restoreMediaMetadata(fresh, metadata, true);
                 }
-                $field.removeClass('InputfieldFileEmpty').addClass('InputfieldStateChanged');
-                setup($field);
+                field.classList.remove('InputfieldFileEmpty');
+                field.classList.add('InputfieldStateChanged');
+                await FieldtypeFlex.classic.setup(field);
             }
-            $status.remove();
-        } catch(error) { $status.attr('role','alert').text(error.message); }
-        finally { input.value = ''; input.disabled = false; setTreeBusy($upload, false); }
+            status.remove();
+        }
+        catch (error) {
+            status.setAttribute('role', 'alert');
+            status.textContent = errorMessage(error);
+        }
+        finally {
+            input.value = '';
+            input.disabled = false;
+            setTreeBusy(upload, false);
+        }
     }
-    // Native File/Image listeners also handle change/drop when noAjax=1.
-    // Intercept this one transport in capture phase, before those listeners.
-    document.addEventListener('change', function(event) {
-        if(!event.target.matches('input[type="file"]') || !event.target.closest('[data-flex-upload="1"]')) return;
-        event.stopImmediatePropagation(); upload(event.target, Array.from(event.target.files || []));
+    // Capture only the Flex transport before native File/Image listeners see it.
+    document.addEventListener('change', event => {
+        const input = event.target;
+        if (!(input instanceof HTMLInputElement) || input.type !== 'file' || !input.closest('[data-flex-upload="1"]'))
+            return;
+        event.stopImmediatePropagation();
+        void upload(input, Array.from(input.files || []));
     }, true);
-    ['dragenter','dragover','dragleave','drop'].forEach(function(name) { document.addEventListener(name, function(event) {
-        var field = event.target.closest('.Inputfield');
-        if(!field || !event.dataTransfer || !Array.from(event.dataTransfer.types || []).includes('Files')) return;
-        var input = $(field).find('[data-flex-upload="1"] input[type="file"]')[0];
-        if(!input || $(input).closest('.Inputfield')[0] !== field) return;
-        event.preventDefault(); event.stopImmediatePropagation();
-        if(name === 'dragleave' && event.relatedTarget && field.contains(event.relatedTarget)) return;
-        var active = name === 'dragenter' || name === 'dragover';
-        $(field).toggleClass('pw-drag-in-file', active);
-        $(field).children('.InputfieldContent').toggleClass('ui-state-hover', active);
-        if(name === 'drop') upload(input, Array.from(event.dataTransfer.files));
-    }, true); });
-    $(document).on('flexMediaRefresh', async function(event, draft, path) {
-        var $upload = $('[data-flex-upload="1"]').filter(function() { return $(this).attr('data-flex-draft') === draft && $(this).attr('data-flex-path') === path; }).first();
-        var $field = $upload.closest('.Inputfield'), token = csrf();
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(name => document.addEventListener(name, rawEvent => {
+        const event = rawEvent;
+        if (!(event.target instanceof Element))
+            return;
+        const field = event.target.closest('.Inputfield');
+        if (!field || !event.dataTransfer || !Array.from(event.dataTransfer.types).includes('Files'))
+            return;
+        const input = field.querySelector('[data-flex-upload="1"] input[type="file"]');
+        if (!input || input.closest('.Inputfield') !== field)
+            return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        if (name === 'dragleave' && event.relatedTarget instanceof Node && field.contains(event.relatedTarget))
+            return;
+        const active = name === 'dragenter' || name === 'dragover';
+        field.classList.toggle('pw-drag-in-file', active);
+        FieldtypeFlex.all(field, ':scope > .InputfieldContent').forEach(content => content.classList.toggle('ui-state-hover', active));
+        if (name === 'drop')
+            void upload(input, Array.from(event.dataTransfer.files));
+    }, true));
+    async function refreshMedia(draft, path) {
+        const upload = FieldtypeFlex.all(document, '[data-flex-upload="1"]').find(upload => FieldtypeFlex.attr(upload, 'data-flex-draft') === draft && FieldtypeFlex.attr(upload, 'data-flex-path') === path);
+        if (!upload)
+            return;
+        const field = FieldtypeFlex.closest(upload, '.Inputfield'), token = csrf();
         try {
-            var data = new URLSearchParams({flex_action:'media-render', flex_path:path});
-            if(token) data.set(token.name, token.value);
-            data.set('flex_complete', draft);
-            var response = await fetch($upload.attr('data-posturl'), {method:'POST', credentials:'same-origin',
-                headers:{'X-Requested-With':'XMLHttpRequest','X-FIELDNAME':$upload.attr('data-fieldname'),'X-FLEX-DRAFT':draft}, body:data});
-            var result = await response.json();
-            if(!response.ok || result.error) throw new Error(result.message || message('unableToRefreshImage', 'Unable to refresh image'));
-            var metadata = mediaMetadata($field);
-            if(window.InputfieldTinyMCE) window.InputfieldTinyMCE.destroyEditorsIn($field);
-            $field.find('> .InputfieldContent').html(result.html);
-            restoreMediaMetadata($field, metadata, false);
-            setup($field); $field.addClass('InputfieldStateChanged');
-            $('iframe.ui-dialog-content').dialog('close');
-        } catch(error) { $('<p role="alert" class="flex-upload-status"></p>').text(error.message).appendTo($field); }
-    });
-})(jQuery);
+            const data = new URLSearchParams({ flex_action: 'media-render', flex_path: path, flex_complete: draft });
+            if (token)
+                data.set(token.name, token.value);
+            const response = await fetch(FieldtypeFlex.attr(upload, 'data-posturl'), { method: 'POST', credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-FIELDNAME': FieldtypeFlex.attr(upload, 'data-fieldname'), 'X-FLEX-DRAFT': draft }, body: data });
+            const result = await response.json();
+            if (!response.ok || result.error)
+                throw new Error(result.message || message('unableToRefreshImage', 'Unable to refresh image'));
+            const metadata = mediaMetadata(field);
+            FieldtypeFlex.classic.destroyEditors(field);
+            const content = FieldtypeFlex.one(field, ':scope > .InputfieldContent');
+            FieldtypeFlex.setHTML(content, result.html);
+            await FieldtypeFlex.activateScripts(content, response);
+            restoreMediaMetadata(field, metadata, false);
+            await FieldtypeFlex.classic.setup(field);
+            field.classList.add('InputfieldStateChanged');
+            FieldtypeFlex.classic.closeDialog();
+        }
+        catch (error) {
+            const status = document.createElement('p');
+            status.setAttribute('role', 'alert');
+            status.className = 'flex-upload-status';
+            status.textContent = errorMessage(error);
+            field.append(status);
+        }
+    }
+})(FieldtypeFlex || (FieldtypeFlex = {}));

@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "none",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "noEmitOnError": true,
+    "outFile": "FieldtypeFlex.js",
+    "newLine": "lf"
+  },
+  "files": ["scripts/typescript/dom.ts", "scripts/typescript/classic.ts", "scripts/typescript/sortable.ts", "scripts/typescript/FieldtypeFlex.ts"]
+}
