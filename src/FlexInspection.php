@@ -135,7 +135,15 @@ final class FlexInspection {
 				if($check === 'search') {
 					$table = $db->escapeTable($field->table);
 					$q = $db->prepare("SELECT search FROM `$table` WHERE pages_id=:page"); $q->execute(['page' => $page->id]);
-					if($q->fetchColumn() !== FlexStorage::search($raw)) $findings[] = $this->finding($field, $page->id, 'search_projection', 'error');
+					// JSON databases may reorder object members after search was derived.
+					// The flat projection has no property boundaries; compare content counts.
+					$terms = static function(string $search): array {
+						$parts = explode(' ', $search);
+						sort($parts, SORT_STRING);
+						return $parts;
+					};
+					$search = $q->fetchColumn();
+					if(!is_string($search) || $terms($search) !== $terms(FlexStorage::search($raw))) $findings[] = $this->finding($field, $page->id, 'search_projection', 'error');
 				} else if($check === 'rows') {
 					$q = $db->prepare('SELECT set_key AS `key`,set_name AS name,schema_key,schema_path AS `schema`,row_key,parent_row_key AS parent,row_id AS id,row_type AS type,ordinal AS sort,data FROM fieldtype_flex_rows WHERE fields_id=:field AND pages_id=:page');
 					$q->execute($bind);

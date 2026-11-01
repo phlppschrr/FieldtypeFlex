@@ -167,7 +167,7 @@ Flex reuses native Inputfields and selected Fieldtype behavior, with these bound
 | Area | Difference |
 | --- | --- |
 | Text / HTML | Declared HTML text supports native URL sleep/wakeup and optional internal link abstraction. Image markup QA is unsupported. Configure Textformatters explicitly when escaping plain text for HTML output. |
-| Incoming HTML links | Automatic `$target->links()` discovery does not include Flex fields. Direct `MarkupQA::findLinks()` calls are incomplete for Flex; see below. |
+| Incoming HTML links | Automatic `$target->links()` discovery does not include Flex fields. Explicit field discovery depends on the core version and is incomplete; see below. |
 | Integer / Float / Datetime | Integer/Float preserve explicit zero. Invalid numbers/dates raise `WireException` rather than using permissive native conversion or blank fallback. |
 | Checkbox / Toggle | Custom checkbox scalars are supported. Toggle supports native `formatType` output modes; custom integer option keys remain supported. |
 | Choices | Values are raw keys, not native FieldtypeOptions objects or option IDs. |
@@ -175,7 +175,9 @@ Flex reuses native Inputfields and selected Fieldtype behavior, with these bound
 | Objects / Rows / layout | Objects return a fixed `FlexValue`; Rows are not Repeater Pages. Ordinary fieldsets and Markup have no stored value. |
 
 Internal link abstraction keeps outgoing HTML links working when targets move or are renamed.
-This does not register Flex fields with native backlink discovery. A direct
+This does not register Flex fields with automatic native backlink discovery.
+ProcessWire 3.0.259 accepts an explicitly named Flex field in `$target->links($selector, $fieldName)`;
+the pinned newer core restricts that method to Textarea fields. A direct
 `MarkupQA::findLinks()` call with an explicit Flex field name can find links in
 searchable root or visible Row HTML, but it is not a complete Flex backlink API:
 links present only in hidden Rows or custom File/Image HTML can be missed because
@@ -960,6 +962,10 @@ Each diagnostic has `code`, `severity` (`warning`), `path`, `property`, `setting
 #### Consistency checks
 
 `check` reads stored data without hydration, defaults, normalization or repair. It checks owner/field assignment, canonical JSON/envelopes, resource budgets, per-Page definitions, unknown row types, rename conflicts, row/search projections and media ownership/metadata. Pending renames are warnings; unknown properties alone are allowed. Media originals are checked for existence; optional variations are not required. Unreferenced live ownership is a warning.
+
+Whole-field search checks compare space-separated content with occurrence counts because
+JSON databases may reorder object properties. The flat search string cannot prove phrase
+or property order. Row projection checks still verify Row identities, order and payloads.
 
 Checks cover selected stored owners, not a global filesystem, cross-field, version or staging inventory. They do not verify file bytes or complete index definitions. Custom file-path hooks/unavailable roots can skip original-path checks; query failures or invalid data can prevent further checks. Reports expose these boundaries, and concurrent writes may require rechecking.
 

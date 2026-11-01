@@ -32,6 +32,7 @@ $page->set($lazyField->name, $raw);
 $page->save($lazyField->name);
 $value = $wire->pages->getFresh($page->id)->getUnformatted($lazyField->name);
 $baseline = $value->rawArray();
+$storedBaseline = json_encode($type->storage()->document($page, $lazyField), JSON_THROW_ON_ERROR);
 $editor = $lazyField->getInputfield($page);
 $editor->value = $value;
 $html = $editor->render();
@@ -105,7 +106,7 @@ try {
 	$same(false, $loaded['error'], 'authenticated row-render returns a native scalar body');
 	$assert(str_contains($loaded['html'], 'name="' . $aPrefix . 'heading"'), 'row-render uses the stable original scoped input name');
 	$same(false, $ajax($renderRequest)['error'], 'repeated row-render safely reissues the same protected body');
-	$same($baseline, $type->storage()->persisted($page, $lazyField), 'row-render never saves canonical data');
+	$same($storedBaseline, json_encode($type->storage()->document($page, $lazyField), JSON_THROW_ON_ERROR), 'row-render never saves canonical data');
 	// Fill the three issued scalar bodies after recovery; normal absent checkboxes clear.
 	$editPost = $recoveryPost + $post;
 	$editPost[$aPrefix . 'heading'] = 'Edited first';
@@ -126,7 +127,7 @@ try {
 	$page->set($name, $success->value);
 	$page->save($name);
 	$saved = $wire->pages->getFresh($page->id)->getUnformatted($name);
-	$same($success->value->rawArray(), $saved->rawArray(), 'partly loaded field saves and survives fresh readback');
+	$sameJson(json_encode($success->value->rawArray()), json_encode($saved->rawArray()), 'partly loaded field saves and survives fresh readback');
 	$same([(int) $page->id], array_map('intval', $wire->pages->findIDs('id=' . $page->id . ', ' . $name . '.items.item.heading=Edited first, include=all')), 'lazy edits update row selector projections');
 	$same(true, $ajax($renderRequest)['error'], 'lazy endpoint rejects a stale canonical revision');
 

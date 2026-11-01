@@ -35,6 +35,10 @@ function runFlexTestSuite(string $suitePath, string $suiteName): int {
 			$message . ($expected === $actual ? '' : ' expected=' . var_export($expected, true) . ' actual=' . var_export($actual, true))
 		);
 	};
+	$sameJson = static function(string $expected, string $actual, string $message) use ($assert): void {
+		$equal = flexTestJsonEquals($expected, $actual);
+		$assert($equal, $message . ($equal ? '' : ' expected=' . $expected . ' actual=' . $actual));
+	};
 	$throws = static function(
 		callable $action,
 		string $message,
@@ -66,6 +70,7 @@ function runFlexTestSuite(string $suitePath, string $suiteName): int {
 		'temporaryFiles',
 		'assert',
 		'same',
+		'sameJson',
 		'throws',
 		'trackFile'
 	);
@@ -331,4 +336,27 @@ function flexTestBaseValue(): array {
 		'required_conditional' => 'Present',
 		'default_text'         => '',
 	];
+}
+
+/** Compare JSON objects without key order, retaining array order, shapes and scalar types. */
+function flexTestJsonEquals(string $expected, string $actual): bool {
+	$compare = static function($left, $right) use (&$compare): bool {
+		if($left instanceof \stdClass && $right instanceof \stdClass) {
+			$left = get_object_vars($left);
+			$right = get_object_vars($right);
+			ksort($left, SORT_STRING);
+			ksort($right, SORT_STRING);
+		} elseif(!is_array($left) || !is_array($right)) {
+			return $left === $right;
+		}
+		if(array_keys($left) !== array_keys($right)) return false;
+		foreach($left as $key => $value) {
+			if(!$compare($value, $right[$key])) return false;
+		}
+		return true;
+	};
+	return $compare(
+		json_decode($expected, false, 512, JSON_THROW_ON_ERROR),
+		json_decode($actual, false, 512, JSON_THROW_ON_ERROR)
+	);
 }

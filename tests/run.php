@@ -8,7 +8,7 @@ if(PHP_SAPI !== 'cli') {
 $suites = [
 	'objects' => ['objects.php'],
 	'compatibility' => ['native-compatibility.php', 'native-selectors.php'],
-	'values' => ['values.php'],
+	'values' => ['json-comparison.php', 'values.php'],
 	'definitions' => ['definitions.php', 'definition-sources.php', 'examples.php'],
 	'formatting' => ['formatting.php', 'textformatters.php', 'media-formatters.php', 'toggle-formatting.php', 'markup.php'],
 	'languages' => ['language-auto.php'],

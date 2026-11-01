@@ -279,17 +279,19 @@ foreach(['root', 'nested', 'root-aliases', 'nested-aliases'] as $scope) {
 		$beforeJson = json_encode($document, JSON_THROW_ON_ERROR);
 		$db->prepare("INSERT INTO `$shapeTable` (pages_id,data,search) VALUES (:id,:data,'') ON DUPLICATE KEY UPDATE data=VALUES(data)")
 			->execute(['id' => $page->id, 'data' => $beforeJson]);
+		$storedBeforeJson = json_encode($store->document($page, $shapeField), JSON_THROW_ON_ERROR);
+		$sameJson($beforeJson, $storedBeforeJson, "$scope database roundtrip preserves both JSON shapes");
 		$preview = $type->checkRenames($shapeField);
 		if($different) {
 			$same(1, count($preview['conflicts']), "$scope rename reports different JSON object/list shapes as a conflict");
 			$same(0, $type->applyRenames($shapeField, $preview)['changed'], "$scope JSON shape conflict blocks apply");
-			$same($beforeJson, json_encode($store->document($page, $shapeField)), "$scope JSON shape conflict preserves both stored values");
+			$same($storedBeforeJson, json_encode($store->document($page, $shapeField)), "$scope JSON shape conflict preserves both stored values");
 		} else {
 			$same([], $preview['conflicts'], "$scope equal JSON shapes remain mergeable");
 			$same(1, $type->applyRenames($shapeField, $preview)['changed'], "$scope equal JSON shapes merge");
 			if($rootScope) $document = (object) ['blocks' => $newSet];
 			else $document->blocks->items[0]->values = (object) ['children' => $newSet];
-			$same(json_encode($document), json_encode($store->document($page, $shapeField)), "$scope merged JSON retains the original object/list shape");
+			$sameJson(json_encode($document), json_encode($store->document($page, $shapeField)), "$scope merged JSON retains the original object/list shape");
 		}
 	}
 }

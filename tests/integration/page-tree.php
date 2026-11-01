@@ -6,8 +6,9 @@ if(PHP_SAPI !== 'cli' || !isset($same, $createField)) {
 }
 
 $fieldsetType = $wire->modules->get('FieldtypeFieldsetPage');
-$fieldsetType->getFieldClass();
-$fieldset = $wire->wire(new FieldsetPageField());
+// Older cores use the ordinary Field class for native FieldsetPage fields.
+$fieldsetClass = __NAMESPACE__ . '\\' . ($fieldsetType->getFieldClass() ?: 'Field');
+$fieldset = $wire->wire(new $fieldsetClass());
 $fieldset->name = 'flex_fieldset_' . bin2hex(random_bytes(3));
 $fieldset->type = $fieldsetType;
 $fieldset->repeaterFields = [$field->id];

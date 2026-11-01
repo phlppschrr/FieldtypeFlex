@@ -76,15 +76,34 @@ $assert(!isset($summary['properties']['blocks.text.obsolete']['locations']), 'su
 $afterCleanup = $store->persisted($page, $maintenance);
 $assert(!isset($afterCleanup['obsolete']) && isset($afterCleanup['keep_unknown'], $afterCleanup['blocks']['items'][0]['values']['obsolete']), 'exact cleanup retains unselected root and nested values');
 
+// A normal Fieldtype save derives search before the JSON database orders object keys.
+$diagnosticField = $createField('flex_check_search', [
+	'long_heading' => ['type' => 'text'], 'a' => ['type' => 'text'], 'zz' => ['type' => 'text'],
+]);
+$page->set($diagnosticField->name, ['long_heading' => 'First phrase', 'a' => 'Second', 'zz' => 'Third']);
+$page->save($diagnosticField->name);
+$same(true, $maintenanceService->page($diagnosticField, 'check', $page->id)['success'], 'check accepts search derived by an ordinary Fieldtype save after database JSON normalization');
+
 // Capture database readback before all diagnostic handlers, independent of cached FlexValue objects.
 $snapshotAll = static function() use ($db, $table): array {
 	return [$db->query("SELECT * FROM `$table` ORDER BY pages_id")->fetchAll(\PDO::FETCH_ASSOC),
 		$db->query('SELECT * FROM fieldtype_flex_rows ORDER BY fields_id,pages_id,set_key,row_id')->fetchAll(\PDO::FETCH_ASSOC),
 		$db->query('SELECT * FROM fieldtype_flex_assets ORDER BY asset_id')->fetchAll(\PDO::FETCH_ASSOC)];
 };
+// JSON object member order can change in storage; flat search text has no property boundaries.
+$searchBefore = $db->query("SELECT search FROM `$table` WHERE pages_id=" . (int) $page->id)->fetchColumn();
+$terms = explode(' ', $searchBefore);
+$db->prepare("UPDATE `$table` SET search=:search WHERE pages_id=:id")->execute(['search' => implode(' ', array_reverse($terms)), 'id' => $page->id]);
+$checkSearch = static fn(): array => $maintenanceService->page($maintenance, 'check', $page->id);
+$same(true, $checkSearch()['success'], 'check accepts the same search content in a different object property order');
+foreach([substr($searchBefore, 1), $searchBefore . ' extra', $searchBefore . ' ' . $terms[0]] as $corruptSearch) {
+	$db->prepare("UPDATE `$table` SET search=:search WHERE pages_id=:id")->execute(['search' => $corruptSearch, 'id' => $page->id]);
+	$assert(in_array('search_projection', array_column($checkSearch()['findings'], 'category'), true), 'check rejects missing, additional or duplicate search content');
+}
+$db->prepare("UPDATE `$table` SET search=:search WHERE pages_id=:id")->execute(['search' => $searchBefore, 'id' => $page->id]);
 $beforeReads = $snapshotAll();
 foreach([['schema', $maintenance->name], ['schema', $maintenance->name, '--page=' . $page->id], ['check', $maintenance->name], ['status'], ['orphans', $maintenance->name]] as $args) {
-	[$code, $out] = $invoke(array_merge($args, ['--json'])); $same(0, $code, 'read-only diagnostic handler succeeds: ' . $args[0]);
+	[$code, $out] = $invoke(array_merge($args, ['--json'])); $same(0, $code, 'read-only diagnostic handler succeeds: ' . $args[0] . ($code === 0 ? '' : ' output=' . $out));
 	$decode($out);
 }
 $same($beforeReads, $snapshotAll(), 'diagnostic handlers preserve canonical, projections and ownership byte for byte');
@@ -99,6 +118,12 @@ $assert(in_array('row_projection', $categories($check()), true), 'check detects 
 $write($page, $afterCleanup);
 $db->prepare('UPDATE fieldtype_flex_rows SET data=:data WHERE fields_id=:field AND pages_id=:page')->execute(['data' => '{broken', 'field' => $maintenance->id, 'page' => $page->id]);
 $assert(in_array('row_projection', $categories($check()), true), 'invalid projection JSON is a known consistency error');
+$write($page, $afterCleanup);
+// Search content comparison must not hide a changed canonical Row order.
+$reordered = $afterCleanup;
+$reordered['blocks']['items'] = array_reverse($reordered['blocks']['items']);
+$db->prepare("UPDATE `$table` SET data=:data WHERE pages_id=:id")->execute(['data' => FlexStorage::encode($reordered), 'id' => $page->id]);
+$assert(in_array('row_projection', $categories($check()), true), 'check detects reordered canonical Rows against unchanged projection ordinals');
 $write($page, $afterCleanup);
 // Reorder JSON keys only: semantic comparison must not flag a projection error.
 $q = $db->prepare('SELECT row_key,data FROM fieldtype_flex_rows WHERE fields_id=:field AND pages_id=:page'); $q->execute(['field' => $maintenance->id, 'page' => $page->id]);

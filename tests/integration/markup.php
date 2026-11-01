@@ -63,7 +63,13 @@ $stored = $type->storage()->persisted($page, $f);
 $same($asleep, $stored['body'], 'Flex storage matches native Textarea bytes');
 // Native backlink discovery must not be confused with HTML URL/link transforms.
 $same([$id], array_values($second->links('id=' . $id, $native->name)->explode('id')), 'native Page links discovers the saved HTML Textarea reference');
-$same([], array_values($second->links('id=' . $id, $name)->explode('id')), 'native Page links does not discover the same reference through a Flex field');
+// The supported core pins differ: 3.0.259 scans all explicitly named fields,
+// while the newer core restricts candidates to FieldtypeTextarea (and subclasses).
+$explicitBacklinks = $wire->config->version === '3.0.259' ? [$id] : [];
+$same($explicitBacklinks, array_values($second->links('id=' . $id, $name)->explode('id')), 'explicit native backlink discovery follows the supported core field filter');
+$page->set($native->name, ''); $page->save($native->name);
+$same([], array_values($second->links('id=' . $id)->explode('id')), 'automatic native backlink discovery does not register Flex fields');
+$page->set($native->name, $input); $page->save($native->name);
 $nativeQa = new MarkupQA($page, $native);
 $same([$id], array_values($nativeQa->findLinks($second, [$native->name])->explode('id')), 'native MarkupQA discovers the Textarea backlink');
 $flexQa = new MarkupQA($page, $f);
