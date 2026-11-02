@@ -13,7 +13,7 @@ const source = fs.readFileSync(path.join(root, 'FieldtypeFlex.js'), 'utf8');
 const start = source.indexOf('    function titleParts(');
 const end = source.indexOf('    function contextPath(', start);
 assert(start >= 0 && end > start, 'Production titleParts function boundary is available');
-const parser = vm.runInNewContext('(function() {' + source.slice(start, end) + '; return {parts: titleParts, title: rowTitle}; })()', {}, {timeout: 1000});
+const parser = vm.runInNewContext('(function() {' + source.slice(start, end) + '; return {parts: titleParts, title: rowTitle}; })()', {rowState: row => ({labels: row.labels}), FieldtypeFlex: {attr: (row, name) => row.getAttribute(name) || ''}}, {timeout: 1000});
 const results = cases.map(test => {
     const parts = parser.parts(test.format, test.values || {}, test.number || 1, test.type || '', test.path || '');
     assert.equal(parts.map(part => part.text).join(''), test.text, test.name);
@@ -24,8 +24,8 @@ const results = cases.map(test => {
 const titles = cases.map(test => {
     if(test.titleText === undefined) return null;
     const row = {
-        attr: name => name === 'data-flex-label-format' ? test.format : (test.type || 'Item'),
-        data: () => test.values || {}
+        getAttribute: name => name === 'data-flex-label-format' ? test.format : (test.type || 'Item'),
+        labels: test.values || {}
     };
     const parts = parser.title(row, (test.number || 1) - 1, test.path || '');
     assert.equal(parts.map(part => part.text).join(''), test.titleText, test.name + ' title/fallback');

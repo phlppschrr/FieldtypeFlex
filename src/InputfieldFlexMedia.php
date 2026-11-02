@@ -1,5 +1,7 @@
 <?php namespace ProcessWire;
 
+require_once __DIR__ . '/FlexBridge.php';
+
 /** Native rendering/validation; Flex owns transport, draft state and physical mutations. */
 trait FlexMediaInput {
 	private array $flexItemInputs = [];
@@ -173,12 +175,12 @@ trait FlexMediaInput {
 	}
 }
 
-class InputfieldFlexFile extends InputfieldFile {
-	use FlexMediaInput;
+class InputfieldFlexFile extends InputfieldFile implements BridgeComponent {
+	use FlexMediaInput, FlexBridgeComponent;
 }
 
-class InputfieldFlexImage extends InputfieldImage {
-	use FlexMediaInput;
+class InputfieldFlexImage extends InputfieldImage implements BridgeComponent {
+	use FlexMediaInput, FlexBridgeComponent;
 
 	protected function getEditUrl(Pagefile $file, $pageID) {
 		return parent::getEditUrl($file, $pageID) . '&flex_draft=' . rawurlencode($this->flexDraft);

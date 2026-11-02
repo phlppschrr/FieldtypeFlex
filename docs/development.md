@@ -40,10 +40,10 @@ Run suites sequentially against one fixture; their owned baseline field name is 
 The admin suite executes the production PHP and JavaScript Row-title parsers
 against `tests/fixtures/row-titles.json`, including final renderer/fallback cases.
 Node.js must be available on PATH (already present in DDEV and used by CI's JS
-syntax checks). Run the JS cases alone with
-`node tests/js/row-title-parts.cjs`; no package install is needed. The test loads
-the actual private functions from FieldtypeFlex.js and fails if their boundaries
-change; it does not maintain a second parser or add production test exports.
+syntax checks). Run the JS cases alone with `node tests/js/row-title-parts.cjs`;
+no package install is needed for these parser cases. The test executes the compiled
+production parser, including renderer/fallback behavior, without a copied parser
+or production test exports.
 
 The admin context regression loads a Flex value before assigning its owner's
 concrete type, then exercises preload, rendering and authenticated processing.
@@ -75,6 +75,73 @@ children contain an Object. Change a checkbox controlling a child through
 `parent`, duplicate a Row with unsaved Object values, save and independently
 read canonical values and row identities. Inspect browser warnings/errors.
 Objects use native fieldsets and require no additional JavaScript or CSS.
+
+## TypeScript admin assets
+
+The editable sources live in `scripts/typescript/`. Run from the module root:
+
+```sh
+npm ci
+npm run build
+npm test
+```
+
+`npm run check` type-checks without writing assets. TypeScript strict mode and the
+DOM types cover both entry points. The compiler joins namespace scripts into the
+existing `FieldtypeFlex.js` and `FlexMaintenance.js`; no bundler, runtime loader or
+production npm dependency is needed. Commit the generated assets with their sources.
+Installation ZIPs include these ready-to-use assets and omit build/test tooling.
+CI rebuilds both assets, runs regressions and rejects stale generated files.
+See TypeScript's [outFile reference](https://www.typescriptlang.org/tsconfig/outFile.html).
+
+`FieldtypeFlex.ts` owns native DOM events, Row state, AJAX, uploads and metadata.
+`dom.ts` contains the small shared DOM/form helpers. `FlexMaintenance.ts` retains
+the native maintenance flow with typed request/report data. The jsdom tests run
+the compiled production runtime, mostly without jQuery, and cover nested Rows,
+unsaved duplication, serialization, deferred removal/undo and limits, keyboard
+ordering, lazy failure/retry and submit blocking, TinyMCE lifecycle, media
+refresh/replacement and maintenance preview invalidation. They supplement actual
+ProcessPageEdit save/readback checks; jsdom cannot validate native input widgets
+or pointer-based jQuery UI sorting.
+
+Two adapters isolate the admin integration from Flex's data and AJAX logic:
+
+- `sortable.ts`: `init(list, start, stop)` and `disabled(list, disabled)` expose
+  native Elements to Flex. Core admin themes use jQuery UI Sortable, including
+  isolation from containing Repeaters. Bridge uses its native `Bridge.sortable()`
+  API and cleans up listeners when lists are removed or replaced.
+- `classic.ts`: Inputfields init/toggle/reloaded/opened/closed, TinyMCE's
+  jQuery-based saveReady/destroy API, the existing Selector path workaround,
+  confirmation/dialog integration and existing external jQuery events. Flex logic
+  receives Elements or scalar values, never jQuery collections. Under Bridge the
+  adapter uses public native lifecycle, dialog and confirmation APIs.
+  Legacy event handlers also bind when a child loads the classic stack later.
+
+The image dialog emits native `flexMediaRefresh` with `{draft, path}` as
+`CustomEvent.detail`; existing external jQuery `flexMediaRefresh` and
+`flexRowAdded` consumers remain supported by the adapter. `dom.ts` uses Bridge's
+existing Trusted Types policy and script runner for AJAX markup, including the
+response nonce. Maintenance controls also reinitialize after in-place form saves.
+
+Flex's Inputfields declare the optional Bridge component contract. Each rendered
+child retains its own component identity and legacy requirements. Flex File/Image
+subclasses declare their borrowed core widget through an
+`AdminThemeBridge::nativeMap` hook (`widget => InputfieldFile` / `InputfieldImage`).
+Bridge writes `data-bridge-widget` beside the subclass's own component identity
+and initializes media on load, AJAX insertion and in-place reload. Flex retains
+its existing upload transport and persistence. A child that needs the classic
+stack, including the current TinyMCE integration, still loads it through Bridge.
+
+Native Bridge support requires **AdminThemeBridge 0.24.0 or newer**, which provides
+public `Bridge.sortable()` and declarative File/Image widgets. See
+[Bridge's component contract](https://github.com/theoretic/bridge/blob/master/docs/contract.md).
+No Bridge package is bundled with Flex. Core admin themes, including AdminThemeUikit, continue to use
+the classic adapters.
+
+Test native-only pages with CSP and Trusted Types enforcement. Pages that load
+legacy Inputfields must follow Bridge's legacy CSP/report-only contract; TinyMCE
+support does not imply that its classic dependencies support enforced Trusted
+Types.
 
 ## Browser checks
 

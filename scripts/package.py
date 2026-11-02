@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 REQUIRED = {
     'API.md', 'LICENSE', 'README.md', 'FieldtypeFlex.module.php',
     'InputfieldFlex.module.php', 'InputfieldFlexRows.module.php',
-    'FieldtypeFlex.js', 'FieldtypeFlex.css',
+    'FieldtypeFlex.js', 'FlexMaintenance.js', 'FieldtypeFlex.css',
     'src/FlexValue.php', 'examples/README.md', 'languages/de.csv',
     'languages/fr.csv', 'languages/es.csv',
 }

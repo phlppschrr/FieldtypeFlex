@@ -1,7 +1,10 @@
 <?php namespace ProcessWire;
 
+require_once __DIR__ . '/src/FlexBridge.php';
+
 /** An atomic page input containing native, independently namespaced ProcessWire inputs. */
-class InputfieldFlex extends Inputfield {
+class InputfieldFlex extends Inputfield implements BridgeComponent {
+	use FlexBridgeComponent;
 	private ?InputfieldWrapper $flexInputs = null;
 	private string $flexDraft = '';
 	private bool $flexProcessed = false;

@@ -525,7 +525,9 @@ class FlexAdmin extends Wire {
 			$this->type->media()->transform($file, 'resize', ['width' => (int) $input->post('width')]);
 		}
 		$this->stageMedia($token, $address, $files);
-		$event->return = '<p>' . $this->_('Image change prepared. Save the page to apply it.') . '</p><script>parent.jQuery(parent.document).trigger("flexMediaRefresh",' . json_encode([$token, $address], JSON_HEX_TAG | JSON_HEX_AMP | JSON_THROW_ON_ERROR) . ');</script>';
+		$theme = $this->wire()->adminTheme;
+		$nonce = $theme && method_exists($theme, 'nonceAttr') ? $theme->nonceAttr() : '';
+		$event->return = '<p>' . $this->_('Image change prepared. Save the page to apply it.') . '</p><script' . $nonce . '>parent.document.dispatchEvent(new parent.CustomEvent("flexMediaRefresh",{detail:' . json_encode(['draft' => $token, 'path' => $address], JSON_HEX_TAG | JSON_HEX_AMP | JSON_THROW_ON_ERROR) . '}));</script>';
 	}
 
 	/**
