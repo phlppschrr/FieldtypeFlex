@@ -8,11 +8,13 @@ if(PHP_SAPI !== 'cli' || !isset($same, $createField)) {
 // Execute the actual reference snippets in the existing disposable suite fixture.
 $api = file_get_contents(dirname(__DIR__, 2) . '/API.md');
 preg_match_all('/```php\n(.*?)```/s', $api, $matches);
-$same(32, count($matches[1]), 'all API PHP examples have an execution context');
+$same(34, count($matches[1]), 'all API PHP examples have an execution context');
 $objectExamples = array_values(array_filter($matches[1], static fn($code) => str_starts_with($code, '// Fixed object definition.')));
 $matches[1] = array_values(array_filter($matches[1], static fn($code) => !in_array($code, $objectExamples, true)));
 $metadataExamples = array_values(array_filter($matches[1], static fn($code) => str_starts_with($code, '// Per-file metadata definition.') || str_starts_with($code, '// Existing image in the gallery.')));
 $matches[1] = array_values(array_filter($matches[1], static fn($code) => !in_array($code, $metadataExamples, true)));
+$alternateExamples = array_values(array_filter($matches[1], static fn($code) => str_starts_with($code, '// Language-alternate definition.') || str_starts_with($code, '// Read and save language-alternate images.')));
+$matches[1] = array_values(array_filter($matches[1], static fn($code) => !in_array($code, $alternateExamples, true)));
 $blocks = array_combine(range(1, count($matches[1])), $matches[1]);
 $loadedSearchExample = $blocks[15];
 $nestedSameRowExample = $blocks[23];
@@ -58,7 +60,8 @@ $renameSchema = $snippet($fragment($blocks[7]))['result'];
 $inheritSchema = $snippet($fragment(str_replace('rich_text_source', $sourceField->name, $blocks[20])))['result'];
 $metadataSchema = $snippet($fragment($metadataExamples[0]))['result'];
 $objectSchema = $snippet($fragment($objectExamples[0]))['result'];
-$schema = $base + $objectSchema + $rowSchema + $mediaSchema + $inheritSchema + $metadataSchema + [
+$alternateSchema = $snippet($fragment($alternateExamples[0]))['result'];
+$schema = $alternateSchema + $base + $objectSchema + $rowSchema + $mediaSchema + $inheritSchema + $metadataSchema + [
 	'summary' => ['type' => 'text'],
 	'appearance' => ['type' => 'select', 'label' => 'Appearance & style', 'options' => ['featured' => 'Featured & selected']],
 	'starts_on' => ['type' => 'datetime', 'dateInputFormat' => 'd.m.Y', 'dateOutputFormat' => 'd.m.Y'],
@@ -195,3 +198,25 @@ $snippet($visibilityCode, $context);
 $same(true, $wire->pages->getFresh($id)->getUnformatted($name)->blocks->first()->isHidden(), 'API visibility example persists hidden state');
 $r = $snippet(str_replace("'content'", "'$name'", $allRowsExample), $context);
 $same(2, count($r['allRows']), 'API explicit unformatted access includes hidden rows');
+
+// Execute the documented alternate definition and public media read/write sequence.
+$previousLanguage = $wire->user->language;
+try {
+	$wire->user->language = $language;
+	$page->of(false);
+	$page->get($name)->image->add($imagePath);
+	$page->save($name);
+	$code = str_replace(['$page->content', "'content'", '/absolute/path/to/german.png'], ['$page->' . $name, "'$name'", $imagePath], $alternateExamples[1]);
+	$r = $snippet($code, $context);
+	$assert($r['image'] instanceof Pageimage, 'API alternate read falls back to populated base image');
+	$same(null, $r['german'], 'API explicit alternate read returns its own empty single-image value');
+	$assert($r['base'] instanceof FlexImages && count($r['base']) === 1, 'API explicit raw image read retains the base collection');
+	$reloaded = $wire->pages->getFresh($id);
+	$raw = $reloaded->getUnformatted($name)->rawArray();
+	$reloaded->of(true);
+	$same($raw['image_de']['items'][0]['basename'], $reloaded->get($name)->image->basename, 'API import and save resolve the persisted German image');
+	$same($raw['image']['items'][0]['basename'], $r['image']->basename, 'API alternate save preserves original base image');
+} finally {
+	$wire->user->language = $previousLanguage;
+	$page->of(false);
+}

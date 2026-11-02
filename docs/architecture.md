@@ -22,6 +22,17 @@ is separate from `of()`; explicitly changing formatting resets it. In-memory Row
 search compares raw scalar leaves but counts collections in their current view.
 Search results retain their selected membership when read without formatting.
 
+Language-alternate properties resolve in `FlexValue::get()` before output
+conversion, within the current schema only. LanguageSupportFields and a nondefault
+user language enable the conventional sibling suffix. The unformatted alternate
+is checked using native scalar emptiness rules from the base property, with
+explicit empty WireArray/NullPage handling. Fixed Objects use logical content.
+The chosen property keeps its own media address, schema and output settings.
+Text alternates retain Core's second formatter pass. Explicit unformatted views,
+canonical exports, writes, content checks and query projections do not substitute
+properties. The resolver reads the current language on every access; no language
+result is cached in retained output views and no storage migration is required.
+
 ## Definition and schema model
 
 The module's `definitionsPath` selects the automatic PHP/JSON directory relative

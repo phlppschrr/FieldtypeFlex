@@ -10,6 +10,8 @@ Use the disposable DDEV fixture described in [docs/development.md](docs/developm
 
 ## Changes and review
 
+Start features on `feature/<short-name>` branches from current `main`. Record every enhancement and fix in [CHANGELOG.md](CHANGELOG.md). When merging into `main`, increase the version using SemVer (major for breaking changes, minor for compatible features, patch for compatible fixes), keeping module metadata, the documented version and dated changelog entries consistent. Use SemVer prerelease identifiers where applicable.
+
 Keep changes focused and use the existing PHP and JavaScript conventions. Add or update integration coverage for behavior changes, including failure paths where data integrity is involved. For admin input changes, verify a real ProcessPageEdit save and inspect browser errors.
 
 Before opening a pull request, run the applicable fixture checks and review the diff. Describe the user-visible behavior, the reason for the change and the verification you performed. Do not include private site data, passwords, generated fixtures or local logs.

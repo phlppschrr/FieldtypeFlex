@@ -515,6 +515,19 @@ class FlexValue extends WireData implements \JsonSerializable {
 		if($this->rawRead) {
 			return $this->getUnformatted((string) $key);
 		}
+		if($this->formatted && $this->definitions->property((string) $key)) {
+			$alternate = $this->languageAlternate((string) $key);
+			if($alternate !== null) {
+				$value = $this->get($alternate);
+				$definition = $this->definitions->property($alternate);
+				// Core passes the formatted alternate through the text formatter again.
+				if($definition['kind'] === 'text' && !$definition['input'] instanceof InputfieldToggle) {
+					$field = FlexMarkup::field($this->flexPage, $this->flexField, $alternate, $definition);
+					$value = $field->type->formatValue($this->flexPage, $field, (string) $value);
+				}
+				return $value;
+			}
+		}
 		$value = parent::get($key);
 		$def = $this->definitions->property((string) $key);
 		if($def && $def['kind'] === 'page') {
@@ -560,6 +573,28 @@ class FlexValue extends WireData implements \JsonSerializable {
 		}
 
 		return $value;
+	}
+
+	/** Resolve a populated sibling before formatting, like LanguageSupportFields. */
+	private function languageAlternate(string $name): ?string {
+		$wire = $this->wire();
+		if(!$wire->languages || !$wire->modules->isInstalled('LanguageSupportFields')) return null;
+		$language = $wire->user->language;
+		if(!$language || !$language->id || $language->isDefault() || $name === 'language') return null;
+		$alternate = $name . '_' . str_replace(['-', '.'], '_', $language->name);
+		if(!$this->definitions->property($alternate)) return null;
+		$value = $this->getUnformatted($alternate);
+		if($value instanceof WireArray) return count($value) ? $alternate : null;
+		if($value instanceof NullPage) return null;
+		if($value instanceof FlexValue) return $this->containsContent($value) ? $alternate : null;
+		if(is_array($value)) return count($value) ? $alternate : null;
+
+		$definition = $this->definitions->property($name);
+		$field = FlexMarkup::field($this->flexPage, $this->flexField, $name, $definition);
+		$types = ['integer' => 'Integer', 'float' => 'Float', 'checkbox' => 'Checkbox', 'date' => 'Datetime', 'page' => 'Page'];
+		$type = $definition['input'] instanceof InputfieldToggle ? 'Toggle' : ($types[$definition['kind']] ?? null);
+		if($type !== null) $field->type = $wire->modules->get('Fieldtype' . $type);
+		return $field->type->isEmptyValue($field, $value) ? null : $alternate;
 	}
 
 	/**
