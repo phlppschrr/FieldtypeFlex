@@ -563,6 +563,10 @@ Native URL `addRoot` and Textarea output options apply. `contentType >= Fieldtyp
 
 Switching to plain mode reads default-language text. **Saving then replaces the language map and discards other translations**; reads preserve them. Before uninstalling LanguageSupport, save a Flex field to remember the default-language ID. Without a live Languages API or remembered ID, old maps cannot be read as plain text. See [language examples](examples/03-text.php).
 
+### Language Alternate Fields
+
+Supports ProcessWire Language Alternate Fields, e.g. `image` / `image_de`. With output formatting enabled, `$page->content->image` resolves the current language and falls back to `image` when the alternate is empty.
+
 ## Field settings
 
 These configure the whole Flex Field:

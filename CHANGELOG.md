@@ -12,6 +12,18 @@
 - Use Bridge's existing CSP/Trusted Types facilities and load the legacy stack
   only when a child Inputfield needs it, including the current TinyMCE integration.
 
+## Unreleased — Language-alternate properties
+
+- Resolve sibling properties such as `image` / `image_de` for the current user
+  language on formatted reads, with native empty-value fallback and the chosen
+  property's output settings. Support Objects, typed/nested Rows and file metadata.
+- Retain explicit unformatted reads, independent writes, canonical data, selectors
+  and media ownership. Match Core's repeated formatter pass for text alternates.
+- Require feature branches, SemVer updates when merging into main and changelog
+  entries for enhancements and fixes in the contribution workflow.
+- Add saved native Field parity tests and briefly document Language Alternate
+  Fields with a naming and output-resolution example.
+
 ## Unreleased — Admin configuration and maintenance
 
 - Add a configurable automatic definitions directory under Modules → Flex.

@@ -62,6 +62,17 @@ The integration runner uses the same command in CI and local development. The po
 
 The CI workflow runs the integration suite and the available WireTests contract across its configured ProcessWire, PHP and database matrix. Its pinned core references are in scripts/processwire-3.0.259-ref.txt and scripts/processwire-ref.txt.
 
+## Language-alternate verification
+
+`ddev flex-test languages` includes saved native alternate Fields as the oracle
+for Flex siblings. It compares language/default/fallback and output formatting,
+text formatter order, numeric zero settings, Checkbox/Toggle, Page references and
+File/Image collection/single output. The Core alternate-name cache is initialized
+after the test's owned Fields are created. Further regressions cover local Object,
+typed/nested Row and per-file metadata scopes, retained formatted views, raw reads,
+write guards, canonical exports and explicit selectors. No editor transport or
+storage schema change is involved.
+
 ## Fixed Object verification
 
 `ddev flex-test objects` covers fixed child schemas, scoped native processing,
