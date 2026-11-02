@@ -563,61 +563,9 @@ Native URL `addRoot` and Textarea output options apply. `contentType >= Fieldtyp
 
 Switching to plain mode reads default-language text. **Saving then replaces the language map and discards other translations**; reads preserve them. Before uninstalling LanguageSupport, save a Flex field to remember the default-language ID. Without a live Languages API or remembered ID, old maps cannot be read as plain text. See [language examples](examples/03-text.php).
 
-### Language-alternate properties
+### Language Alternate Fields
 
-With LanguageSupport and LanguageSupportFields installed, define separate sibling
-properties using `<name>_<language-name>`, for example `image` and `image_de` when
-the language is named `de`:
-
-```php
-// Language-alternate definition.
-'image' => ['type' => 'image', 'maxFiles' => 1],
-'image_de' => ['type' => 'image', 'maxFiles' => 1],
-```
-
-```php
-// Read and save language-alternate images.
-$page->of(true);
-$image = $page->content->image; // image_de for German if populated, otherwise image
-$german = $page->content->image_de; // Explicit alternate
-$base = $page->content->getUnformatted('image'); // Base collection, no substitution
-
-$page->of(false);
-$page->content->image_de->add('/absolute/path/to/german.png');
-$page->save('content');
-```
-
-Automatic substitution applies only to formatted reads in a nondefault user
-language. With formatting off, both properties are independent; assignments
-always target the named property. The alternate's own output settings apply,
-including File/Image single-versus-collection output. Both properties must be
-known in the same schema scope. This also works inside Objects, typed/nested Rows
-and per-file custom metadata; retained unknown properties do not participate.
-Hyphens and dots in language names become underscores in property suffixes.
-No additional `useLanguages` setting is needed.
-
-An empty or absent alternate falls back to the base property. Scalar emptiness
-uses the base property's native Fieldtype rules: text `"0"` is populated;
-numeric zero is empty unless `zeroNotEmpty` is enabled on the base; an unchecked
-Checkbox is empty, whereas Toggle `0` is populated. Empty collections and NullPage
-references fall back. A nonempty Rows collection is populated even if its Rows
-are hidden in formatted output. An Object is populated when it contains logical
-content. Fallback tests raw content before formatting, so a reference later
-filtered from output does not trigger a second fallback.
-
-As in Core LanguageSupportFields, a resolved text alternate passes through its
-formatter chain twice. Non-idempotent formatters can therefore transform it
-twice: `TextformatterEntities` changes `&` to `&amp;amp;` on the automatic base
-read, while an explicit alternate read produces `&amp;`. Repeated reads start
-from raw data; they do not accumulate further transformations.
-
-`getUnformatted()`, unformatted views, `rawArray()`, JSON, `hasValue()` and selectors
-continue to address explicit properties. Runtime `getArray()` and iteration
-follow formatted reads. Reading never rewrites either value, its media ownership
-or change tracking. Template `noLang` does not disable alternate substitution,
-matching Core's alternate-field hook; multilingual text maps retain their separate
-[language-mode behavior](#language-modes).
-See [ProcessWire language-alternate fields](https://processwire.com/docs/multi-language-support/multi-language-fields/#language-alternate-fields).
+Supports ProcessWire Language Alternate Fields, e.g. `image` / `image_de`. With output formatting enabled, `$page->content->image` resolves the current language and falls back to `image` when the alternate is empty.
 
 ## Field settings
 

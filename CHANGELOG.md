@@ -9,8 +9,8 @@
   and media ownership. Match Core's repeated formatter pass for text alternates.
 - Require feature branches, SemVer updates when merging into main and changelog
   entries for enhancements and fixes in the contribution workflow.
-- Add saved native Field parity tests and document alternate naming, zero/blank
-  behavior, output formatting and formatter caveats.
+- Add saved native Field parity tests and briefly document Language Alternate
+  Fields with a naming and output-resolution example.
 
 ## Unreleased — Admin configuration and maintenance
 

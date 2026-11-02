@@ -16,7 +16,7 @@ https://github.com/user-attachments/assets/eb40e7a9-d51c-47b3-b798-db6acb97651a
 
 - **Define structures in code.** Use PHP, JSON or native Inputfield objects. PHP definitions support reusable schemas, translations and page-aware configuration.
 - **Native ProcessWire inputs.** Use TinyMCE, images, Page references, multilingual fields, conditional inputs and familiar editor layouts.
-- **Language alternates.** Define siblings such as `image` and `image_de`; formatted reads select the current language with native fallback. See [language-alternate properties](API.md#language-alternate-properties).
+- **Language alternates.** Define siblings such as `image` and `image_de`; formatted reads select the current language with native fallback. See [Language Alternate Fields](API.md#language-alternate-fields).
 - **Structured Objects.** Group related properties into fixed, nested structures without creating separate ProcessWire fields.
 - **Typed and nested Rows.** Mix different block types, each with its own fields. Editors can add, duplicate, reorder and hide rows without separate Repeater Pages.
 - **Files and images.** Use ProcessWire-compatible `Pagefile` and `Pageimage` objects, image resizing and custom metadata for individual files.
