@@ -518,14 +518,7 @@ class FlexValue extends WireData implements \JsonSerializable {
 		if($this->formatted && $this->definitions->property((string) $key)) {
 			$alternate = $this->languageAlternate((string) $key);
 			if($alternate !== null) {
-				$value = $this->get($alternate);
-				$definition = $this->definitions->property($alternate);
-				// Core passes the formatted alternate through the text formatter again.
-				if($definition['kind'] === 'text' && !$definition['input'] instanceof InputfieldToggle) {
-					$field = FlexMarkup::field($this->flexPage, $this->flexField, $alternate, $definition);
-					$value = $field->type->formatValue($this->flexPage, $field, (string) $value);
-				}
-				return $value;
+				return $this->get($alternate);
 			}
 		}
 		$value = parent::get($key);

@@ -84,7 +84,11 @@ try {
 				foreach([false, true] as $of) {
 					$p->of($of);
 					$value = $p->get($f->name);
-					$same($shape($p->get($base->name)), $shape($value->get($name)), "$name saved native parity language=$active->name OF=" . (int) $of);
+					$expected = $p->get($base->name);
+					// Core currently applies the alternate Text formatter twice through the base name.
+					// Flex intentionally formats the selected alternate only once.
+					if($name === 'formatted' && $active === $language && $of && $alternateValue !== '') $expected = $p->get($alt->name);
+					$same($shape($expected), $shape($value->get($name)), "$name saved alternate resolution language=$active->name OF=" . (int) $of);
 					$same($shape($p->get($alt->name)), $shape($value->get($name . '_de')), "$name direct alternate remains explicit");
 					$same($raw, $value->rawArray(), "$name output preserves canonical values");
 					$same(false, $value->isChanged(), "$name reads do not dirty values");
@@ -165,21 +169,21 @@ try {
 	$p->of(true);
 	$value = $p->get($nested->name);
 	foreach(['Root' => $value, 'Object' => $value->object, 'Row' => $value->blocks->first(), 'Child' => $value->blocks->first()->child->first()] as $label => $scope) {
-		$same($label . ' &amp;amp; DE', $scope->heading, "$label uses local formatted alternate");
+		$same($label . ' &amp; DE', $scope->heading, "$label formats local alternate once");
 		$same($label, $scope->getUnformatted('heading'), "$label explicit raw access bypasses alternates");
 		$same($label, $scope->unformattedView()->heading, "$label raw view bypasses alternates");
-		$same($label . ' &amp;amp; DE', $scope->getArray()['heading'], "$label runtime array resolves alternates");
+		$same($label . ' &amp; DE', $scope->getArray()['heading'], "$label runtime array formats alternates once");
 	}
-	$same('Metadata &amp;amp; DE', $value->image->heading, 'file custom metadata resolves local alternate');
+	$same('Metadata &amp; DE', $value->image->heading, 'file custom metadata formats alternate once');
 	$same('Root', json_decode(json_encode($value), true)['heading'], 'JSON retains canonical base');
 	$wire->user->language = $defaultLanguage;
 	$same('Root', $value->heading, 'retained formatted view responds to language changes');
 	$wire->user->language = $language;
-	$same('Root &amp;amp; DE', $value->heading, 'repeated reads format from the original alternate');
+	$same('Root &amp; DE', $value->heading, 'repeated reads format the original alternate once');
 	$noLang = $p->template->noLang;
 	try {
 		$p->template->noLang = 1;
-		$same('Root &amp;amp; DE', $value->heading, 'template noLang does not suppress alternate substitution');
+		$same('Root &amp; DE', $value->heading, 'template noLang does not suppress alternate substitution');
 		[$nativeBase, $nativeAlt] = $pairs['text'];
 		$p->of(false);
 		$p->set($nativeBase->name, 'Default');

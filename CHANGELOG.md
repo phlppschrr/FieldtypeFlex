@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Fix double application of textformatters to formatted Language Alternate values.
+
 ## 0.5.0 — 2026-11-02
 
 - Migrate admin JavaScript to vanilla TypeScript; retain support for classic admin themes.
