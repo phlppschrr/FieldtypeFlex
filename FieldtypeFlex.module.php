@@ -149,6 +149,12 @@ class FieldtypeFlex extends Fieldtype implements ConfigurableModule, FieldtypeHa
 	 * @return void
 	 */
 	public function init() {
+		$this->addHookAfter('AdminThemeBridge::nativeMap', function(HookEvent $event): void {
+			$map = $event->return;
+			$map['InputfieldFlexFile'] = ['kind' => 'field', 'widget' => 'InputfieldFile'];
+			$map['InputfieldFlexImage'] = ['kind' => 'field', 'widget' => 'InputfieldImage'];
+			$event->return = $map;
+		});
 		$this->addHookAfter('ProcessWire::finished', function() {
 			$this->media()->sweep();
 		});

@@ -195,7 +195,6 @@ function nativeAdmin(w, calls) {
         contract:'1',
         legacy:{loaded:()=>false,load:async()=>calls.push(['legacy'])},
         Inputfields:{init:scope=>calls.push(['init',scope]),open(row){row.classList.remove('InputfieldStateCollapsed');row.dispatchEvent(new w.CustomEvent('opened',{bubbles:true}));},close(row){row.classList.add('InputfieldStateCollapsed');row.dispatchEvent(new w.CustomEvent('closed',{bubbles:true}));}},
-        files:{init:async(field,kind)=>calls.push(['media',field,kind])},
         sortable:async(list,options)=>{calls.push(['sort',list,options]);return ()=>calls.push(['destroy',list]);},
         dialog:{close:()=>calls.push(['close'])},
         confirm:async(message,ok)=>{calls.push(['confirm',message]);ok();return true;}
@@ -208,10 +207,10 @@ function nativeAdmin(w, calls) {
         legacy:{needsStack:()=>true,initElement:scope=>{w.Bridge.Inputfields.init(scope);scope.dispatchEvent(new w.CustomEvent('reloaded',{bubbles:true}));}}
     };
 }
-test('Bridge uses native sortable, media widgets and toggle APIs without jQuery', async()=>{
+test('Bridge uses native sortable and toggle APIs without the proposed files API', async()=>{
     const calls=[];
-    const h=await harness(set()+`<div class="Inputfield" data-flex-media="image"></div>`,{before(w){nativeAdmin(w,calls);}});
-    assert.equal(h.window.jQuery,undefined); assert.equal(calls.filter(x=>x[0]==='sort').length,1); assert.equal(calls.filter(x=>x[0]==='media').length,1);
+    const h=await harness(set()+`<div class="Inputfield" data-bridge-component="InputfieldFlexImage" data-bridge-widget="InputfieldImage"></div>`,{before(w){nativeAdmin(w,calls);}});
+    assert.equal(h.window.jQuery,undefined); assert.equal(calls.filter(x=>x[0]==='sort').length,1);
     const sort=calls.find(x=>x[0]==='sort'); assert.equal(sort[2].enabled(),true);
     h.flex.test.setTreeBusy(h.document.querySelector('.flex-rows'),true);assert.equal(sort[2].enabled(),false);
     h.flex.test.setTreeBusy(h.document.querySelector('.flex-rows'),false);
@@ -235,12 +234,18 @@ test('Bridge loads legacy only for a rendered legacy child and binds its later c
     assert.equal(handlers.length,4);await h.flex.classic.setup(scope);assert.equal(calls.filter(x=>x[0]==='legacy').length,1);
     h.close();
 });
-test('Bridge reinitializes media subclasses when an in-place save reloads the new form', async()=>{
+test('Bridge media subclasses use the declarative Inputfields lifecycle without a files API', async()=>{
     const calls=[];
     const h=await harness(set(),{before(w){nativeAdmin(w,calls);}});
-    const field=h.document.createElement('div');field.className='Inputfield';field.setAttribute('data-flex-media','file');h.document.querySelector('.InputfieldFlex').append(field);
-    field.dispatchEvent(new h.window.CustomEvent('reloaded',{bubbles:true}));await tick();
-    assert(calls.some(x=>x[0]==='media'&&x[1]===field&&x[2]==='file'));h.close();
+    const field=h.document.createElement('div');field.className='Inputfield';
+    field.setAttribute('data-bridge-component','InputfieldFlexFile');field.setAttribute('data-bridge-widget','InputfieldFile');
+    h.document.querySelector('.InputfieldFlex').append(field);
+    assert.equal(h.window.Bridge.files,undefined);
+    await h.flex.classic.setup(field);
+    assert(calls.some(x=>x[0]==='init'&&x[1]===field));
+    assert.equal(field.getAttribute('data-bridge-component'),'InputfieldFlexFile');
+    assert.equal(field.getAttribute('data-bridge-widget'),'InputfieldFile');
+    assert.equal(calls.filter(x=>x[0]==='legacy').length,0);h.close();
 });
 test('Bridge with a legacy child closes the upstream image dialog instead of the native one', async()=>{
     const calls=[];

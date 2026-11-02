@@ -947,7 +947,6 @@ class FlexFieldDefs extends Wire {
 					}
 					$input->label = $original->label;
 					$input->editable($original->editable());
-					$input->wrapAttr('data-flex-media', $definition['kind']);
 					$input->noAjax = 1;
 					$input->overwrite = 0;
 					$input->noRename = 1;

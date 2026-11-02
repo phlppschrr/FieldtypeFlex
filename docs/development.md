@@ -114,7 +114,7 @@ Two adapters isolate the admin integration from Flex's data and AJAX logic:
   jQuery-based saveReady/destroy API, the existing Selector path workaround,
   confirmation/dialog integration and existing external jQuery events. Flex logic
   receives Elements or scalar values, never jQuery collections. Under Bridge the
-  adapter uses public native lifecycle, dialog, confirmation and File/Image APIs.
+  adapter uses public native lifecycle, dialog and confirmation APIs.
   Legacy event handlers also bind when a child loads the classic stack later.
 
 The image dialog emits native `flexMediaRefresh` with `{draft, path}` as
@@ -125,14 +125,17 @@ response nonce. Maintenance controls also reinitialize after in-place form saves
 
 Flex's Inputfields declare the optional Bridge component contract. Each rendered
 child retains its own component identity and legacy requirements. Flex File/Image
-subclasses opt into native widgets with `Bridge.files.init()` while retaining
-their existing upload transport and persistence. A child that needs the classic
+subclasses declare their borrowed core widget through an
+`AdminThemeBridge::nativeMap` hook (`widget => InputfieldFile` / `InputfieldImage`).
+Bridge writes `data-bridge-widget` beside the subclass's own component identity
+and initializes media on load, AJAX insertion and in-place reload. Flex retains
+its existing upload transport and persistence. A child that needs the classic
 stack, including the current TinyMCE integration, still loads it through Bridge.
 
-Native Bridge support currently requires the proposed public widget APIs in
-[Bridge's `feature/native-widget-apis` branch](https://github.com/phlppschrr/bridge/tree/feature/native-widget-apis).
-They are not part of the unmodified Bridge 0.22.1 release. No Bridge package is
-bundled with Flex. Core admin themes, including AdminThemeUikit, continue to use
+Native Bridge support requires **AdminThemeBridge 0.24.0 or newer**, which provides
+public `Bridge.sortable()` and declarative File/Image widgets. See
+[Bridge's component contract](https://github.com/theoretic/bridge/blob/master/docs/contract.md).
+No Bridge package is bundled with Flex. Core admin themes, including AdminThemeUikit, continue to use
 the classic adapters.
 
 Test native-only pages with CSP and Trusted Types enforcement. Pages that load

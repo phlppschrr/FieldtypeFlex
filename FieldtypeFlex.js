@@ -118,7 +118,6 @@ var FieldtypeFlex;
                 if (FieldtypeFlex.needsLegacy(scope))
                     await window.Bridge?.legacy.load();
                 window.ProcessWireAdminTheme.legacy.initElement(scope);
-                await FieldtypeFlex.classic.initMedia(scope);
                 return;
             }
             const $ = window.jQuery;
@@ -132,14 +131,6 @@ var FieldtypeFlex;
             if (scope.matches('.Inputfield'))
                 inputs.unshift(scope);
             inputs.forEach(input => $(input).trigger('reloaded'));
-        },
-        async initMedia(scope) {
-            if (!FieldtypeFlex.nativeBridge() || window.Bridge?.contract !== '1')
-                return;
-            const fields = FieldtypeFlex.all(scope, '[data-flex-media]');
-            if (scope instanceof HTMLElement && scope.matches('[data-flex-media]'))
-                fields.unshift(scope);
-            await Promise.all(fields.map(field => window.Bridge.files.init(field, FieldtypeFlex.attr(field, 'data-flex-media') === 'image' ? 'image' : 'file')));
         },
         toggle(row, open) {
             if (FieldtypeFlex.nativeBridge() && window.Bridge?.contract === '1') {
@@ -644,9 +635,9 @@ var FieldtypeFlex;
         formError(form, message('inputVarsExceeded', 'This form contains {count} input values, exceeding PHP max_input_vars={max}.').replace('{count}', String(count)).replace('{max}', String(max)), false);
     }, true);
     FieldtypeFlex.classic.preserveSelectorPaths();
-    FieldtypeFlex.ready(() => { FieldtypeFlex.classic.preserveSelectorPaths(); initRows(document); void FieldtypeFlex.classic.initMedia(document); });
-    document.addEventListener('pw-runtime-ready', () => { initRows(document); void FieldtypeFlex.classic.initMedia(document); });
-    FieldtypeFlex.classic.events(scope => { initRows(scope); void FieldtypeFlex.classic.initMedia(scope); }, (row, open) => { syncToggle(row); if (open)
+    FieldtypeFlex.ready(() => { FieldtypeFlex.classic.preserveSelectorPaths(); initRows(document); });
+    document.addEventListener('pw-runtime-ready', () => { initRows(document); });
+    FieldtypeFlex.classic.events(scope => { initRows(scope); }, (row, open) => { syncToggle(row); if (open)
         void loadRow(row); }, scope => {
         FieldtypeFlex.all(scope, 'textarea').forEach(input => {
             const editor = window.tinymce?.get(input.id);

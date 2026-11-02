@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased — Vanilla TypeScript and native Bridge support
+
+- Migrate the admin runtime to vanilla TypeScript with directly shipped JavaScript,
+  a simple build and regression tests. Preserve core admin themes through small
+  adapters for jQuery UI sorting and classic ProcessWire Inputfield APIs.
+- Support native nested Rows, AJAX and media widgets under AdminThemeBridge 0.24.0+
+  through its public sorter and declarative native-map widget registration.
+  Remove the proposed `Bridge.files.init()` integration in favor of the released
+  lifecycle; retain subclass identity, Flex uploads and metadata persistence.
+- Use Bridge's existing CSP/Trusted Types facilities and load the legacy stack
+  only when a child Inputfield needs it, including the current TinyMCE integration.
+
 ## Unreleased — Admin configuration and maintenance
 
 - Add a configurable automatic definitions directory under Modules → Flex.

@@ -33,7 +33,6 @@ namespace FieldtypeFlex {
             if(window.ProcessWireAdminTheme) {
                 if(needsLegacy(scope)) await window.Bridge?.legacy.load();
                 window.ProcessWireAdminTheme.legacy.initElement(scope);
-                await classic.initMedia(scope);
                 return;
             }
             const $ = window.jQuery;
@@ -43,12 +42,6 @@ namespace FieldtypeFlex {
             const inputs = all(scope, '.Inputfield');
             if(scope.matches('.Inputfield')) inputs.unshift(scope);
             inputs.forEach(input => $(input).trigger('reloaded'));
-        },
-        async initMedia(scope: ParentNode): Promise<void> {
-            if(!nativeBridge() || window.Bridge?.contract !== '1') return;
-            const fields = all(scope, '[data-flex-media]');
-            if(scope instanceof HTMLElement && scope.matches('[data-flex-media]')) fields.unshift(scope);
-            await Promise.all(fields.map(field => window.Bridge!.files.init(field, attr(field, 'data-flex-media') === 'image' ? 'image' : 'file')));
         },
         toggle(row: HTMLElement, open: boolean): void {
             if(nativeBridge() && window.Bridge?.contract === '1') {
@@ -156,7 +149,6 @@ namespace FieldtypeFlex {
         contract: string;
         Inputfields: {init(scope: ParentNode): void; open(row: HTMLElement): void; close(row: HTMLElement): void};
         legacy: {loaded(): boolean; load(): Promise<void>};
-        files: {init(field: HTMLElement, kind: 'file' | 'image'): Promise<void>};
         sortable(list: HTMLElement, options: {items: string; handle: string; cancel: string; axis: 'y'; threshold: number; enabled(): boolean; start(row: HTMLElement): void; stop(row: HTMLElement): void}): Promise<() => void>;
         dialog: {close(): void};
         confirm(message: string, callback: () => void): Promise<boolean>;

@@ -24,6 +24,14 @@ foreach($bridgeComponents as $component) {
 	$method = new \ReflectionMethod($component, 'getBridgeComponent');
 	$same(get_class($component), $method->getDeclaringClass()->getName(), $component->className() . ' declares its own native behaviour, without implicit subclass opt-in');
 	if($component instanceof InputfieldFile) {
-		$same($component instanceof InputfieldImage ? 'image' : 'file', $component->wrapAttr('data-flex-media'), 'Media widget selection preserves the real subclass and native component identity');
+		$same(null, $component->wrapAttr('data-flex-media'), 'Media subclasses need no Flex-specific client initialization marker');
+		if($wire->modules->isInstalled('AdminThemeBridge')) {
+			$theme = $wire->modules->get('AdminThemeBridge');
+			if(method_exists($theme, 'borrowedWidget')) {
+				$widget = $component instanceof InputfieldImage ? 'InputfieldImage' : 'InputfieldFile';
+				$same(['kind' => 'field', 'widget' => $widget], $theme->getNativeMap()[$component->className()], 'Flex registers each media subclass in the public native map');
+				$same($widget, $theme->borrowedWidget($component), 'Bridge resolves the declared native media widget');
+			}
+		}
 	}
 }

@@ -216,9 +216,9 @@ namespace FieldtypeFlex {
         formError(form, message('inputVarsExceeded', 'This form contains {count} input values, exceeding PHP max_input_vars={max}.').replace('{count}', String(count)).replace('{max}', String(max)), false);
     }, true);
     classic.preserveSelectorPaths();
-    ready(() => { classic.preserveSelectorPaths(); initRows(document); void classic.initMedia(document); });
-    document.addEventListener('pw-runtime-ready', () => { initRows(document); void classic.initMedia(document); });
-    classic.events(scope => { initRows(scope); void classic.initMedia(scope); }, (row, open) => { syncToggle(row); if(open) void loadRow(row); }, scope => {
+    ready(() => { classic.preserveSelectorPaths(); initRows(document); });
+    document.addEventListener('pw-runtime-ready', () => { initRows(document); });
+    classic.events(scope => { initRows(scope); }, (row, open) => { syncToggle(row); if(open) void loadRow(row); }, scope => {
         all<HTMLTextAreaElement>(scope, 'textarea').forEach(input => {
             const editor = window.tinymce?.get(input.id);
             if(editor) { editor.save(); input.dispatchEvent(new Event('input', {bubbles: true})); }
