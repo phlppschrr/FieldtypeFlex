@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/src/FlexField.php';
 require_once __DIR__ . '/src/FlexFieldDefs.php';
+require_once __DIR__ . '/src/FlexPhpDoc.php';
 require_once __DIR__ . '/src/FlexValue.php';
 require_once __DIR__ . '/src/FlexMarkup.php';
 require_once __DIR__ . '/src/FlexRows.php';
@@ -20,7 +21,10 @@ require_once __DIR__ . '/src/FlexMedia.php';
 
 // Native CLI also discovers metadata/methods without an implements declaration.
 // This is the upstream-recommended compatibility path for cores without CliModule.
-/** Structured ProcessWire values with native inputs, typed rows and owned media. */
+/**
+ * Structured ProcessWire values with native inputs, typed rows and owned media.
+ * @method string getPhpDoc(Field $field) Generate IDE stubs in NullPage context.
+ */
 class FieldtypeFlex extends Fieldtype implements ConfigurableModule, FieldtypeHasFiles, FieldtypeHasPagefiles, FieldtypeHasPageimages {
 	/** Full sort paths carried past core’s two-part field parsing. */
 	private array $flexSortPaths = [];
@@ -112,7 +116,7 @@ class FieldtypeFlex extends Fieldtype implements ConfigurableModule, FieldtypeHa
 	public static function getModuleInfo() {
 		return [
 			'title'    => __('Flex'),
-			'version'  => '0.5.1',
+			'version'  => '0.6.0',
 			'summary'  => __('PHP/JSON-defined compound fields with native inputs and selectors'),
 			'author'   => __('FieldtypeFlex contributors'),
 			'href'     => 'https://github.com/phlppschrr/FieldtypeFlex',
@@ -1279,7 +1283,20 @@ class FieldtypeFlex extends Fieldtype implements ConfigurableModule, FieldtypeHa
 	}
 
 	/**
-	 * Build native field settings with a compact source summary and optional structure.
+	 * Generate IDE-only PHPDoc class stubs using the field's NullPage definitions.
+	 *
+	 * Hook after this method to customize the returned PHP or save it to a helper file.
+	 * Generated classes must not be loaded at runtime.
+	 *
+	 * @param Field $field Owning Flex field.
+	 * @return string Complete PHP helper source, including the opening tag and namespace.
+	 */
+	public function ___getPhpDoc(Field $field): string {
+		return FlexPhpDoc::render($field, $this->getDefinitions($field));
+	}
+
+	/**
+	 * Build native field settings with a source summary and optional PHPDoc stubs.
 	 * @param Field $field Owning Flex field.
 	 * @return InputfieldWrapper
 	 */
@@ -1295,7 +1312,7 @@ class FieldtypeFlex extends Fieldtype implements ConfigurableModule, FieldtypeHa
 		$status = $modules->get('InputfieldMarkup');
 		$status->name = 'flexDefinitionStatus';
 		$status->label = $this->_('Active source');
-		$status->description = $this->_('Source and structure reflect saved settings, evaluated without a specific page. Page-dependent definitions may differ.');
+		$status->description = $this->_('Source and PHPDoc reflect saved settings, evaluated without a specific page. Page-dependent definitions may differ.');
 		$sourceOrigin = $source['origin'] === 'automatic'
 			? $this->_('Automatic')
 			: $this->_('Configured');
@@ -1305,9 +1322,9 @@ class FieldtypeFlex extends Fieldtype implements ConfigurableModule, FieldtypeHa
 			default => $this->_('No definition yet.'),
 		};
 		$html = '<p>' . $escape($sourceText) . '</p>';
-		$defs = null;
+		$phpdocSource = null;
 		try {
-			$defs = $this->getDefinitions($field);
+			$phpdocSource = $this->getPhpDoc($field);
 		} catch(FlexDefinitionException $error) {
 			$this->logDefinitionError($this->wire()->pages->newNullPage(), $field, $error);
 			$html .= '<p class="notice-error">' . $escape($this->wire()->sanitizer->unentities($error->getMessage())) . '</p>';
@@ -1343,35 +1360,6 @@ class FieldtypeFlex extends Fieldtype implements ConfigurableModule, FieldtypeHa
 		$group->add($json);
 		$wrapper->add($group);
 
-		if($defs && $source['kind'] !== 'missing') {
-			$structure = $modules->get('InputfieldMarkup');
-			$structure->name = 'flexStructure';
-			$structure->label = $this->_('Structure');
-			$structure->collapsed = Inputfield::collapsedYes;
-			$lines = [];
-			$walk = function(array $nodes, int $depth = 0) use (&$walk, &$lines): void {
-				foreach($nodes as $node) {
-					$kind = match($node['kind']) {
-						'fieldset' => $this->_('Fieldset'),
-						'rows' => $this->_('Repeatable set'),
-						'row-type' => $this->_('Row type'),
-						default => $node['type'],
-					};
-					$line = str_repeat('  ', $depth) . $node['name'] . ' — ' . $kind;
-					if($node['required']) {
-						$line .= ' · ' . $this->_('required');
-					}
-					if($node['useLanguages']) {
-						$line .= ' · ' . $this->_('multilingual');
-					}
-					$lines[] = $line;
-					$walk($node['children'], $depth + 1);
-				}
-			};
-			$walk($defs->structure());
-			$structure->value = '<pre>' . $escape(implode("\n", $lines) ?: $this->_('This definition has no properties.')) . '</pre>';
-			$wrapper->add($structure);
-		}
 		$hide = $modules->get('InputfieldCheckbox');
 		$hide->name = 'flexHideWrap';
 		$hide->label = $this->_('Hide outer field label');
@@ -1380,6 +1368,23 @@ class FieldtypeFlex extends Fieldtype implements ConfigurableModule, FieldtypeHa
 		$hide->uncheckedValue = 0;
 		$wrapper->add($hide);
 		(new FlexMaintenanceAdmin($this))->addInput($wrapper, $field);
+		if($phpdocSource !== null && $source['kind'] !== 'missing') {
+			$phpdoc = $modules->get('InputfieldMarkup');
+			$phpdoc->name = 'flexPhpDoc';
+			$phpdoc->label = 'PHPDoc';
+			$phpdoc->description = $this->_('These helpers describe the NullPage definition for your IDE. Keep them out of runtime loading. Types cover formatted and unformatted reads; page-dependent definitions may differ.');
+			$phpdoc->collapsed = Inputfield::collapsedYes;
+			$rootClass = preg_match('/^class (\w+) extends FlexValue\b/m', $phpdocSource, $match) ? $match[1] : 'FlexValue';
+			$variable = '$' . $field->name;
+			$readCode = '/** @var ' . $rootClass . ' ' . $variable . ' */' . "\n" . $variable . " = \$page->get('" . $field->name . "');";
+			$steps = '<ol><li><p>' . $escape($this->_('Save the following helper classes in a PHP file indexed by your IDE:')) . '</p><pre><code>' . $escape($phpdocSource) . '</code></pre></li>';
+			$steps .= '<li><p>' . $escape($this->_('Assign the field value and declare its type for code completion:')) . '</p><pre><code>' . $escape($readCode) . '</code></pre></li>';
+			if(preg_match('/^ \* @property \S+ \$(\w+)/m', $phpdocSource, $match)) {
+				$steps .= '<li><p>' . $escape($this->_('Use the typed variable to access a defined property:')) . '</p><pre><code>' . $escape('$value = ' . $variable . '->' . $match[1] . ';') . '</code></pre></li>';
+			}
+			$phpdoc->value = $steps . '</ol>';
+			$wrapper->add($phpdoc);
+		}
 		$help = $modules->get('InputfieldMarkup');
 		$help->value = '<p><a href="https://github.com/phlppschrr/FieldtypeFlex/blob/main/README.md">' . $escape($this->_('Documentation and examples')) . '</a></p>';
 		$wrapper->add($help);

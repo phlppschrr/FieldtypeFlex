@@ -582,6 +582,10 @@ These configure the whole Flex Field:
 
 Database JSON depth and PHP/resource limits still apply with budgets disabled.
 
+### PHPDoc class stubs
+
+The Details tab provides PHPDoc helpers evaluated with `NullPage`. Use hookable `FieldtypeFlex::getPhpDoc(Field $field): string` for custom exports; generated classes are for IDE use only.
+
 ## Maintenance APIs
 
 Ordinary field saves, metadata updates, cloning and deletion maintain canonical data, selector projections and media ownership automatically. No routine rebuild or collector calls are needed.

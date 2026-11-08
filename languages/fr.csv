@@ -20,11 +20,6 @@ Display the child inputs without the Flex heading.,Afficher les champs enfants s
 Automatic,Automatique,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,086247a9b57fde6eefee2a0c4752242d
 Configured,Configuré,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,61aa63eb3ac1c3408640463ee5fe8aa3
 Active source,Source active,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,a51bbd65445cff414616dbd04c2c34d2
-Fieldset,Groupe de champs,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,5b3a50aadfa94048d38820473b25ec57
-Repeatable set,Collection répétable,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,6a60d9d10d4516bf9988133d12619b7f
-Row type,Type de ligne,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,6f524ce004ca3d42571f5690b27ae756
-required,obligatoire,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,ac67ede5a84eb5a1add7ff4440e9a485
-multilingual,multilingue,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,39b54e52b6cb2f51165f2736030781ed
 Technical cause,Cause technique,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,4c8af2ac03d1b81d0c74cc24a234c5c6
 Flex,Flex,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,09d2bd168181f1e64c2b1651a80a8aa8
 PHP/JSON-defined compound fields with native inputs and selectors,Champs composés définis en PHP/JSON avec champs de saisie et sélecteurs natifs,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,9560bda478132dee41d442a929c0db97
@@ -315,9 +310,6 @@ No definition yet.,Aucune définition pour le moment.,,site/modules/FieldtypeFle
 Optional PHP/JSON path relative to site/templates. Leave blank for automatic lookup or inline JSON.,Chemin PHP/JSON facultatif relatif à site/templates. Laissez vide pour la recherche automatique ou le JSON intégré.,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,e7bd488eafeb1f8905e3dad23a981090
 Override definition file,Fichier de définition spécifique,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,39877271362e79c9d6c11012eff6aad5
 Relative to site/templates. Automatic definitions use FIELD.php or FIELD.json in this directory.,Relatif à site/templates. Les définitions automatiques utilisent CHAMP.php ou CHAMP.json dans ce répertoire.,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,a4972a9a9fd8e79f26a826e43cf35333
-"Source and structure reflect saved settings, evaluated without a specific page. Page-dependent definitions may differ.","La source et la structure reflètent les réglages enregistrés, évalués sans page spécifique. Les définitions dépendant de la page peuvent différer.",,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,fbd14b99978bcd1e424dba474a1f3175
-Structure,Structure,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,dc4c71563b9bc39a65be853457e6b7b6
-This definition has no properties.,Cette définition ne contient aucune propriété.,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,915b63179e11ac55bfc0d8deb096c825
 This directory does not exist yet. No directory or files will be created.,Ce répertoire n’existe pas encore. Aucun répertoire ni fichier ne sera créé.,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,e7e860b5096ce0abfe03391717eba1af
 The definition file is not readable.,Le fichier de définition n’est pas lisible.,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,81b8379cfbe55d5acfded4644284b94a
 The definitions directory must resolve inside site/templates.,Le répertoire des définitions doit se trouver dans site/templates.,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,c7f602e7732f380dc536bdefb9207d55
@@ -340,3 +332,8 @@ Invalid stored object envelope,Structure d’objet stockée non valide,,site/mod
 Invalid stored object envelope,Structure d’objet stockée non valide,,site/modules/FieldtypeFlex/src/FlexMaintenance.php,7daa26f98654d383bec9a7ba3ebb5291
 Unknown object property,Propriété d’objet inconnue,,site/modules/FieldtypeFlex/src/FlexQuery.php,ffc24754af6b0c65a53330da804c161c
 Invalid retained Flex object,Objet Flex conservé non valide,,site/modules/FieldtypeFlex/src/FlexPath.php,5e57fdb11b51b32f54dace15821d3508
+"Source and PHPDoc reflect saved settings, evaluated without a specific page. Page-dependent definitions may differ.","La source et le PHPDoc reflètent les réglages enregistrés, évalués sans page spécifique. Les définitions dépendant de la page peuvent différer.",,"site/modules/FieldtypeFlex/FieldtypeFlex.module.php","6948d0da713cc8575f77b81e8bef6105"
+These helpers describe the NullPage definition for your IDE. Keep them out of runtime loading. Types cover formatted and unformatted reads; page-dependent definitions may differ.,Ces classes décrivent la définition NullPage pour votre IDE. Ne les chargez pas à l’exécution. Les types couvrent les lectures formatées et non formatées ; les définitions dépendant de la page peuvent différer.,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,d26b91284c6a7263548527dcc7d34abd
+Save the following helper classes in a PHP file indexed by your IDE:,Enregistrez les classes suivantes dans un fichier PHP indexé par votre IDE :,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,b254fe6590921f51abcbecedc9b038d3
+Assign the field value and declare its type for code completion:,Affectez la valeur du champ à une variable et indiquez son type pour la complétion du code :,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,5ff8a42e1fb8d65c24127533fc1438a5
+Use the typed variable to access a defined property:,Utilisez la variable typée pour accéder à une propriété définie :,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,90bae5ce77636dedf41290dc4f3e7e7e

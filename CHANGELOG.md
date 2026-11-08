@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.0 — 2026-11-08
+
+- Add PHPDoc class stubs and usage examples to field settings, with a hookable `getPhpDoc()` API for custom exports.
+
 ## 0.5.1 — 2026-11-02
 
 - Fix double application of textformatters to formatted Language Alternate values.
