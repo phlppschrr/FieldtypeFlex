@@ -243,10 +243,8 @@ Row type children must be definitions or a wrapper,children eines Row-Typs muss 
 "Invalid Textformatter module on ""%s"": %s","Ungültiges Textformatter-Modul für ""%s"": %s",,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,08ebbc5c5c0b5b714b58769305f53b30
 Unsupported Flex Page-reference target field,Nicht unterstütztes Zielfeld für Flex-Seitenreferenz,,site/modules/FieldtypeFlex/src/FlexQuery.php,77799ded8d22a3401149fcec83eb7dd2
 Flex Page-reference traversal does not support selector negation or grouping,Die Traversierung von Flex-Seitenreferenzen unterstützt keine Selektor-Negation oder Gruppierung,,site/modules/FieldtypeFlex/src/FlexQuery.php,12e59af690ae1161240003aaa61371bc
-Data maintenance,Datenpflege,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,00527b2473e61f0aeb5f86275b587376
 Potentially orphaned does not mean safe to delete. Dynamic definitions may intentionally omit properties.,Potenziell verwaist bedeutet nicht gefahrlos löschbar. Dynamische Definitionen können Properties absichtlich auslassen.,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,13e96ebd8ecdc2f8db1326245592bfcb
 Checked pages,Geprüfte Seiten,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,b61d50b9f475d78d01a11e5803d838b7
-Renames,Umbenennungen,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,9c2485a66f064c8690e791958c4d36ae
 Conflicts and errors,Konflikte und Fehler,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,ee4c6264371befc21ad3f53efb44c079
 Old path,Alter Pfad,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,39cebb6e9507b2bf937ee5024fca1819
 Affected pages,Betroffene Seiten,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,90ad095b30dc0896c1843ba661df070e
@@ -337,3 +335,4 @@ These helpers describe the NullPage definition for your IDE. Keep them out of ru
 Save the following helper classes in a PHP file indexed by your IDE:,"Speichern Sie die folgenden Hilfsklassen in einer PHP-Datei, die Ihre IDE indexiert:",,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,b254fe6590921f51abcbecedc9b038d3
 Assign the field value and declare its type for code completion:,Weisen Sie den Feldwert einer Variablen zu und geben Sie deren Typ für die Code-Vervollständigung an:,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,5ff8a42e1fb8d65c24127533fc1438a5
 Use the typed variable to access a defined property:,Greifen Sie über die typisierte Variable auf eine definierte Eigenschaft zu:,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,90bae5ce77636dedf41290dc4f3e7e7e
+Apply property renames,Umbenennungen von Eigenschaften anwenden,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,c2fb535f301536cca99441a6a3f852a8

@@ -238,8 +238,9 @@ if(interface_exists(CliModule::class)) {
 
 // Execute every published CLI example against the owned field and Page fixture.
 $api = file_get_contents(dirname(__DIR__, 2) . '/API.md');
-preg_match('/### Native CLI\n(.*?)### Field configuration/s', $api, $chapter);
+$same(1, preg_match('/^### Native CLI[^\n]*\n(.*?)(?=^#{1,3} |\z)/ms', $api, $chapter), 'published native CLI chapter is found');
 preg_match_all('/^php index\.php flex (.+)$/m', $chapter[1], $examples);
+$same(9, count($examples[1]), 'all published CLI examples are exercised');
 foreach($examples[1] as $example) {
 	$args = explode(' ', str_replace(['content', '1234'], [$maintenance->name, (string) $page->id], $example));
 	[$code] = $invoke($args);

@@ -6,7 +6,7 @@ FieldtypeFlex lets you define structured content in PHP or JSON and edit it usin
 
 Use it for anything from a simple group of properties to nested content blocks with different types, images and Page references. Values are accessible through the familiar ProcessWire API and can be queried with selectors.
 
-**Version:** 0.6.0
+**Version:** 0.6.1
 
 https://github.com/user-attachments/assets/eb40e7a9-d51c-47b3-b798-db6acb97651a
 

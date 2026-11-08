@@ -116,7 +116,7 @@ class FieldtypeFlex extends Fieldtype implements ConfigurableModule, FieldtypeHa
 	public static function getModuleInfo() {
 		return [
 			'title'    => __('Flex'),
-			'version'  => '0.6.0',
+			'version'  => '0.6.1',
 			'summary'  => __('PHP/JSON-defined compound fields with native inputs and selectors'),
 			'author'   => __('FieldtypeFlex contributors'),
 			'href'     => 'https://github.com/phlppschrr/FieldtypeFlex',
@@ -180,6 +180,12 @@ class FieldtypeFlex extends Fieldtype implements ConfigurableModule, FieldtypeHa
 			}
 			$this->wire()->config->js('FieldtypeFlexSelectorFields', $names);
 			$this->wire()->config->scripts->add($this->wire()->config->urls->get('FieldtypeFlex') . 'FieldtypeFlex.js');
+		});
+		$this->addHookAfter('ProcessField::buildEditFormActions', function(HookEvent $event) {
+			$field = $event->object->getField();
+			if($field instanceof Field && $field->type instanceof self && $event->return instanceof InputfieldWrapper) {
+				(new FlexMaintenanceAdmin($this))->addInput($event->return, $field);
+			}
 		});
 		$this->addHookBefore('ProcessField::executeEdit', function() {
 			(new FlexMaintenanceAdmin($this))->dispatch();
@@ -1367,7 +1373,6 @@ class FieldtypeFlex extends Fieldtype implements ConfigurableModule, FieldtypeHa
 		$hide->checked((bool) $field->flexHideWrap);
 		$hide->uncheckedValue = 0;
 		$wrapper->add($hide);
-		(new FlexMaintenanceAdmin($this))->addInput($wrapper, $field);
 		if($phpdocSource !== null && $source['kind'] !== 'missing') {
 			$phpdoc = $modules->get('InputfieldMarkup');
 			$phpdoc->name = 'flexPhpDoc';
