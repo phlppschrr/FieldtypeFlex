@@ -321,13 +321,41 @@ try {
 // Configuration rendering does not migrate data, exposes no prune switch and is superuser-only.
 $before = $store->persisted($page, $maintenance);
 $config = $type->getConfigInputfields($maintenance);
-$assert($config->getChildByName('flexMaintenance') instanceof InputfieldFieldset, 'superuser gets collapsed native maintenance fieldset');
+$same(null, $config->getChildByName('flexMaintenanceRenames'), 'Details excludes maintenance actions');
+$same(null, $config->getChildByName('flexMaintenanceCleanup'), 'Details excludes cleanup actions');
 $same(null, $config->getChildByName('flexPrune'), 'prune is no longer a field configuration option');
-$same(FlexStorage::revision($before), FlexStorage::revision($store->persisted($page, $maintenance)), 'config rendering never performs a migration');
+$process = $wire->modules->get('ProcessField');
+$processField = new \ReflectionProperty($process, 'field');
+$previousField = $processField->getValue($process);
+try {
+	$processField->setValue($process, $maintenance);
+	$actions = $process->buildEditFormActions($wire->wire(new InputfieldForm()));
+	foreach(['flexMaintenanceRenames' => 'exchange', 'flexMaintenanceCleanup' => 'eraser'] as $name => $icon) {
+		$action = $actions->getChildByName($name);
+		$assert($action instanceof InputfieldMarkup, 'native Actions tab contains ' . $name);
+		$same(Inputfield::collapsedYes, $action->collapsed, 'maintenance action uses native collapsed section');
+		$same($icon, $action->icon, 'maintenance action has a native icon');
+		$assert($action->description !== '', 'maintenance action has a native description');
+	}
+	$html = $actions->render();
+	$document = new \DOMDocument();
+	$document->loadHTML($html, LIBXML_NOERROR | LIBXML_NOWARNING);
+	$xpath = new \DOMXPath($document);
+	$same(1, $xpath->query('//button[@data-flex-maintenance="rename" and @type="button"]')->length, 'native rename button preserves its explicit non-submit action');
+	$same(1, $xpath->query('//button[@data-flex-maintenance="applyRename" and @hidden and @disabled]')->length, 'native apply button stays hidden and disabled until preview');
+	$same('delete', $actions->children()->last()->name, 'native field deletion remains the final action');
+	$processField->setValue($process, $sourceField);
+	$same(null, $process->buildEditFormActions($wire->wire(new InputfieldForm()))->getChildByName('flexMaintenanceRenames'), 'non-Flex field Actions receive no Flex maintenance controls');
+} finally {
+	$processField->setValue($process, $previousField);
+}
+$same(FlexStorage::revision($before), FlexStorage::revision($store->persisted($page, $maintenance)), 'rendering Details and Actions never performs a migration');
 $userBefore = $wire->user;
 try {
 	$wire->users->setCurrentUser($wire->users->getGuestUser());
-	$assert(!$type->getConfigInputfields($maintenance)->getChildByName('flexMaintenance'), 'maintenance controls are unavailable to non-superusers');
+	$guestActions = $wire->wire(new InputfieldWrapper());
+	(new FlexMaintenanceAdmin($type))->addInput($guestActions, $maintenance);
+	$same(0, count($guestActions), 'maintenance controls are unavailable to non-superusers');
 } finally { $wire->users->setCurrentUser($userBefore); }
 
 // Exercise the real core dispatcher, not only the thin PHP adapter.

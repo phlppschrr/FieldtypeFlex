@@ -8,6 +8,10 @@ FieldtypeFlex uses a disposable ProcessWire installation under .dev/pw. The modu
 - PHP and database versions provided by the configured DDEV project
 - Network access for the first fixture setup to fetch the pinned ProcessWire core and development tools
 
+The DDEV container has no usable Git metadata. Its `COMPOSER_ROOT_VERSION=dev-main`
+setting identifies the development root package for Composer without changing module
+release metadata or adding a maintained `version` field to composer.json.
+
 No personal AgentTools configuration or provider API credentials are required for setup or testing.
 
 ## Setup and checks
@@ -234,6 +238,8 @@ Unrounded Float parity uses native `colType=double` to avoid SQL FLOAT precision
 loss; this does not change Flex's canonical storage.
 
 ## Data maintenance verification
+
+Field → Actions contains separate collapsed sections for property renames and unknown-property cleanup. Both use native Inputfields and buttons; scans and apply operations remain explicit, CSRF-protected requests.
 
 `ddev flex-test maintenance` tests the shared raw data path, typed rename/cleanup,
 preview revisions, atomic projections and media ownership. Keep API, CLI and Admin

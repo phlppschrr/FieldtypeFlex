@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Move rename and cleanup tools to individual native sections in the field Actions tab.
+- Restore execution of documented CLI examples in integration tests and configure the DDEV Composer root version.
+
 ## 0.6.0 — 2026-11-08
 
 - Add PHPDoc class stubs and usage examples to field settings, with a hookable `getPhpDoc()` API for custom exports.

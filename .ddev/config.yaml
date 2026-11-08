@@ -11,7 +11,9 @@ database:
     version: "10.11"
 use_dns_when_possible: true
 composer_version: "2"
-web_environment: []
+# This fixture has no Git metadata inside the container.
+web_environment:
+    - COMPOSER_ROOT_VERSION=dev-main
 nodejs_version: "24"
 corepack_enable: false
 

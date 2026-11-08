@@ -624,7 +624,7 @@ $result = $type->cleanupProperties($field, $paths, $cleanup, true); // Explicit 
 
 Results include `checked`, `changed`, `unchanged`, `wouldChange`, `properties`, `renames`, `conflicts`, `errors`, opaque `pages` preview tokens and cursors. Continue successful incomplete batches using `lastPageId`; repair failures and resume from `resumeAfterPageId` (`retryPageIds` identifies failures). `complete` means the selected range was exhausted; `finished` additionally requires success (and no skipped checks for diagnostics). Scans are not global snapshots. Before removing `renamedFrom`, complete all batches and repeat a successful scan from zero with no pending renames.
 
-Superusers can preview/apply renames and selected cleanup under **Field → Details → Data maintenance**. Changing cleanup paths invalidates the preview. Ordinary configuration saves never migrate data.
+Superusers can preview/apply renames and selected cleanup under **Field → Actions**, in the **Apply property renames** and **Remove unknown properties** sections. Changing cleanup paths invalidates the preview. Ordinary configuration saves never migrate data.
 
 ### Native CLI and consistency checks
 

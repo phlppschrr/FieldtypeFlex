@@ -14,11 +14,6 @@ final class FlexMaintenanceAdmin extends Wire {
 	public function addInput(InputfieldWrapper $wrapper, Field $field): void {
 		if(!$field->id || !$this->wire()->user->isSuperuser()) return;
 		$modules = $this->wire()->modules;
-		$group = $modules->get('InputfieldFieldset');
-		$group->name = 'flexMaintenance';
-		$group->label = $this->_('Data maintenance');
-		$group->collapsed = Inputfield::collapsedYes;
-		$input = $modules->get('InputfieldMarkup');
 		$escape = fn($text) => $this->wire()->sanitizer->entities($text);
 		$messages = [
 			'checked' => $this->_('Checked pages'),
@@ -42,26 +37,45 @@ final class FlexMaintenanceAdmin extends Wire {
 			'noOrphans' => $this->_('No unknown properties found.'),
 			'noRenames' => $this->_('No pending renames remain in this complete scan. The checked renamedFrom attributes can now be removed.'),
 		];
-		$button = static function(string $action, string $label, bool $hidden = false) use ($escape): string {
-			return '<button type="button" class="ui-button" data-flex-maintenance="' . $action . '"' . ($hidden ? ' hidden disabled' : '') . '>' . $escape($label) . '</button> ';
+		$button = static function(string $action, string $label, bool $hidden = false) use ($modules): string {
+			$input = $modules->get('InputfieldButton');
+			$input->name = 'flexMaintenance_' . $action;
+			$input->value = $label;
+			$input->attr('data-flex-maintenance', $action);
+			if($hidden) $input->attr(['hidden' => 'hidden', 'disabled' => 'disabled']);
+			return $input->render() . ' ';
 		};
 		$report = '<p class="FlexMaintenanceProgress" role="status" aria-live="polite"></p><div class="FlexMaintenanceReport"></div>';
-		$input->label = '';
-		$input->value = '<div class="FlexMaintenance" data-field="' . (int) $field->id . '" data-messages="' . $escape(json_encode($messages, JSON_THROW_ON_ERROR)) . '">'
-			. '<section class="FlexMaintenanceTask"><h3>' . $escape($this->_('Renames')) . '</h3>'
-			. '<p>' . $escape($this->_('Check stored values against renamedFrom before applying renames.')) . '</p><p>'
-			. $button('rename', $this->_('Check renames'))
-			. $button('applyRename', $this->_('Apply checked renames'), true)
-			. '</p>' . $report . '</section>'
-			. '<section class="FlexMaintenanceTask"><h3>' . $escape($this->_('Remove unknown properties')) . '</h3>'
-			. '<p>' . $escape($this->_('Potentially orphaned does not mean safe to delete. Dynamic definitions may intentionally omit properties.')) . '</p><p>'
-			. $button('orphans', $this->_('Find unknown properties')) . '</p><div class="FlexMaintenancePaths"></div><p>'
-			. $button('cleanup', $this->_('Check selection'), true)
-			. $button('applyCleanup', $this->_('Remove selected properties'), true)
-			. '</p>' . $report . '</section></div>';
-
-		$group->add($input);
-		$wrapper->add($group);
+		$tasks = [
+			'flexMaintenanceRenames' => [
+				'label' => $this->_('Apply property renames'),
+				'icon' => 'exchange',
+				'description' => $this->_('Check stored values against renamedFrom before applying renames.'),
+				'value' => '<p>' . $button('rename', $this->_('Check renames'))
+					. $button('applyRename', $this->_('Apply checked renames'), true) . '</p>' . $report,
+			],
+			'flexMaintenanceCleanup' => [
+				'label' => $this->_('Remove unknown properties'),
+				'icon' => 'eraser',
+				'description' => $this->_('Potentially orphaned does not mean safe to delete. Dynamic definitions may intentionally omit properties.'),
+				'value' => '<p>' . $button('orphans', $this->_('Find unknown properties')) . '</p><div class="FlexMaintenancePaths"></div><p>'
+					. $button('cleanup', $this->_('Check selection'), true)
+					. $button('applyCleanup', $this->_('Remove selected properties'), true) . '</p>' . $report,
+			],
+		];
+		foreach($tasks as $name => $task) {
+			$input = $modules->get('InputfieldMarkup');
+			$input->name = $name;
+			$input->label = $task['label'];
+			$input->icon = $task['icon'];
+			$input->description = $task['description'];
+			$input->collapsed = Inputfield::collapsedYes;
+			$input->value = '<div class="FlexMaintenance" data-field="' . (int) $field->id . '" data-messages="' . $escape(json_encode($messages, JSON_THROW_ON_ERROR)) . '">'
+				. '<section class="FlexMaintenanceTask">' . $task['value'] . '</section></div>';
+			$delete = $wrapper->getChildByName('delete');
+			if($delete) $wrapper->insertBefore($input, $delete);
+			else $wrapper->add($input);
+		}
 		$this->wire()->config->scripts->add($this->wire()->config->urls->get('FieldtypeFlex') . 'FlexMaintenance.js');
 		$this->wire()->config->styles->add($this->wire()->config->urls->get('FieldtypeFlex') . 'FieldtypeFlex.css');
 	}
