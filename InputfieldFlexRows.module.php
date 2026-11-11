@@ -25,7 +25,7 @@ class InputfieldFlexRows extends Inputfield implements BridgeComponent {
 	public static function getModuleInfo() {
 		return [
 			'title'    => __('Flex rows'),
-			'version'  => '0.6.1',
+			'version'  => '0.7.0',
 			'summary'  => __('Repeatable native inputs inside Flex'),
 			'requires' => 'FieldtypeFlex',
 		];
@@ -244,6 +244,7 @@ class InputfieldFlexRows extends Inputfield implements BridgeComponent {
 	 * @return string
 	 */
 	public function renderRow(FlexRow $row, int $number = 1, bool $isNew = false, bool $forceLoad = false): string {
+		if(isset($this->definition['settings']['_flexTable'])) return $this->renderTableRow($row);
 		$id = $row->rowId();
 		$removed = isset($this->removedRows[$id]);
 		$inputs = $this->rowInputs[$id] ?? null;
@@ -290,21 +291,7 @@ class InputfieldFlexRows extends Inputfield implements BridgeComponent {
 			}
 		}
 		$bodyId = 'flex_row_' . $this->name . '__' . $id;
-		$hideLabel = $this->_('Hide item');
-		$showLabel = $this->_('Show item');
-		$removeLabel = $this->_('Remove');
-		$undoLabel = $this->_('Undo removal');
-		$buttons = '';
-		foreach([
-			'duplicate' => ['copy', $this->_('Duplicate')],
-			'visibility' => [$row->isHidden() ? 'eye-slash' : 'eye', $row->isHidden() ? $showLabel : $hideLabel],
-			'remove' => ['trash-o', $removed ? $undoLabel : $removeLabel],
-		] as $action => [$icon, $actionLabel]) {
-			$state = '';
-			if($action === 'remove') $state = ' aria-pressed="' . ($removed ? 'true' : 'false') . '" data-flex-remove-label="' . $entities($removeLabel) . '" data-flex-undo-label="' . $entities($undoLabel) . '"';
-			if($action === 'visibility') $state = ' aria-pressed="' . ($row->isHidden() ? 'true' : 'false') . '" data-flex-hide-label="' . $entities($hideLabel) . '" data-flex-show-label="' . $entities($showLabel) . '"';
-			$buttons .= '<button type="button" class="flex-row-action" data-flex-row-action="' . $action . '" title="' . $entities($actionLabel) . '" aria-label="' . $entities($actionLabel) . '"' . $state . '><i class="fa fa-fw fa-' . $icon . '" aria-hidden="true"></i></button>';
-		}
+		$buttons = $this->rowActions($row, $removed);
 		$sortLabel = $entities($this->_('Drag to reorder; use Up and Down arrow keys when focused'));
 		if($loaded) {
 			$body = $inputs->render();
@@ -323,6 +310,95 @@ class InputfieldFlexRows extends Inputfield implements BridgeComponent {
 			'<button type="button" class="flex-row-toggle" aria-controls="' . $entities($bodyId) . '" aria-expanded="' . ($collapsed ? 'false' : 'true') . '"><span class="flex-row-label"><span class="flex-row-title">' . $label . '</span></span><i class="fa fa-fw fa-angle-down flex-row-chevron" aria-hidden="true"></i></button>' .
 			'<span class="flex-row-controls">' . $buttons . '</span></div></div>' .
 			'<div class="InputfieldContent flex-row-content" id="' . $entities($bodyId) . '">' . $body . '</div></li>';
+	}
+
+	/** Shared actions for cards and table rows. */
+	private function rowActions(FlexRow $row, bool $removed): string {
+		$entities = fn($value) => $this->wire()->sanitizer->entities((string) $value);
+		$hideLabel = $this->_('Hide item');
+		$showLabel = $this->_('Show item');
+		$removeLabel = $this->_('Remove');
+		$undoLabel = $this->_('Undo removal');
+		$buttons = '';
+		foreach([
+			'duplicate' => ['copy', $this->_('Duplicate')],
+			'visibility' => [$row->isHidden() ? 'eye-slash' : 'eye', $row->isHidden() ? $showLabel : $hideLabel],
+			'remove' => ['trash-o', $removed ? $undoLabel : $removeLabel],
+		] as $action => [$icon, $actionLabel]) {
+			$state = '';
+			if($action === 'remove') $state = ' aria-pressed="' . ($removed ? 'true' : 'false') . '" data-flex-remove-label="' . $entities($removeLabel) . '" data-flex-undo-label="' . $entities($undoLabel) . '"';
+			if($action === 'visibility') $state = ' aria-pressed="' . ($row->isHidden() ? 'true' : 'false') . '" data-flex-hide-label="' . $entities($hideLabel) . '" data-flex-show-label="' . $entities($showLabel) . '"';
+			$buttons .= '<button type="button" class="flex-row-action" data-flex-row-action="' . $action . '" title="' . $entities($actionLabel) . '" aria-label="' . $entities($actionLabel) . '"' . $state . '><i class="fa fa-fw fa-' . $icon . '" aria-hidden="true"></i></button>';
+		}
+		return $buttons;
+	}
+
+	/** Render a native cell without changing global markup or its processing parent. */
+	private function tableCell(Inputfield $input, bool $readOnly = false): string {
+		$parent = $input->parent;
+		$wrapper = $this->wire(new InputfieldWrapper());
+		$input->addClass('flex-table-input', 'wrapClass');
+		if(!$readOnly && ($input instanceof InputfieldText || $input instanceof InputfieldInteger)) {
+			$input->addClass('flex-table-text', 'wrapClass');
+		}
+		$wrapper->add($input);
+		try {
+			return $readOnly ? $wrapper->renderValue() : $wrapper->render();
+		} finally {
+			$input->setParent($parent);
+		}
+	}
+
+	/** Only presentation differs; row processing and draft identities stay shared. */
+	private function renderTableRow(FlexRow $row, bool $readOnly = false): string {
+		$entities = fn($value) => $this->wire()->sanitizer->entities((string) $value);
+		$id = $row->rowId();
+		$removed = isset($this->removedRows[$id]);
+		$inputs = $this->inputsFor($row);
+		$prefix = FlexPath::inputPrefix($this->flexInputName ?: $this->name, $row->address());
+		$table = $this->definition['settings']['_flexTable'];
+		$cells = '';
+		foreach($table['columns'] as $name) {
+			$tag = $name === 'row_label' ? 'th' : 'td';
+			$input = $inputs->getChildByName($prefix . $name);
+			$cells .= '<' . $tag . ' class="flex-table-cell"' . ($tag === 'th' ? ' scope="row"' : '') . '>' . $this->tableCell($input, $readOnly) . '</' . $tag . '>';
+		}
+		if($readOnly) return '<tr>' . $cells . '</tr>';
+		$sortLabel = $entities($this->_('Drag to reorder; use Up and Down arrow keys when focused'));
+		$transport = '';
+		foreach(['remove' => $removed, 'hidden' => $row->isHidden()] as $control => $state) {
+			$transport .= '<input type="hidden" class="flex-row-' . $control . '-value" name="' . $entities(FlexPath::controlName($this->flexInputName ?: $this->name, $row->address(), $control)) . '" value="' . ($state ? '1' : '0') . '">';
+		}
+		return '<tr class="flex-row' . ($row->isHidden() ? ' flex-row-hidden' : '') . ($removed ? ' flex-row-remove-pending' : '') . '" data-flex-row="' . $id . '" data-flex-type="' . $entities($row->rowType()) . '">' . $cells .
+			'<td class="flex-row-header flex-table-actions"><div class="flex-row-controls"><button type="button" class="flex-row-sort" title="' . $sortLabel . '" aria-label="' . $sortLabel . '"><i class="fa fa-fw fa-arrows" aria-hidden="true"></i></button>' . $this->rowActions($row, $removed) . '</div><span class="flex-row-transport">' . $transport . '</span></td></tr>';
+	}
+
+	/** Headers use the same prepared inputs as normal Object form processing. */
+	private function renderTable(string $rows, bool $readOnly = false): string {
+		$entities = fn($value) => $this->wire()->sanitizer->entities((string) $value);
+		$table = $this->definition['settings']['_flexTable'];
+		$headers = $this->flexTableHeaders;
+		$head = '';
+		$cols = '';
+		foreach($table['columns'] as $name) {
+			$width = $table['widths'][$name] ?? '';
+			$cols .= '<col' . ($width !== '' ? ' style="width:' . $entities($width) . '"' : '') . '>';
+			if($headers instanceof InputfieldWrapper) {
+				$input = $headers->getChildByName($headers->flexObjectPrefix . $name);
+				$text = $this->tableCell($input, $readOnly);
+			} else {
+				$input = $this->definition['types']['row']['schema']->getPropertyInputfield($name);
+				$language = $this->wire()->user->language;
+				$text = $entities(($language && !$language->isDefault() ? $input->get('label' . $language->id) : '') ?: $input->label);
+			}
+			if(!$readOnly) {
+				$label = $entities(sprintf($this->_('Resize column %s'), $input->label));
+				$text .= '<button type="button" class="flex-table-resize" title="' . $label . '" aria-label="' . $label . '" aria-keyshortcuts="ArrowLeft ArrowRight"></button>';
+			}
+			$head .= '<th scope="col"' . ($readOnly ? '' : ' class="flex-table-resizable"') . '>' . $text . '</th>';
+		}
+		$actions = $readOnly ? '' : '<th class="flex-table-actions" scope="col"><span class="flex-table-sr">' . $entities($this->_('Row actions')) . '</span></th>';
+		return '<div class="flex-table-scroll" role="region" aria-label="' . $entities($this->label ?: $this->_('Table')) . '" tabindex="0"><table class="flex-table-grid"><colgroup>' . $cols . ($readOnly ? '' : '<col>') . '</colgroup><thead><tr>' . $head . $actions . '</tr></thead><tbody class="flex-rows-items">' . $rows . '</tbody></table></div>';
 	}
 
 	/**
@@ -360,10 +436,12 @@ class InputfieldFlexRows extends Inputfield implements BridgeComponent {
 			// Native column-width rules must not stretch this compact select to 100%.
 			$typeControl = '<label class="flex-row-type-control" for="' . $entities($typeId) . '"><span>' . $typeLabel . '</span><select class="flex-row-type InputfieldSetWidth" id="' . $entities($typeId) . '" aria-label="' . $typeLabel . '">' . $options . '</select></label>';
 		}
-		return '<div class="flex-rows" data-flex-set="' . $entities($this->setName) . '" data-flex-draft="' . $entities($this->flexDraft) . '" data-flex-page-url="' . $entities($this->flexRoot->ownerPage()->editUrl()) . '" data-flex-field="' . $entities($this->flexRoot->ownerField()->name) . '" data-flex-min="' . (int) ($settings['minItems'] ?? 0) . '" data-flex-max="' . (int) ($settings['maxItems'] ?? 0) . '"' . $attributes . '>' .
+		$table = isset($settings['_flexTable']);
+		$items = $table ? $this->renderTable($html) : '<ul class="Inputfields flex-rows-items">' . $html . '</ul>';
+		return '<div class="flex-rows' . ($table ? ' flex-table' : '') . '" data-flex-set="' . $entities($this->setName) . '" data-flex-draft="' . $entities($this->flexDraft) . '" data-flex-page-url="' . $entities($this->flexRoot->ownerPage()->editUrl()) . '" data-flex-field="' . $entities($this->flexRoot->ownerField()->name) . '" data-flex-min="' . (int) ($settings['minItems'] ?? 0) . '" data-flex-max="' . (int) ($settings['maxItems'] ?? 0) . '"' . $attributes . '>' .
 			'<input type="hidden" name="' . $entities(FlexPath::controlName($this->flexInputName ?: $this->name, $this->setName, 'present')) . '" value="1">' .
 			'<input type="hidden" class="flex-rows-order" name="' . $entities(FlexPath::controlName($this->flexInputName ?: $this->name, $this->setName, 'order')) . '" value="' . implode(',', $ids) . '">' .
-			'<ul class="Inputfields flex-rows-items">' . $html . '</ul>' . $typeControl . '<button type="button" class="ui-button flex-row-add"><i class="fa fa-plus-circle" aria-hidden="true"></i> ' . $entities($addLabel) . '</button>' .
+			$items . $typeControl . '<button type="button" class="ui-button flex-row-add"><i class="fa fa-plus-circle" aria-hidden="true"></i> ' . $entities($addLabel) . '</button>' .
 			'<p class="flex-rows-status uk-hidden-visually" role="status" aria-live="polite"></p><p class="flex-rows-error" role="alert"></p></div>';
 	}
 
@@ -375,9 +453,9 @@ class InputfieldFlexRows extends Inputfield implements BridgeComponent {
 	public function ___renderValue() {
 		$html = '';
 		foreach($this->value as $row) {
-			$html .= $this->inputsFor($row)->renderValue();
+			$html .= isset($this->definition['settings']['_flexTable']) ? $this->renderTableRow($row, true) : $this->inputsFor($row)->renderValue();
 		}
-		return $html;
+		return isset($this->definition['settings']['_flexTable']) ? $this->renderTable($html, true) : $html;
 	}
 
 	/**

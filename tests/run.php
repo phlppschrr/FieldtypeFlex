@@ -6,6 +6,7 @@ if(PHP_SAPI !== 'cli') {
 }
 
 $suites = [
+	'tables' => ['tables.php', 'table-editor.php'],
 	'objects' => ['objects.php'],
 	'compatibility' => ['native-compatibility.php', 'native-selectors.php'],
 	'values' => ['json-comparison.php', 'values.php'],

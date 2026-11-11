@@ -30,9 +30,10 @@ namespace FieldtypeFlex {
     }
     export const classic = {
         async setup(scope: HTMLElement): Promise<void> {
-            if(window.ProcessWireAdminTheme) {
+            const theme = bridgeTheme();
+            if(theme) {
                 if(needsLegacy(scope)) await window.Bridge?.legacy.load();
-                window.ProcessWireAdminTheme.legacy.initElement(scope);
+                theme.legacy.initElement(scope);
                 return;
             }
             const $ = window.jQuery;
@@ -106,7 +107,7 @@ namespace FieldtypeFlex {
             else window.jQuery?.('iframe.ui-dialog-content').dialog('close');
         },
         confirm(message: string, callback: () => void): void {
-            if(window.ProcessWireAdminTheme) { void window.Bridge?.confirm(message, callback); return; }
+            if(bridgeTheme()) { void window.Bridge?.confirm(message, callback); return; }
             if(window.ProcessWire?.confirm) window.ProcessWire.confirm(message, callback);
             else if(window.confirm(message)) callback();
         },
@@ -160,11 +161,16 @@ namespace FieldtypeFlex {
         observe(callback: () => void): () => void;
         legacy: {needsStack(field: Element): boolean; initElement(scope: HTMLElement): void};
     }
-    export function nativeBridge(): boolean { return !!window.ProcessWireAdminTheme && !window.ProcessWireAdminTheme.upstream(); }
+    // Classic Uikit uses the same global name without Bridge's public capabilities.
+    export function bridgeTheme(): ThemeAPI | undefined {
+        const theme = window.ProcessWireAdminTheme;
+        return typeof theme?.upstream === 'function' && theme.legacy && theme.trusted ? theme : undefined;
+    }
+    export function nativeBridge(): boolean { const theme = bridgeTheme(); return !!theme && !theme.upstream(); }
     export function needsLegacy(scope: HTMLElement): boolean {
         const fields = all(scope, '.Inputfield[data-bridge-legacy]');
         if(scope.matches('.Inputfield[data-bridge-legacy]')) fields.unshift(scope);
-        return fields.some(field => window.ProcessWireAdminTheme?.legacy.needsStack(field));
+        return fields.some(field => bridgeTheme()?.legacy.needsStack(field));
     }
 }
 interface Window {

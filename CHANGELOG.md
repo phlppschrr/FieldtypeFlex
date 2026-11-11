@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+## 0.7.0 — 2026-11-11
+
+- Add tables with native editable cells, optional headers and row labels, column widths, and shared Rows actions.
+- Allow editors to drag column dividers to resize table columns until the page is reloaded.
+- Show editable header values as column titles and keep multilingual cells compact with language tabs.
+- Reduce nested field borders and spacing in the table editor, including the row actions.
+- Give Uikit and Konkat tables bold gray headings, white data cells and a transparent header above the row actions.
+- Focus native inputs when clicking their table cells, stretch text fields to the row height and tighten language tabs.
+- Distinguish classic Uikit's admin global from Bridge when initializing inputs and inserting AJAX rows.
+
 ## 0.6.1 — 2026-11-09
 
 - Move rename and cleanup tools to individual native sections in the field Actions tab.

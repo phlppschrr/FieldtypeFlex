@@ -13,21 +13,24 @@ namespace FieldtypeFlex {
     }
     function message(key: string, fallback: string): string { return window.ProcessWire?.config.FieldtypeFlex?.[key] || fallback; }
     function errorMessage(error: unknown): string { return error instanceof Error ? error.message : String(error); }
-    function rows(set: HTMLElement): HTMLElement[] { return all(set, ':scope > .flex-rows-items > .flex-row[data-flex-row]'); }
+    function rowList(set: HTMLElement): HTMLElement { return one(set, '.flex-rows-items'); }
+    function rows(set: HTMLElement): HTMLElement[] { return all(rowList(set), ':scope > .flex-row[data-flex-row]'); }
+    function rowBodies(row: HTMLElement): HTMLElement[] { return all(row, ':scope > .flex-row-content, :scope > .flex-table-cell'); }
     function activeRows(set: HTMLElement): HTMLElement[] { return rows(set).filter(row => !row.matches('.flex-row-remove-pending')); }
     function removalState(row: HTMLElement, removed: boolean): void {
-        const body = one(row, ':scope > .flex-row-content');
+        const bodies = rowBodies(row);
+        const transport = row.querySelector<HTMLElement>(':scope > .flex-table-actions .flex-row-transport') || row;
         row.classList.toggle('flex-row-remove-pending', removed);
         one(row, ':scope > .flex-row-header').classList.toggle('ui-state-error', removed);
-        one<HTMLInputElement>(row, ':scope > .flex-row-remove-value').value = removed ? '1' : '0';
-        all(row, ':scope > .flex-row-remove-mirror').forEach(input => input.remove());
+        one<HTMLInputElement>(row, ':scope > .flex-row-remove-value, :scope > .flex-table-actions .flex-row-remove-value').value = removed ? '1' : '0';
+        all(transport, ':scope > .flex-row-remove-mirror').forEach(input => input.remove());
         if(removed) {
-            serialize(body).forEach(([name, value]) => {
+            bodies.flatMap(serialize).forEach(([name, value]) => {
                 const mirror = document.createElement('input');
-                mirror.type = 'hidden'; mirror.className = 'flex-row-remove-mirror'; mirror.name = name; mirror.value = value; row.append(mirror);
+                mirror.type = 'hidden'; mirror.className = 'flex-row-remove-mirror'; mirror.name = name; mirror.value = value; transport.append(mirror);
             });
         }
-        all<Control>(body, controlSelector).forEach(input => {
+        bodies.flatMap(body => all<Control>(body, controlSelector)).forEach(input => {
             if(removed) {
                 if(!disabledBeforeRemoval.has(input)) disabledBeforeRemoval.set(input, input.disabled);
                 input.disabled = true;
@@ -101,7 +104,9 @@ namespace FieldtypeFlex {
     }
     function updateLabels(set: HTMLElement): void {
         rows(set).forEach((row, index) => {
-            const title = one(row, ':scope > .flex-row-header .flex-row-title'); title.replaceChildren();
+            const title = row.querySelector<HTMLElement>(':scope > .flex-row-header .flex-row-title');
+            if(!title) return;
+            title.replaceChildren();
             rowTitle(row, index, contextPath(row)).forEach(part => {
                 if(!part.text) return;
                 if(part.badge || part.muted) {
@@ -126,12 +131,13 @@ namespace FieldtypeFlex {
         all<HTMLButtonElement>(set, ':scope > .flex-row-add').forEach(button => button.disabled = busy || (max > 0 && count >= max));
         rows(set).forEach(row => {
             const header = one(row, ':scope > .flex-row-header');
-            one<HTMLButtonElement>(header, '.flex-row-toggle').disabled = busy;
+            const toggle = header.querySelector<HTMLButtonElement>('.flex-row-toggle');
+            if(toggle) toggle.disabled = busy;
             one<HTMLButtonElement>(header, '[data-flex-row-action="duplicate"]').disabled = busy || (max > 0 && count >= max);
             one<HTMLButtonElement>(header, '[data-flex-row-action="remove"]').disabled = busy || (!row.matches('.flex-row-remove-pending') && count <= min);
             one<HTMLButtonElement>(header, '.flex-row-sort').disabled = busy || count < 2;
         });
-        sortable.disabled(one(set, ':scope > .flex-rows-items'), busy || count < 2);
+        sortable.disabled(rowList(set), busy || count < 2);
     }
     function order(set: HTMLElement): void {
         change(one<HTMLInputElement>(set, ':scope > .flex-rows-order'), rows(set).map(row => attr(row, 'data-flex-row')).join(','));
@@ -146,8 +152,8 @@ namespace FieldtypeFlex {
             input.classList.remove('InputfieldTinyMCELoaded', 'InputfieldTinyMCELazy');
         });
     }
-    function syncToggle(row: HTMLElement): void { one(row, ':scope > .flex-row-header .flex-row-toggle').setAttribute('aria-expanded', String(!row.matches('.InputfieldStateCollapsed'))); }
-    function openRow(row: HTMLElement, open: boolean): void { classic.toggle(row, open); syncToggle(row); }
+    function syncToggle(row: HTMLElement): void { row.querySelector(':scope > .flex-row-header .flex-row-toggle')?.setAttribute('aria-expanded', String(!row.matches('.InputfieldStateCollapsed'))); }
+    function openRow(row: HTMLElement, open: boolean): void { if(row.tagName === 'TR') return; classic.toggle(row, open); syncToggle(row); }
     function loadRow(row: HTMLElement): Promise<boolean> {
         if(attr(row, 'data-flex-loaded') !== '0') return Promise.resolve(true);
         if(rowState(row).load) return rowState(row).load!;
@@ -190,7 +196,7 @@ namespace FieldtypeFlex {
                 if(!row.matches('.flex-row-remove-pending') && row.querySelector('.InputfieldStateError')) openRow(row, true);
                 syncToggle(row);
             });
-            sortable.init(one(set, ':scope > .flex-rows-items'), teardown, async row => { order(set); await classic.setup(row); moved(set, row); });
+            sortable.init(rowList(set), teardown, async row => { order(set); await classic.setup(row); moved(set, row); });
             updateLabels(set); updateActions(set);
         });
     }
@@ -224,6 +230,55 @@ namespace FieldtypeFlex {
             if(editor) { editor.save(); input.dispatchEvent(new Event('input', {bubbles: true})); }
         });
     }, (draft, path) => { void refreshMedia(draft, path); });
+    function tableColumnResizer(handle: HTMLElement): ((distance: number) => void) | undefined {
+        const table = handle.closest<HTMLTableElement>('.flex-table-grid');
+        const heading = handle.closest<HTMLTableCellElement>('th');
+        const headings = table?.tHead?.rows[0]?.cells;
+        if(!table || !heading || !headings) return;
+        const columns = all<HTMLTableColElement>(table, ':scope > colgroup > col');
+        const index = heading.cellIndex;
+        const widths = Array.from(headings, cell => cell.getBoundingClientRect().width);
+        const width = widths[index];
+        if(!width || columns.length !== widths.length) return;
+        const tableWidth = table.getBoundingClientRect().width;
+        const direction = getComputedStyle(table).direction === 'rtl' ? -1 : 1;
+        return distance => {
+            const nextWidth = Math.max(Math.min(64, width), width + direction * distance);
+            // Freeze the displayed widths so the table layout cannot redistribute space.
+            columns.forEach((column, i) => { column.style.width = `${i === index ? nextWidth : widths[i]}px`; });
+            table.style.width = `${tableWidth + nextWidth - width}px`;
+            table.classList.add('flex-table-resized');
+        };
+    }
+    delegate('pointerdown', '.flex-table-resize', (event, handle) => {
+        if(event.button !== 0 || !event.isPrimary) return;
+        const resize = tableColumnResizer(handle);
+        if(!resize) return;
+        event.preventDefault();
+        handle.setPointerCapture(event.pointerId);
+        const listeners = new AbortController();
+        let moved = false;
+        handle.addEventListener('pointermove', move => {
+            if(move.pointerId !== event.pointerId) return;
+            if(move.clientX !== event.clientX) moved = true;
+            if(moved) resize(move.clientX - event.clientX);
+        }, {signal: listeners.signal});
+        handle.addEventListener('lostpointercapture', () => listeners.abort(), {once: true});
+    });
+    delegate('keydown', '.flex-table-resize', (event, handle) => {
+        if(event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+        event.preventDefault();
+        tableColumnResizer(handle)?.(event.key === 'ArrowRight' ? 16 : -16);
+    });
+    delegate('click', '.flex-table-grid > tbody > tr > .flex-table-cell, .flex-table-grid > thead > tr > th', (event, cell) => {
+        const target = event.target;
+        if(event.defaultPrevented || !(target instanceof Element) || target.closest('td, th') !== cell) return;
+        if(target.closest('input, textarea, select, button, a, label, [contenteditable], [role="button"], [role="tab"]')) return;
+        if(window.getSelection()?.type === 'Range') return;
+        const control = all<HTMLElement>(cell, '.flex-table-input > .InputfieldContent :is(input:not([type="hidden"]), textarea, select):not(:disabled)')
+            .find(input => input.getClientRects().length && getComputedStyle(input).visibility === 'visible');
+        control?.focus({preventScroll: true});
+    });
     delegate('click', '.flex-row-retry', (event, button) => { event.preventDefault(); void loadRow(closest(button, '.flex-row')); });
     delegate('click', '.flex-row-toggle', (event, button) => {
         event.preventDefault(); event.stopPropagation(); const row = closest(button, '.flex-row'); openRow(row, row.matches('.InputfieldStateCollapsed'));
@@ -278,7 +333,7 @@ namespace FieldtypeFlex {
         const error = one(set, ':scope > .flex-rows-error'); error.textContent = '';
         if(action === 'visibility' && row) {
             const hidden = !row.matches('.flex-row-hidden'); row.classList.toggle('flex-row-hidden', hidden);
-            change(one<HTMLInputElement>(row, ':scope > .flex-row-hidden-value'), hidden ? '1' : '0');
+            change(one<HTMLInputElement>(row, ':scope > .flex-row-hidden-value, :scope > .flex-table-actions .flex-row-hidden-value'), hidden ? '1' : '0');
             const label = attr(button, hidden ? 'data-flex-show-label' : 'data-flex-hide-label');
             button.setAttribute('aria-pressed', String(hidden)); button.setAttribute('aria-label', label); button.title = label;
             const icon = one(button, 'i'); icon.classList.toggle('fa-eye', !hidden); icon.classList.toggle('fa-eye-slash', hidden); return;
@@ -309,8 +364,8 @@ namespace FieldtypeFlex {
             if(!response.ok || result.error) throw new Error(result.message || message('unableToAdd', 'Unable to add item'));
             if(!set.isConnected) return;
             const fresh = parseHTML(result.html);
-            if(action === 'duplicate' && row) row.after(fresh); else one(set, ':scope > .flex-rows-items').append(fresh);
-            await activateScripts(fresh, response); order(set); await classic.setup(fresh); initRows(set); one(fresh, ':scope > .flex-row-header .flex-row-toggle').focus(); classic.added(fresh);
+            if(action === 'duplicate' && row) row.after(fresh); else rowList(set).append(fresh);
+            await activateScripts(fresh, response); order(set); await classic.setup(fresh); initRows(set); (fresh.querySelector<HTMLElement>(':scope > .flex-row-header .flex-row-toggle') || one<HTMLElement>(fresh, ':scope > .flex-row-header .flex-row-sort')).focus(); classic.added(fresh);
         } catch(problem) { error.textContent = errorMessage(problem); }
         finally { setTreeBusy(set, false); }
     }

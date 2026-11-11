@@ -1,4 +1,130 @@
 /* UIKit supplies the Core Original palette; Konkat supplies the --pw-* values. */
+.flex-table-scroll { overflow-x: auto; margin-bottom: .75rem; }
+.flex-table-grid { width: max-content; min-width: 100%; border-collapse: collapse; table-layout: auto; }
+.flex-table-grid > thead > tr > th,
+.flex-table-grid > tbody > tr > td,
+.flex-table-grid > tbody > tr > th {
+    border: 1px solid var(--pw-border-color, rgba(0, 0, 0, .15));
+    vertical-align: top;
+    text-align: start;
+    font-weight: normal;
+}
+.flex-table-grid > thead > tr > th {
+    padding: .2rem .4rem;
+    background-color: rgba(128, 128, 128, .12);
+    font-weight: bold;
+}
+.flex-table-grid > thead > tr > th:has(> .Inputfields) { padding: 0; }
+.AdminThemeUikitOriginal .flex-table-grid > thead > tr > th { border-bottom-width: 2px; }
+.flex-table-grid > thead > tr > .flex-table-actions { border: 0; background: transparent; }
+.flex-table-grid > tbody { background-color: var(--pw-blocks-background, #fff); }
+.flex-table-grid > tbody > tr > :is(th, td) { padding: 0; }
+.flex-table-grid.flex-table-resized { table-layout: fixed; min-width: 0; }
+.flex-table-grid > thead > tr > .flex-table-resizable { position: relative; }
+.flex-table-grid .flex-table-resize {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-end: -.3125rem;
+    z-index: 1;
+    width: .625rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    cursor: col-resize;
+    touch-action: none;
+}
+.flex-table-grid .flex-table-resize:focus-visible { outline: 2px solid currentColor; outline-offset: -2px; }
+.flex-table-grid :is(th, td) > .Inputfields { margin: 0; padding: 0; list-style: none; }
+.flex-table-grid .flex-table-input.Inputfield { float: none; width: 100%; margin: 0; border: 0; min-width: 0; }
+.flex-table-grid .flex-table-input.Inputfield:not(.InputfieldStateError, .ui-state-error) {
+    background: transparent;
+    outline: 0;
+    box-shadow: none;
+}
+.flex-table-grid .flex-table-input > .InputfieldContent { padding: 0; border: 0; }
+.flex-table-grid .flex-table-input:not(.InputfieldStateError, .ui-state-error) > .InputfieldContent {
+    background: transparent;
+}
+.flex-table-grid .flex-table-input > .InputfieldHeader,
+.flex-table-sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+.flex-table-grid .flex-table-input > .InputfieldHeader > .langTabsToggle,
+.flex-table-grid .flex-table-input > .InputfieldHeader > .toggle-icon { display: none; }
+.flex-table-grid .flex-table-input :is(input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), textarea, select) {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+}
+.flex-table-grid .flex-table-input :is(.InputfieldContent, .LanguageSupport)
+    > :is(input:not([type="checkbox"], [type="radio"], [type="hidden"]), textarea, select) {
+    padding-block: .2rem;
+}
+.flex-table-grid .flex-table-input.Inputfield:not(.InputfieldStateError, .ui-state-error)
+    :is(.InputfieldContent, .LanguageSupport)
+    > :is(input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), textarea, select):not(:focus, [aria-invalid="true"]) {
+    background-color: transparent;
+    border-color: transparent;
+    box-shadow: none;
+}
+.flex-table-grid > thead .flex-table-input :is(.InputfieldContent, .LanguageSupport) > input[type="text"] {
+    display: block;
+    font-weight: bold;
+}
+.flex-table-grid > thead .flex-table-input:not(.InputfieldStateError, .ui-state-error)
+    :is(.InputfieldContent, .LanguageSupport) > input[type="text"]:focus:not([aria-invalid="true"]) {
+    /* Konkat's optional focus style sets an !important background. */
+    background-color: transparent !important;
+}
+.flex-table-grid .flex-table-input :is(.InputfieldContent, .LanguageSupport)
+    > :is(input:not([type="checkbox"], [type="radio"], [type="hidden"]), textarea) { padding-inline: .4rem; }
+.flex-table-grid .flex-table-input :is(.InputfieldContent, .LanguageSupport)
+    > :is(input:not([type="checkbox"], [type="radio"], [type="hidden"]), select:not([multiple], [size])) { height: 2rem; }
+.flex-table-grid .flex-table-input .langTabs > ul { margin-block: 0; }
+.AdminThemeUikitOriginal .flex-table-grid .flex-table-input .langTabs > ul { padding-block-start: 0; background: transparent; }
+.AdminThemeUikitOriginal .flex-table-grid .flex-table-input .langTabs > ul > li { margin-block-start: 0; }
+.AdminThemeUikitOriginal .flex-table-grid .flex-table-input .langTabs > ul > li > a { display: block; }
+.flex-table-grid .flex-table-input .langTabs > ul a { padding-block: .2rem; }
+.AdminThemeUikitDefault .flex-table-grid .flex-table-input .langTabs > ul > li > a { border-bottom: 0; }
+.AdminThemeUikitDefault .flex-table-grid .flex-table-input .langTabs > ul > li.uk-active > a { color: var(--pw-main-color); }
+.flex-table-grid .flex-table-cell { min-width: 3rem; }
+.flex-table-grid .flex-table-input textarea { min-height: 3rem; }
+.flex-table-grid .flex-table-input :is(.InputfieldContent, .LanguageSupport) > textarea { display: block; }
+/* Give percentage height a reference; the table still sizes rows by their contents. */
+.flex-table-grid .flex-table-cell:has(> .Inputfields > .flex-table-text) { height: 1px; }
+.flex-table-grid .flex-table-cell > .Inputfields:has(> .flex-table-text) {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+.flex-table-grid .flex-table-cell .flex-table-text,
+.flex-table-grid .flex-table-cell .flex-table-text > .InputfieldContent,
+.flex-table-grid .flex-table-cell .flex-table-text .langTabs,
+.flex-table-grid .flex-table-cell .flex-table-text .LanguageSupportCurrent {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+}
+.flex-table-grid .flex-table-cell .flex-table-text :is(.InputfieldContent, .LanguageSupport) > :is(input, textarea) {
+    flex-grow: 1;
+}
+.flex-table-grid .flex-table-cell .flex-table-text :is(.InputfieldContent, .LanguageSupport) > input:not([type="hidden"]) { min-height: 2rem; }
+.flex-table-grid .flex-table-actions { width: 1%; white-space: nowrap; }
+.flex-table-actions > .flex-row-controls { display: flex; }
+.flex-table-grid .flex-table-actions .flex-row-controls > button { min-height: 2rem; color: inherit; }
+.flex-table-grid > tbody > .flex-row { display: table-row; float: none; }
+.flex-table-grid > tbody > .flex-row-hidden > .flex-table-cell { opacity: .6; }
+.flex-table-grid > tbody > .flex-row-remove-pending { background: var(--pw-error-background-color, #fff0ef); }
+.flex-table-grid .flex-row-placeholder > td { height: 2.5rem; border: 2px dashed currentColor; }
+.flex-table-grid .InputfieldError { white-space: normal; }
+
 .flex-rows > .flex-rows-items {
     margin: 0 0 1rem;
     padding: 0;
@@ -13,7 +139,7 @@
 .AdminThemeUikitOriginal .flex-rows .flex-row {
     border: 0;
 }
-.flex-rows .flex-row > .flex-row-header {
+.flex-rows .flex-row > .flex-row-header:where(:not(.flex-table-actions)) {
     margin: 0;
     padding: 0;
     border: 0;

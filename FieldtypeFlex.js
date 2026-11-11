@@ -62,7 +62,7 @@ var FieldtypeFlex;
     }
     FieldtypeFlex.serialize = serialize;
     function trustedHTML(html) {
-        return window.ProcessWireAdminTheme?.trusted.html(html) ?? html;
+        return FieldtypeFlex.bridgeTheme()?.trusted.html(html) ?? html;
     }
     FieldtypeFlex.trustedHTML = trustedHTML;
     function setHTML(scope, html) { scope.innerHTML = trustedHTML(html); }
@@ -78,8 +78,9 @@ var FieldtypeFlex;
     // Native Inputfields can return inline configuration scripts in AJAX markup.
     // template/innerHTML keep them inert; execute them once after insertion, as before.
     async function activateScripts(scope, response) {
-        if (window.ProcessWireAdminTheme) {
-            await window.ProcessWireAdminTheme.runScripts(scope, { legacy: FieldtypeFlex.needsLegacy(scope), nonce: response?.headers?.get('X-Bridge-Nonce') || '' });
+        const theme = FieldtypeFlex.bridgeTheme();
+        if (theme) {
+            await theme.runScripts(scope, { legacy: FieldtypeFlex.needsLegacy(scope), nonce: response?.headers?.get('X-Bridge-Nonce') || '' });
             return;
         }
         all(scope, 'script').forEach(inert => {
@@ -114,10 +115,11 @@ var FieldtypeFlex;
 (function (FieldtypeFlex) {
     FieldtypeFlex.classic = {
         async setup(scope) {
-            if (window.ProcessWireAdminTheme) {
+            const theme = FieldtypeFlex.bridgeTheme();
+            if (theme) {
                 if (FieldtypeFlex.needsLegacy(scope))
                     await window.Bridge?.legacy.load();
-                window.ProcessWireAdminTheme.legacy.initElement(scope);
+                theme.legacy.initElement(scope);
                 return;
             }
             const $ = window.jQuery;
@@ -214,7 +216,7 @@ var FieldtypeFlex;
                 window.jQuery?.('iframe.ui-dialog-content').dialog('close');
         },
         confirm(message, callback) {
-            if (window.ProcessWireAdminTheme) {
+            if (FieldtypeFlex.bridgeTheme()) {
                 void window.Bridge?.confirm(message, callback);
                 return;
             }
@@ -257,13 +259,19 @@ var FieldtypeFlex;
     };
 })(FieldtypeFlex || (FieldtypeFlex = {}));
 (function (FieldtypeFlex) {
-    function nativeBridge() { return !!window.ProcessWireAdminTheme && !window.ProcessWireAdminTheme.upstream(); }
+    // Classic Uikit uses the same global name without Bridge's public capabilities.
+    function bridgeTheme() {
+        const theme = window.ProcessWireAdminTheme;
+        return typeof theme?.upstream === 'function' && theme.legacy && theme.trusted ? theme : undefined;
+    }
+    FieldtypeFlex.bridgeTheme = bridgeTheme;
+    function nativeBridge() { const theme = bridgeTheme(); return !!theme && !theme.upstream(); }
     FieldtypeFlex.nativeBridge = nativeBridge;
     function needsLegacy(scope) {
         const fields = FieldtypeFlex.all(scope, '.Inputfield[data-bridge-legacy]');
         if (scope.matches('.Inputfield[data-bridge-legacy]'))
             fields.unshift(scope);
-        return fields.some(field => window.ProcessWireAdminTheme?.legacy.needsStack(field));
+        return fields.some(field => bridgeTheme()?.legacy.needsStack(field));
     }
     FieldtypeFlex.needsLegacy = needsLegacy;
 })(FieldtypeFlex || (FieldtypeFlex = {}));
@@ -274,7 +282,8 @@ var FieldtypeFlex;
     // Element-only contract: replacing this adapter does not affect Row logic.
     FieldtypeFlex.sortable = {
         init(list, start, stop) {
-            if (window.ProcessWireAdminTheme) {
+            const theme = FieldtypeFlex.bridgeTheme();
+            if (theme) {
                 if (window.Bridge?.contract !== '1' || nativeSorts.has(list))
                     return;
                 const state = { disabled: false };
@@ -293,7 +302,7 @@ var FieldtypeFlex;
                 }).catch(error => { nativeSorts.delete(list); console.error('Flex sorting failed', error); });
                 if (!observing) {
                     observing = true;
-                    window.ProcessWireAdminTheme.observe(() => nativeSorts.forEach((state, list) => {
+                    theme.observe(() => nativeSorts.forEach((state, list) => {
                         if (!list.isConnected) {
                             state.destroy?.();
                             nativeSorts.delete(list);
@@ -346,25 +355,28 @@ var FieldtypeFlex;
     }
     function message(key, fallback) { return window.ProcessWire?.config.FieldtypeFlex?.[key] || fallback; }
     function errorMessage(error) { return error instanceof Error ? error.message : String(error); }
-    function rows(set) { return FieldtypeFlex.all(set, ':scope > .flex-rows-items > .flex-row[data-flex-row]'); }
+    function rowList(set) { return FieldtypeFlex.one(set, '.flex-rows-items'); }
+    function rows(set) { return FieldtypeFlex.all(rowList(set), ':scope > .flex-row[data-flex-row]'); }
+    function rowBodies(row) { return FieldtypeFlex.all(row, ':scope > .flex-row-content, :scope > .flex-table-cell'); }
     function activeRows(set) { return rows(set).filter(row => !row.matches('.flex-row-remove-pending')); }
     function removalState(row, removed) {
-        const body = FieldtypeFlex.one(row, ':scope > .flex-row-content');
+        const bodies = rowBodies(row);
+        const transport = row.querySelector(':scope > .flex-table-actions .flex-row-transport') || row;
         row.classList.toggle('flex-row-remove-pending', removed);
         FieldtypeFlex.one(row, ':scope > .flex-row-header').classList.toggle('ui-state-error', removed);
-        FieldtypeFlex.one(row, ':scope > .flex-row-remove-value').value = removed ? '1' : '0';
-        FieldtypeFlex.all(row, ':scope > .flex-row-remove-mirror').forEach(input => input.remove());
+        FieldtypeFlex.one(row, ':scope > .flex-row-remove-value, :scope > .flex-table-actions .flex-row-remove-value').value = removed ? '1' : '0';
+        FieldtypeFlex.all(transport, ':scope > .flex-row-remove-mirror').forEach(input => input.remove());
         if (removed) {
-            FieldtypeFlex.serialize(body).forEach(([name, value]) => {
+            bodies.flatMap(FieldtypeFlex.serialize).forEach(([name, value]) => {
                 const mirror = document.createElement('input');
                 mirror.type = 'hidden';
                 mirror.className = 'flex-row-remove-mirror';
                 mirror.name = name;
                 mirror.value = value;
-                row.append(mirror);
+                transport.append(mirror);
             });
         }
-        FieldtypeFlex.all(body, FieldtypeFlex.controlSelector).forEach(input => {
+        bodies.flatMap(body => FieldtypeFlex.all(body, FieldtypeFlex.controlSelector)).forEach(input => {
             if (removed) {
                 if (!disabledBeforeRemoval.has(input))
                     disabledBeforeRemoval.set(input, input.disabled);
@@ -458,7 +470,9 @@ var FieldtypeFlex;
     }
     function updateLabels(set) {
         rows(set).forEach((row, index) => {
-            const title = FieldtypeFlex.one(row, ':scope > .flex-row-header .flex-row-title');
+            const title = row.querySelector(':scope > .flex-row-header .flex-row-title');
+            if (!title)
+                return;
             title.replaceChildren();
             rowTitle(row, index, contextPath(row)).forEach(part => {
                 if (!part.text)
@@ -494,12 +508,14 @@ var FieldtypeFlex;
         FieldtypeFlex.all(set, ':scope > .flex-row-add').forEach(button => button.disabled = busy || (max > 0 && count >= max));
         rows(set).forEach(row => {
             const header = FieldtypeFlex.one(row, ':scope > .flex-row-header');
-            FieldtypeFlex.one(header, '.flex-row-toggle').disabled = busy;
+            const toggle = header.querySelector('.flex-row-toggle');
+            if (toggle)
+                toggle.disabled = busy;
             FieldtypeFlex.one(header, '[data-flex-row-action="duplicate"]').disabled = busy || (max > 0 && count >= max);
             FieldtypeFlex.one(header, '[data-flex-row-action="remove"]').disabled = busy || (!row.matches('.flex-row-remove-pending') && count <= min);
             FieldtypeFlex.one(header, '.flex-row-sort').disabled = busy || count < 2;
         });
-        FieldtypeFlex.sortable.disabled(FieldtypeFlex.one(set, ':scope > .flex-rows-items'), busy || count < 2);
+        FieldtypeFlex.sortable.disabled(rowList(set), busy || count < 2);
     }
     function order(set) {
         FieldtypeFlex.change(FieldtypeFlex.one(set, ':scope > .flex-rows-order'), rows(set).map(row => FieldtypeFlex.attr(row, 'data-flex-row')).join(','));
@@ -520,8 +536,9 @@ var FieldtypeFlex;
             input.classList.remove('InputfieldTinyMCELoaded', 'InputfieldTinyMCELazy');
         });
     }
-    function syncToggle(row) { FieldtypeFlex.one(row, ':scope > .flex-row-header .flex-row-toggle').setAttribute('aria-expanded', String(!row.matches('.InputfieldStateCollapsed'))); }
-    function openRow(row, open) { FieldtypeFlex.classic.toggle(row, open); syncToggle(row); }
+    function syncToggle(row) { row.querySelector(':scope > .flex-row-header .flex-row-toggle')?.setAttribute('aria-expanded', String(!row.matches('.InputfieldStateCollapsed'))); }
+    function openRow(row, open) { if (row.tagName === 'TR')
+        return; FieldtypeFlex.classic.toggle(row, open); syncToggle(row); }
     function loadRow(row) {
         if (FieldtypeFlex.attr(row, 'data-flex-loaded') !== '0')
             return Promise.resolve(true);
@@ -591,7 +608,7 @@ var FieldtypeFlex;
                     openRow(row, true);
                 syncToggle(row);
             });
-            FieldtypeFlex.sortable.init(FieldtypeFlex.one(set, ':scope > .flex-rows-items'), teardown, async (row) => { order(set); await FieldtypeFlex.classic.setup(row); moved(set, row); });
+            FieldtypeFlex.sortable.init(rowList(set), teardown, async (row) => { order(set); await FieldtypeFlex.classic.setup(row); moved(set, row); });
             updateLabels(set);
             updateActions(set);
         });
@@ -647,6 +664,66 @@ var FieldtypeFlex;
             }
         });
     }, (draft, path) => { void refreshMedia(draft, path); });
+    function tableColumnResizer(handle) {
+        const table = handle.closest('.flex-table-grid');
+        const heading = handle.closest('th');
+        const headings = table?.tHead?.rows[0]?.cells;
+        if (!table || !heading || !headings)
+            return;
+        const columns = FieldtypeFlex.all(table, ':scope > colgroup > col');
+        const index = heading.cellIndex;
+        const widths = Array.from(headings, cell => cell.getBoundingClientRect().width);
+        const width = widths[index];
+        if (!width || columns.length !== widths.length)
+            return;
+        const tableWidth = table.getBoundingClientRect().width;
+        const direction = getComputedStyle(table).direction === 'rtl' ? -1 : 1;
+        return distance => {
+            const nextWidth = Math.max(Math.min(64, width), width + direction * distance);
+            // Freeze the displayed widths so the table layout cannot redistribute space.
+            columns.forEach((column, i) => { column.style.width = `${i === index ? nextWidth : widths[i]}px`; });
+            table.style.width = `${tableWidth + nextWidth - width}px`;
+            table.classList.add('flex-table-resized');
+        };
+    }
+    FieldtypeFlex.delegate('pointerdown', '.flex-table-resize', (event, handle) => {
+        if (event.button !== 0 || !event.isPrimary)
+            return;
+        const resize = tableColumnResizer(handle);
+        if (!resize)
+            return;
+        event.preventDefault();
+        handle.setPointerCapture(event.pointerId);
+        const listeners = new AbortController();
+        let moved = false;
+        handle.addEventListener('pointermove', move => {
+            if (move.pointerId !== event.pointerId)
+                return;
+            if (move.clientX !== event.clientX)
+                moved = true;
+            if (moved)
+                resize(move.clientX - event.clientX);
+        }, { signal: listeners.signal });
+        handle.addEventListener('lostpointercapture', () => listeners.abort(), { once: true });
+    });
+    FieldtypeFlex.delegate('keydown', '.flex-table-resize', (event, handle) => {
+        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')
+            return;
+        event.preventDefault();
+        tableColumnResizer(handle)?.(event.key === 'ArrowRight' ? 16 : -16);
+    });
+    FieldtypeFlex.delegate('click', '.flex-table-grid > tbody > tr > .flex-table-cell, .flex-table-grid > thead > tr > th', (event, cell) => {
+        const target = event.target;
+        if (event.defaultPrevented || !(target instanceof Element) || target.closest('td, th') !== cell)
+            return;
+        if (target.closest('input, textarea, select, button, a, label, [contenteditable], [role="button"], [role="tab"]'))
+            return;
+        if (window.getSelection()?.type === 'Range')
+            return;
+        const control = FieldtypeFlex.all(cell, '.flex-table-input > .InputfieldContent :is(input:not([type="hidden"]), textarea, select):not(:disabled)')
+            .find(input => input.getClientRects().length && getComputedStyle(input).visibility === 'visible');
+        control?.focus({ preventScroll: true });
+    });
     FieldtypeFlex.delegate('click', '.flex-row-retry', (event, button) => { event.preventDefault(); void loadRow(FieldtypeFlex.closest(button, '.flex-row')); });
     FieldtypeFlex.delegate('click', '.flex-row-toggle', (event, button) => {
         event.preventDefault();
@@ -739,7 +816,7 @@ var FieldtypeFlex;
         if (action === 'visibility' && row) {
             const hidden = !row.matches('.flex-row-hidden');
             row.classList.toggle('flex-row-hidden', hidden);
-            FieldtypeFlex.change(FieldtypeFlex.one(row, ':scope > .flex-row-hidden-value'), hidden ? '1' : '0');
+            FieldtypeFlex.change(FieldtypeFlex.one(row, ':scope > .flex-row-hidden-value, :scope > .flex-table-actions .flex-row-hidden-value'), hidden ? '1' : '0');
             const label = FieldtypeFlex.attr(button, hidden ? 'data-flex-show-label' : 'data-flex-hide-label');
             button.setAttribute('aria-pressed', String(hidden));
             button.setAttribute('aria-label', label);
@@ -794,12 +871,12 @@ var FieldtypeFlex;
             if (action === 'duplicate' && row)
                 row.after(fresh);
             else
-                FieldtypeFlex.one(set, ':scope > .flex-rows-items').append(fresh);
+                rowList(set).append(fresh);
             await FieldtypeFlex.activateScripts(fresh, response);
             order(set);
             await FieldtypeFlex.classic.setup(fresh);
             initRows(set);
-            FieldtypeFlex.one(fresh, ':scope > .flex-row-header .flex-row-toggle').focus();
+            (fresh.querySelector(':scope > .flex-row-header .flex-row-toggle') || FieldtypeFlex.one(fresh, ':scope > .flex-row-header .flex-row-sort')).focus();
             FieldtypeFlex.classic.added(fresh);
         }
         catch (problem) {

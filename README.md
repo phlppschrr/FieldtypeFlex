@@ -6,7 +6,7 @@ FieldtypeFlex lets you define structured content in PHP or JSON and edit it usin
 
 Use it for anything from a simple group of properties to nested content blocks with different types, images and Page references. Values are accessible through the familiar ProcessWire API and can be queried with selectors.
 
-**Version:** 0.6.1
+**Version:** 0.7.0
 
 https://github.com/user-attachments/assets/eb40e7a9-d51c-47b3-b798-db6acb97651a
 
@@ -20,6 +20,7 @@ https://github.com/user-attachments/assets/eb40e7a9-d51c-47b3-b798-db6acb97651a
 - **Language alternates.** Define siblings such as `image` and `image_de`; formatted reads select the current language with native fallback. See [Language Alternate Fields](API.md#language-alternate-fields).
 - **Structured Objects.** Group related properties into fixed, nested structures without creating separate ProcessWire fields.
 - **Typed and nested Rows.** Mix different block types, each with its own fields. Editors can add, duplicate, reorder and hide rows without separate Repeater Pages.
+- **Basic tables.** Use native inputs in fixed columns with optional editable headings and row labels. See the [table examples](examples/08-tables.php).
 - **Files and images.** Use ProcessWire-compatible `Pagefile` and `Pageimage` objects, image resizing and custom metadata for individual files.
 - **ProcessWire selectors.** Find pages by properties inside Objects and Rows, including nested values and block types.
 - **Schema changes without data loss.** Unknown properties survive normal saves. Use `renamedFrom` and maintenance tools to handle renamed or obsolete properties.

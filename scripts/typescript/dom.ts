@@ -43,7 +43,7 @@ namespace FieldtypeFlex {
         });
     }
     export function trustedHTML(html: string): string {
-        return window.ProcessWireAdminTheme?.trusted.html(html) ?? html;
+        return bridgeTheme()?.trusted.html(html) ?? html;
     }
     export function setHTML(scope: HTMLElement, html: string): void { scope.innerHTML = trustedHTML(html); }
     export function insertHTML(scope: HTMLElement, where: InsertPosition, html: string): void { scope.insertAdjacentHTML(where, trustedHTML(html)); }
@@ -55,8 +55,9 @@ namespace FieldtypeFlex {
     // Native Inputfields can return inline configuration scripts in AJAX markup.
     // template/innerHTML keep them inert; execute them once after insertion, as before.
     export async function activateScripts(scope: HTMLElement, response?: Response): Promise<void> {
-        if(window.ProcessWireAdminTheme) {
-            await window.ProcessWireAdminTheme.runScripts(scope, {legacy: needsLegacy(scope), nonce: response?.headers?.get('X-Bridge-Nonce') || ''});
+        const theme = bridgeTheme();
+        if(theme) {
+            await theme.runScripts(scope, {legacy: needsLegacy(scope), nonce: response?.headers?.get('X-Bridge-Nonce') || ''});
             return;
         }
         all<HTMLScriptElement>(scope, 'script').forEach(inert => {

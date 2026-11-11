@@ -8,7 +8,9 @@ if(PHP_SAPI !== 'cli' || !isset($same, $createField)) {
 // Execute the actual reference snippets in the existing disposable suite fixture.
 $api = file_get_contents(dirname(__DIR__, 2) . '/API.md');
 preg_match_all('/```php\n(.*?)```/s', $api, $matches);
-$same(32, count($matches[1]), 'all API PHP examples have an execution context');
+$same(33, count($matches[1]), 'all API PHP examples have an execution context');
+$tableExamples = array_values(array_filter($matches[1], static fn($code) => str_starts_with($code, '// Table definition.')));
+$matches[1] = array_values(array_filter($matches[1], static fn($code) => !in_array($code, $tableExamples, true)));
 $objectExamples = array_values(array_filter($matches[1], static fn($code) => str_starts_with($code, '// Fixed object definition.')));
 $matches[1] = array_values(array_filter($matches[1], static fn($code) => !in_array($code, $objectExamples, true)));
 $metadataExamples = array_values(array_filter($matches[1], static fn($code) => str_starts_with($code, '// Per-file metadata definition.') || str_starts_with($code, '// Existing image in the gallery.')));
@@ -45,6 +47,12 @@ $snippet = static function(string $code, array $vars = []) use ($trackFile): arr
 	return $run($path, $vars);
 };
 $fragment = static fn(string $code): string => "return [\n" . $code . "\n];";
+$tableSchema = $snippet($fragment($tableExamples[0]))['result'];
+$tableField = $createField('flex_api_table', $tableSchema);
+$tableValue = $type->getBlankValue($page, $tableField)->prices;
+$tableValue->rows->addRow('row', ['service' => 'Advice']);
+$same('Advice', $tableValue->rows->first()->service, 'API table definition and public Rows access execute');
+$same(null, $tableValue->headers, 'API table example uses fixed column labels');
 $rowTitleSettings = $snippet($fragment($rowTitleFragment))['result'];
 $same('[{@path} › {@type}] #n: _{heading|title}_', $rowTitleSettings['rowTitle'], 'API rowTitle fragment executes as native Rows settings');
 $dependencySettings = $snippet($fragment($dependencyFragment))['result'];

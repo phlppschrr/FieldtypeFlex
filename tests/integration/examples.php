@@ -33,7 +33,8 @@ $exampleDefinitions = [
     'choices' => ['05-choices.php', ['country', 'priority', 'features', 'topics', 'ordered', 'tags']],
     'references-media' => ['06-references-media.php', ['primary_page', 'related_pages', 'show_credits', 'cover', 'gallery', 'downloads']],
     'rows' => ['07-rows.php', ['heading', 'hero', 'downloads', 'notes_enabled', 'slides.item.heading', 'facts.item.number', 'blocks.text.heading', 'sections.section.show_notes', 'sections.section.blocks.text.notes.note.text']],
-    'advanced' => ['08-advanced.php', ['heading', 'translation', 'date', 'body', 'note', 'link.url', 'link.label']],
+    'tables' => ['08-tables.php', ['prices.rows.row.service', 'prices.rows.row.price', 'comparison.headers.standard', 'comparison.rows.row.row_label', 'comparison.rows.row.premium']],
+    'advanced' => ['09-advanced.php', ['heading', 'translation', 'date', 'body', 'note', 'link.url', 'link.label']],
 ];
 $exampleIndex = file_get_contents($examplesRoot . 'README.md');
 foreach($exampleDefinitions as [$filename]) {

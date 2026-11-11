@@ -97,6 +97,14 @@ row context attached; no fieldset-to-rows adapter is needed. Each type has its o
 
 PHP, JSON and native InputfieldWrapper definitions use the same tree model. PHP executes as trusted code inside the owning ProcessWire API context. Definition errors keep field and source context. In Page Edit, a missing or invalid definition blocks save when existing data is at risk and preserves submitted values for correction.
 
+The public `table` definition expands into an Object with optional `headers` and
+a `rows` collection of the single type `row`. Its renderer reuses the prepared
+native input tree, Rows processing and AJAX actions; only markup and the shared
+browser helpers distinguish table rows from cards. Per-instance Object render
+hooks assemble the table without changing global Inputfield markup. Fixed header
+labels come from the cell schema, so newly registered draft ancestors do not need
+to exist in the canonical value. See the [table API](../API.md#tables).
+
 Editor removal is transient Inputfield state, separate from row visibility metadata.
 Full posted order authenticates every row. InputfieldFlexRows retains an ordered
 render-only row list and removal marks for error recovery, while its processed

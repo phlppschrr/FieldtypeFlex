@@ -336,3 +336,17 @@ Save the following helper classes in a PHP file indexed by your IDE:,"Speichern 
 Assign the field value and declare its type for code completion:,Weisen Sie den Feldwert einer Variablen zu und geben Sie deren Typ für die Code-Vervollständigung an:,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,5ff8a42e1fb8d65c24127533fc1438a5
 Use the typed variable to access a defined property:,Greifen Sie über die typisierte Variable auf eine definierte Eigenschaft zu:,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,90bae5ce77636dedf41290dc4f3e7e7e
 Apply property renames,Umbenennungen von Eigenschaften anwenden,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,c2fb535f301536cca99441a6a3f852a8
+%s is not supported on a table,%s wird bei Tabellen nicht unterstützt,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,1ce4a5e05e091a8a3841d8782d38e6a0
+%s must be a boolean,%s muss ein boolescher Wert sein,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,8f43197ee7bf39c7de4f4de7deb94b60
+Each table column must be an Inputfield definition,Jede Tabellenspalte muss eine Inputfield-Definition sein,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,fff9007c63960e2891eaee20213e928e
+Label,Bezeichnung,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,b021df6aac4654c454f46c77646e745f
+"Table Page columns require Select, SelectMultiple, AsmSelect or PageAutocomplete","Page-Tabellenspalten erfordern Select, SelectMultiple, AsmSelect oder PageAutocomplete",,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,002754012e89984cabcb930d06cebca5
+Table cells cannot use AJAX collapse or tabs,Tabellenzellen können keine AJAX-Einklappfunktion oder Tabs verwenden,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,40e44a53d749a267ff6cafb837f0591f
+Table column width must be a positive rem or px length,Die Tabellenspaltenbreite muss eine positive Länge in rem oder px sein,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,bc77fe042f21b79c170edebe192cab48
+Table columns must be a non-empty property map,Tabellenspalten müssen als nicht leere Eigenschaftszuordnung definiert sein,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,f527432e7133c23cd6c50404c0e4e7a7
+"Table columns must be value inputs, not wrappers or markup","Tabellenspalten müssen Werteingaben sein, keine Wrapper oder Markup",,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,afead822796af3b62b4506377c6ffcdd
+Unsupported table column input: %s,Nicht unterstütztes Tabellenspalten-Inputfield: %s,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,8fca3ce7056f9b2fbe7b9414471ac93d
+row_label is reserved for table row labels,row_label ist für Tabellenzeilenbeschriftungen reserviert,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,e1803c4f0e3023f137ed796819e60c72
+Row actions,Zeilenaktionen,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,09debd9a654a51d3320d117f7f6c9f10
+Table,Tabelle,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,51c45b795d5d18a3e4e0c37e8b20a141
+Resize column %s,Breite der Spalte %s ändern,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,21d53025776dcafda3783d5d72b15433

@@ -17,6 +17,12 @@ function row(id, text = id, extra = '') {
 function set(content = row('a') + row('b'), attributes = '') {
     return `<div class="flex-rows" data-flex-set="blocks" data-flex-draft="draft" data-flex-field="content" data-flex-page-url="/edit/?id=42" data-flex-type="text" ${attributes}><ul class="flex-rows-items">${content}</ul><input class="flex-rows-order" name="order"><button type="button" class="flex-row-add">Add</button><p class="flex-rows-error"></p><p class="flex-rows-status"></p></div>`;
 }
+function tableRow(id, text = id) {
+    return `<tr class="flex-row" data-flex-row="${id}" data-flex-type="row"><td class="flex-table-cell"><ul class="Inputfields"><li class="Inputfield"><input name="cell_${id}" value="${text}" required></li></ul></td><td class="flex-row-header flex-table-actions"><button type="button" class="flex-row-sort">Sort</button><button type="button" data-flex-row-action="duplicate" class="flex-row-action">Duplicate</button><button type="button" data-flex-row-action="remove" class="flex-row-action" data-flex-remove-label="Remove" data-flex-undo-label="Undo">Remove</button><button type="button" data-flex-row-action="visibility" class="flex-row-action" data-flex-hide-label="Hide" data-flex-show-label="Show"><i></i></button><span class="flex-row-transport"><input class="flex-row-remove-value" value="0"><input class="flex-row-hidden-value" value="0"></span></td></tr>`;
+}
+function tableSet(content = tableRow('a') + tableRow('b')) {
+    return set('').replace('class="flex-rows"', 'class="flex-rows flex-table"').replace('<ul class="flex-rows-items"></ul>', `<div class="flex-table-scroll"><table><thead><tr><th>Cell</th><th>Actions</th></tr></thead><tbody class="flex-rows-items">${content}</tbody></table></div>`);
+}
 async function harness(content = set(), options = {}) {
     const errors = [];
     const console = new VirtualConsole(); console.on('jsdomError', error => errors.push(error));
@@ -39,6 +45,78 @@ test('native initialization, live labels, safe text and keyboard order without j
     assert.equal(d.querySelector('.flex-rows-order').value, 'b,a');
     assert.equal(d.activeElement, handle); assert.match(d.querySelector('.flex-rows-status').textContent, /2 of 2/);
     assert(d.querySelector('.InputfieldFlex').classList.contains('InputfieldStateChanged')); h.close();
+});
+test('table rows share keyboard order, visibility, removal and undo without card headers', async () => {
+    const h = await harness(tableSet()); const d = h.document, a = d.querySelector('[data-flex-row="a"]');
+    const handle = a.querySelector('.flex-row-sort');
+    handle.dispatchEvent(new h.window.KeyboardEvent('keydown', {key:'End', bubbles:true})); await tick();
+    assert.equal(d.querySelector('.flex-rows-order').value, 'b,a'); assert.equal(d.activeElement, handle);
+    a.querySelector('[data-flex-row-action="visibility"]').click(); assert.equal(a.querySelector('.flex-row-hidden-value').value, '1');
+    a.querySelector('[data-flex-row-action="remove"]').click();
+    assert(a.querySelector('[name="cell_a"]').disabled); assert.equal(a.querySelector('.flex-row-remove-mirror').value, 'a');
+    assert.equal(a.querySelectorAll(':scope > input').length, 0, 'transport remains valid table markup');
+    a.querySelector('[data-flex-row-action="remove"]').click(); assert(!a.querySelector('[name="cell_a"]').disabled); h.close();
+});
+test('AJAX table duplication includes unsaved cells and inserts a native table row', async () => {
+    const h = await harness(tableSet(tableRow('a')), {response:async () => ({ok:true,json:async () => ({html:tableRow('copy','Copied')})})});
+    const d = h.document; d.querySelector('[name="cell_a"]').value = 'Unsaved cell';
+    d.querySelector('[data-flex-row-action="duplicate"]').click(); await tick();
+    assert.equal(h.calls[0].body.get('cell_a'), 'Unsaved cell'); assert.equal(d.querySelector('tbody').children.length, 2);
+    assert.equal(d.querySelector('tbody').lastElementChild.tagName, 'TR'); assert.equal(d.querySelector('.flex-rows-order').value, 'a,copy'); h.close();
+});
+test('clicking a table cell focuses its visible enabled field and leaves tabs and actions alone', async () => {
+    const h = await harness(tableSet(tableRow('a')));
+    const d = h.document;
+    d.querySelector('table').classList.add('flex-table-grid');
+    const cell = d.querySelector('.flex-table-cell');
+    cell.querySelector('.Inputfield').outerHTML = `<li class="Inputfield flex-table-input"><div class="InputfieldContent">
+        <a href="#language" role="tab">Language</a>
+        <input name="disabled" disabled>
+        <input name="inactive_language" style="display:none">
+        <textarea name="active_language"></textarea>
+        </div></li>`;
+    const disabled = cell.querySelector('[name="disabled"]');
+    const active = cell.querySelector('textarea');
+    for(const field of [disabled, active]) field.getClientRects = () => [{width: 100, height: 30}];
+    const tab = cell.querySelector('[role="tab"]');
+    const actionButton = d.querySelector('[data-flex-row-action="duplicate"]');
+    tab.focus(); tab.click();
+    assert.equal(d.activeElement, tab);
+    actionButton.focus();
+    d.querySelector('.flex-table-actions').click();
+    assert.equal(d.activeElement, actionButton);
+    cell.click();
+    assert.equal(d.activeElement, active);
+    active.disabled = true;
+    tab.focus(); cell.click();
+    assert.equal(d.activeElement, tab);
+    h.close();
+});
+test('multilingual table cells hide field headers and their controls', async () => {
+    const h = await harness(tableSet(tableRow('a'))), d = h.document;
+    const table = d.querySelector('table'); table.classList.add('flex-table-grid');
+    const cell = d.querySelector('li.Inputfield'); cell.classList.add('flex-table-input');
+    const header = d.createElement('label');
+    header.className = 'InputfieldHeader';
+    header.innerHTML = 'Column caption<button class="langTabsToggle" type="button">Languages</button><i class="toggle-icon"></i>';
+    cell.prepend(header);
+    const columnCell = cell.cloneNode(true);
+    const headRow = table.createTHead().insertRow();
+    const th = d.createElement('th'); th.scope = 'col'; headRow.append(th, d.createElement('th'));
+    const headInputs = cell.parentElement.cloneNode(false); th.append(headInputs); headInputs.append(columnCell);
+    const columnHeader = columnCell.querySelector('.InputfieldHeader');
+    const style = d.createElement('style'); style.textContent = fs.readFileSync(path.join(__dirname, '../../FieldtypeFlex.css'), 'utf8'); d.head.append(style);
+    assert.equal(h.window.getComputedStyle(header).position, 'absolute', 'ordinary repeated header is compact');
+    for(const nativeState of ['hasLangTabs', 'langTabsOff']) {
+        cell.className = 'Inputfield flex-table-input ' + nativeState;
+        columnCell.className = cell.className;
+        for(const label of [header, columnHeader]) {
+            assert.equal(h.window.getComputedStyle(label).position, 'absolute', 'field header occupies no space in the cell');
+            assert.equal(h.window.getComputedStyle(label.querySelector('.langTabsToggle')).display, 'none');
+            assert.equal(h.window.getComputedStyle(label.querySelector('.toggle-icon')).display, 'none');
+        }
+    }
+    h.close();
 });
 test('nested labels retain original sibling values and parent breadcrumbs', async () => {
     const nested = set(row('child', 'Child')).replace('data-flex-set="blocks"', 'data-flex-set="nested"');
@@ -207,6 +285,22 @@ function nativeAdmin(w, calls) {
         legacy:{needsStack:()=>true,initElement:scope=>{w.Bridge.Inputfields.init(scope);scope.dispatchEvent(new w.CustomEvent('reloaded',{bubbles:true}));}}
     };
 }
+test('classic Uikit global does not activate Bridge paths during table AJAX or native setup', async()=>{
+    const calls=[];
+    const h=await harness(tableSet(tableRow('a')),{
+        before(w){
+            w.ProcessWireAdminTheme={init(){},setupWireTabs(){}};
+            w.ProcessWire={config:{},confirm(message,ok){calls.push('confirm');ok();}};
+            function $(element){return {0:element,on(){return this;},trigger(){return this;}};} $.fn={};w.jQuery=$;
+            w.Inputfields={init(){calls.push('init');}};
+        },
+        response:async()=>({ok:true,json:async()=>({html:tableRow('copy')})})
+    });
+    h.document.querySelector('[data-flex-row-action="duplicate"]').click();await tick();
+    assert.equal(h.document.querySelectorAll('tbody > tr').length,2);assert.equal(h.document.querySelector('.flex-rows-error').textContent,'');
+    assert(calls.includes('init'));h.flex.classic.confirm('Continue',()=>calls.push('ok'));assert(calls.includes('ok'));
+    h.close();
+});
 test('Bridge uses native sortable and toggle APIs without the proposed files API', async()=>{
     const calls=[];
     const h=await harness(set()+`<div class="Inputfield" data-bridge-component="InputfieldFlexImage" data-bridge-widget="InputfieldImage"></div>`,{before(w){nativeAdmin(w,calls);}});

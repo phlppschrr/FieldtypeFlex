@@ -4,7 +4,8 @@ namespace FieldtypeFlex {
     // Element-only contract: replacing this adapter does not affect Row logic.
     export const sortable = {
         init(list: HTMLElement, start: (row: HTMLElement) => void, stop: (row: HTMLElement) => void): void {
-            if(window.ProcessWireAdminTheme) {
+            const theme = bridgeTheme();
+            if(theme) {
                 if(window.Bridge?.contract !== '1' || nativeSorts.has(list)) return;
                 const state = {disabled: false} as {disabled: boolean; destroy?: () => void};
                 nativeSorts.set(list, state);
@@ -18,7 +19,7 @@ namespace FieldtypeFlex {
                 }).catch(error => { nativeSorts.delete(list); console.error('Flex sorting failed', error); });
                 if(!observing) {
                     observing = true;
-                    window.ProcessWireAdminTheme.observe(() => nativeSorts.forEach((state, list) => {
+                    theme.observe(() => nativeSorts.forEach((state, list) => {
                         if(!list.isConnected) { state.destroy?.(); nativeSorts.delete(list); }
                     }));
                 }

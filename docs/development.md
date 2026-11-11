@@ -93,6 +93,16 @@ Objects use native fieldsets and require no additional JavaScript or CSS.
 
 ## TypeScript admin assets
 
+`ddev flex-test tables` covers table definitions, native widget processing,
+header/column preservation, multilingual/nested values, native errors and undo,
+and authenticated AJAX add/duplicate (including new draft ancestors). The JS
+runtime suite also exercises table ordering, remove/undo, unsaved duplication
+and native language-header display states. For browser QA, test a real PageEdit
+save and independent readback, dropdowns, drag/keyboard sorting and horizontal
+scrolling under a classic theme. Update Bridge from official upstream before
+testing it, preserve the old installation and record the tested commit. HTTP
+PageEdit tests do not replace visual layout or browser-console inspection.
+
 The editable sources live in `scripts/typescript/`. Run from the module root:
 
 ```sh

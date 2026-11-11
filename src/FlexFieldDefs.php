@@ -415,6 +415,7 @@ class FlexFieldDefs extends Wire {
 			if(!is_array($settings)) {
 				throw new WireException(sprintf($this->_("Flex property '%s' must be an array"), $name));
 			}
+			if(($settings['type'] ?? '') === 'table') $settings = $this->tableDefinition($settings);
 			$isRows = ($settings['type'] ?? '') === 'rows';
 			$isObject = ($settings['type'] ?? '') === 'object';
 			$this->validateStructureSettings($settings, $isRows);
@@ -495,6 +496,57 @@ class FlexFieldDefs extends Wire {
 			}
 			$parent->add($input);
 		}
+	}
+
+	/** Tables are syntax and presentation over existing Object/Rows schemas. */
+	private function tableDefinition(array $settings): array {
+		foreach(['editableHeaders', 'rowLabels'] as $key) {
+			if(array_key_exists($key, $settings) && !is_bool($settings[$key])) throw new WireException(sprintf($this->_('%s must be a boolean'), $key));
+		}
+		foreach(['children', 'types', 'rowTitle', 'rowCollapse', 'rowLazyLoad', 'inheritField'] as $key) {
+			if(array_key_exists($key, $settings)) throw new WireException(sprintf($this->_('%s is not supported on a table'), $key));
+		}
+		$columns = $settings['columns'] ?? null;
+		if(!is_array($columns) || !$columns || array_is_list($columns)) throw new WireException($this->_('Table columns must be a non-empty property map'));
+		if(array_key_exists('row_label', $columns)) throw new WireException($this->_('row_label is reserved for table row labels'));
+		$headers = [];
+		$widths = [];
+		$label = ['type' => 'text', 'label' => $this->_('Label'), 'useLanguages' => $settings['useLanguages'] ?? false, 'langBlankInherit' => 1];
+		if($settings['rowLabels'] ?? false) $columns = ['row_label' => $label] + $columns;
+		foreach($columns as $name => &$column) {
+			if(!is_array($column)) throw new WireException($this->_('Each table column must be an Inputfield definition'));
+			if(array_key_exists('width', $column)) {
+				$width = $column['width'];
+				if(!is_string($width) || !preg_match('/^(?:[0-9]+(?:\.[0-9]+)?|\.[0-9]+)(?:rem|px)$/D', $width) || (float) $width <= 0) throw new WireException($this->_('Table column width must be a positive rem or px length'));
+				$widths[$name] = $width;
+				unset($column['width']);
+			}
+			// The native wrapper fills its cell; its percentage layout is unrelated.
+			$column['columnWidth'] = 100;
+			$headers[$name] = $label + ['value' => ''];
+			$headers[$name]['size'] = 1;
+			$headers[$name]['collapsed'] = Inputfield::collapsedNever;
+			$headers[$name]['label'] = $column['label'] ?? ucwords(str_replace('_', ' ', $name));
+			$headers[$name]['value'] = $headers[$name]['label'];
+			foreach($column as $key => $value) {
+				if($key === 'renamedFrom' || preg_match('/^label[0-9]+$/D', $key)) $headers[$name][$key] = $value;
+			}
+			if(($settings['useLanguages'] ?? false) && $this->wire()->languages && $this->wire()->modules->isInstalled('LanguageSupportFields')) {
+				$defaults = [];
+				foreach($this->wire()->languages as $language) $defaults[$language->id] = $column['label' . $language->id] ?? $headers[$name]['label'];
+				$headers[$name]['value'] = $defaults;
+			}
+		}
+		unset($column);
+		$table = ['columns' => array_keys($columns), 'widths' => $widths, 'rowLabels' => $settings['rowLabels'] ?? false];
+		$rows = ['type' => 'rows', '_flexTable' => $table, 'rowCollapse' => FieldtypeFlex::ROW_EXPAND_ALL, 'types' => ['row' => ['children' => $columns]]];
+		foreach(['minItems', 'maxItems', 'addRowLabel'] as $key) {
+			if(array_key_exists($key, $settings)) { $rows[$key] = $settings[$key]; unset($settings[$key]); }
+		}
+		$children = ($settings['editableHeaders'] ?? false) ? ['headers' => ['type' => 'object', 'children' => $headers]] : [];
+		$children['rows'] = $rows;
+		unset($settings['columns'], $settings['editableHeaders'], $settings['rowLabels'], $settings['useLanguages']);
+		return array_replace($settings, ['type' => 'object', 'children' => $children, '_flexTable' => $table]);
 	}
 
 	private function importWrapper(InputfieldWrapper $source, InputfieldWrapper $parent, int $nesting = 0): void {
@@ -603,6 +655,19 @@ class FlexFieldDefs extends Wire {
 				throw new WireException($this->_('Row type children must be definitions or a wrapper'));
 			}
 			$schema = new self($this->flexField, $this->flexPage, $children, $this->depth + 1);
+			if(isset($settings['_flexTable'])) {
+				$allowed = ['InputfieldText', 'InputfieldEmail', 'InputfieldURL', 'InputfieldInteger', 'InputfieldFloat', 'InputfieldTextarea', 'InputfieldCheckbox', 'InputfieldToggle', 'InputfieldSelect', 'InputfieldRadios', 'InputfieldCheckboxes', 'InputfieldSelectMultiple', 'InputfieldAsmSelect', 'InputfieldTextTags', 'InputfieldDatetime', 'InputfieldPage'];
+				foreach($schema->properties() as $column => $definition) {
+					$cell = $definition['input'];
+					if(!in_array($cell->className(), $allowed, true) || in_array($definition['kind'], ['object', 'rows', 'file', 'image'], true)) throw new WireException(sprintf($this->_('Unsupported table column input: %s'), $cell->className()));
+					if($cell instanceof InputfieldPage && !$cell->labelFieldName) $cell->labelFieldName = 'title';
+					if($cell instanceof InputfieldPage && !in_array(ltrim((string) $cell->inputfield, '_'), ['InputfieldSelect', 'InputfieldSelectMultiple', 'InputfieldAsmSelect', 'InputfieldPageAutocomplete'], true)) throw new WireException($this->_('Table Page columns require Select, SelectMultiple, AsmSelect or PageAutocomplete'));
+					if(in_array((int) $cell->collapsed, [Inputfield::collapsedYesAjax, Inputfield::collapsedBlankAjax, Inputfield::collapsedTab, Inputfield::collapsedTabAjax, Inputfield::collapsedTabLocked], true)) throw new WireException($this->_('Table cells cannot use AJAX collapse or tabs'));
+					if(in_array((int) $cell->collapsed, [Inputfield::collapsedNo, Inputfield::collapsedYes, Inputfield::collapsedBlank, Inputfield::collapsedPopulated], true)) $cell->collapsed = Inputfield::collapsedNever;
+					if(in_array((int) $cell->collapsed, [Inputfield::collapsedBlankLocked, Inputfield::collapsedYesLocked], true)) $cell->collapsed = Inputfield::collapsedNoLocked;
+				}
+				if(array_keys($schema->properties()) !== $settings['_flexTable']['columns']) throw new WireException($this->_('Table columns must be value inputs, not wrappers or markup'));
+			}
 			$schema->rowTypeLabel = $typeSettings['label'] ?? ucwords(str_replace('_', ' ', $type));
 			$this->properties[$name]['types'][$type] = [
 				'label'    => $schema->rowTypeLabel(),
@@ -926,6 +991,17 @@ class FlexFieldDefs extends Wire {
 					$input->flexObjectPrefix = FlexPath::inputPrefix($inputName, $address);
 					$children = $definition['schema']->getInputfields($object, $input->flexObjectPrefix, $draft, $root ?: $value, $base, $inputName, $ancestors, $value ? $value->address() : '');
 					foreach($children->children() as $child) $input->add($child);
+					if(isset($definition['settings']['_flexTable'])) {
+						$rows = $children->getChildByName($input->flexObjectPrefix . 'rows');
+						$rows->label = $input->label;
+						$rows->flexTableHeaders = $children->getChildByName($input->flexObjectPrefix . 'headers');
+						foreach(['render', 'renderValue'] as $method) {
+							$input->addHookBefore($method, function(HookEvent $event) use ($rows, $method) {
+								$event->replace = true;
+								$event->return = $rows->$method();
+							});
+						}
+					}
 				} else if($definition && $definition['kind'] === 'rows') {
 					$input->definition = $definition;
 					$input->setName = $value && $value->address() !== '' ? $value->address() . '.' . $name : $name;

@@ -6,6 +6,7 @@ FieldtypeFlex stores structured content in one ProcessWire field. Get the module
 - [Reading and writing values](#reading-and-writing-values)
 - [Definitions](#definitions)
 - [Objects](#objects)
+- [Tables](#tables)
 - [Rows](#rows)
 - [File and Image properties](#file-and-image-properties)
 - [Selectors](#selectors)
@@ -193,6 +194,25 @@ Schema paths include each collection and type, e.g. `sections.section.blocks.tex
 Read/edit `$page->content->link->url`, or assign `$page->content->link = ['url' => '/about/']` with formatting off. **Map assignment replaces the Object and applies defaults to omitted known children**; editing a leaf retains other values. Stored unknown children survive ordinary saves. The Object always exists: use `hasValue('link')` instead of truthiness. Assign plain maps, not raw envelopes.
 
 Formatting, languages, change tracking and renames apply recursively. Names and bare dependencies are local; `parent.`/`root.` address containing/root scopes. Selectors use Object paths (`content.link.label=Contact`); scalar leaves can be sorted. Objects have no `.count`; their child collections do. `FlexRows::find()` accepts Object leaf paths. Objects are unsupported in per-file `customFields`.
+
+## Tables
+
+`table` defines fixed `columns` in display order and lets editors add, duplicate, reorder, hide and remove rows. `minItems` and `maxItems` limit row count. A column's optional `width` is a positive `rem` or `px` length. Editors can drag column dividers to resize until reload.
+
+```php
+// Table definition.
+'prices' => [
+    'type' => 'table',
+    'columns' => [
+        'service' => ['type' => 'text', 'label' => 'Service'],
+        'price' => ['type' => 'float', 'label' => 'Price', 'width' => '7rem'],
+    ],
+],
+```
+
+Read `$page->content->prices->rows` (`FlexRows`) or add a row with `$table->rows->addRow('row', ['service' => 'Advice'])`. Column labels are fixed by default. `editableHeaders => true` exposes `$table->headers->service` with the column label as its initial value. `rowLabels => true` adds the reserved `$row->row_label` property. Disabling either option or removing a column retains its stored values. Table `useLanguages` applies to generated headings and row labels. Set it on each data column separately as needed.
+
+Cells support Text, Email, URL, Integer, Float, plain Textarea, Checkbox, Toggle, Select, Radios, Checkboxes, SelectMultiple, AsmSelect, TextTags and Datetime. Page references support Select, SelectMultiple, AsmSelect and PageAutocomplete. [Examples with fixed and editable headings](examples/08-tables.php).
 
 ## Rows
 
