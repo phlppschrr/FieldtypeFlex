@@ -656,12 +656,12 @@ class FlexFieldDefs extends Wire {
 			}
 			$schema = new self($this->flexField, $this->flexPage, $children, $this->depth + 1);
 			if(isset($settings['_flexTable'])) {
-				$allowed = ['InputfieldText', 'InputfieldEmail', 'InputfieldURL', 'InputfieldInteger', 'InputfieldFloat', 'InputfieldTextarea', 'InputfieldCheckbox', 'InputfieldToggle', 'InputfieldSelect', 'InputfieldRadios', 'InputfieldCheckboxes', 'InputfieldSelectMultiple', 'InputfieldAsmSelect', 'InputfieldTextTags', 'InputfieldDatetime', 'InputfieldPage', 'InputfieldImage'];
+				$allowed = ['InputfieldText', 'InputfieldEmail', 'InputfieldURL', 'InputfieldInteger', 'InputfieldFloat', 'InputfieldTextarea', 'InputfieldCheckbox', 'InputfieldToggle', 'InputfieldSelect', 'InputfieldRadios', 'InputfieldCheckboxes', 'InputfieldSelectMultiple', 'InputfieldAsmSelect', 'InputfieldTextTags', 'InputfieldDatetime', 'InputfieldPage', 'InputfieldImage', 'InputfieldFile'];
 				foreach($schema->properties() as $column => $definition) {
 					$cell = $definition['input'];
 					if(!in_array($cell->className(), $allowed, true) || in_array($definition['kind'], ['object', 'rows'], true)) throw new WireException(sprintf($this->_('Unsupported table column input: %s'), $cell->className()));
 					if($cell instanceof InputfieldPage && !$cell->labelFieldName) $cell->labelFieldName = 'title';
-					if($cell instanceof InputfieldPage && !in_array(ltrim((string) $cell->inputfield, '_'), ['InputfieldSelect', 'InputfieldSelectMultiple', 'InputfieldAsmSelect', 'InputfieldPageAutocomplete', 'InputfieldCheckboxes', 'InputfieldRadios', 'InputfieldTextTags'], true)) throw new WireException(sprintf($this->_('Unsupported table Page widget: %s'), $cell->inputfield));
+					if($cell instanceof InputfieldPage && !in_array(ltrim((string) $cell->inputfield, '_'), ['InputfieldSelect', 'InputfieldSelectMultiple', 'InputfieldAsmSelect', 'InputfieldPageAutocomplete', 'InputfieldCheckboxes', 'InputfieldRadios', 'InputfieldTextTags', 'InputfieldPageListSelect', 'InputfieldPageListSelectMultiple'], true)) throw new WireException(sprintf($this->_('Unsupported table Page widget: %s'), $cell->inputfield));
 					if(in_array((int) $cell->collapsed, [Inputfield::collapsedYesAjax, Inputfield::collapsedBlankAjax, Inputfield::collapsedTab, Inputfield::collapsedTabAjax, Inputfield::collapsedTabLocked], true)) throw new WireException($this->_('Table cells cannot use AJAX collapse or tabs'));
 					if(in_array((int) $cell->collapsed, [Inputfield::collapsedNo, Inputfield::collapsedYes, Inputfield::collapsedBlank, Inputfield::collapsedPopulated], true)) $cell->collapsed = Inputfield::collapsedNever;
 					if(in_array((int) $cell->collapsed, [Inputfield::collapsedBlankLocked, Inputfield::collapsedYesLocked], true)) $cell->collapsed = Inputfield::collapsedNoLocked;

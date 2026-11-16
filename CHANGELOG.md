@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Open File and PageList editors in a full-width table detail row.
 - Support Checkboxes, Radios and TextTags for Page references in table cells.
 - Show image thumbnails in table cells and open the native editor in a full-width detail row that closes when focus moves to another cell.
 - Remove the extra Inputfield frame and padding from the table image editor.

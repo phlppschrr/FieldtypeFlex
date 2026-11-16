@@ -76,11 +76,11 @@ $badTables = [
  ['columns' => ['row_label' => ['type' => 'text']]],
 ];
 foreach(['100%', 'auto', '-2rem', '0px', '1em', '1rem;display:none', 12] as $width) $badTables[] = ['columns' => ['value' => ['width' => $width]]];
-foreach(['file', 'TinyMCE', 'fieldset', 'Markup', 'Hidden', 'Icon', 'Selector'] as $inputType) $badTables[] = ['columns' => ['value' => ['type' => $inputType]]];
+foreach(['TinyMCE', 'fieldset', 'Markup', 'Hidden', 'Icon', 'Selector'] as $inputType) $badTables[] = ['columns' => ['value' => ['type' => $inputType]]];
 foreach([10, 11, 20, 21, 22] as $collapsed) $badTables[] = ['columns' => ['value' => ['type' => 'text', 'collapsed' => $collapsed]]];
 $badTables[] = ['columns' => ['value' => ['type' => 'object', 'children' => []]]];
 $badTables[] = ['columns' => ['value' => ['type' => 'rows', 'types' => ['item' => ['children' => []]]]]];
-$badTables[] = ['columns' => ['value' => ['type' => 'page', 'inputfield' => 'InputfieldPageListSelect']]];
+$badTables[] = ['columns' => ['value' => ['type' => 'page', 'inputfield' => 'InputfieldIcon']]];
 foreach($badTables as $index => $override) {
  $bad = clone $tf; $bad->flexDefinition = json_encode(['prices' => array_replace($valid, $override)]);
  $throws(fn() => $type->getDefinitions($bad, $page), "invalid table definition $index is rejected", FlexDefinitionException::class);
@@ -91,13 +91,16 @@ $throws(fn() => $type->getDefinitions($bad, $page), 'inherited rich text is reje
 
 $imageTable = $createField('flex_table_images', ['grid' => ['type' => 'table', 'columns' => [
 	'photo' => ['type' => 'image', 'maxFiles' => 3],
+	'attachment' => ['type' => 'file', 'extensions' => 'txt', 'maxFiles' => 3],
 ]]]);
 $imageTableValue = $type->getBlankValue($page, $imageTable);
 $imageTableValue->grid->rows->addRow('row');
 $imageTableEditor = $imageTable->getInputfield($page);
 $imageTableEditor->value = $imageTableValue;
 $imageTableHtml = $imageTableEditor->render();
-$assert(str_contains($imageTableHtml, 'class="flex-table-preview"') && str_contains($imageTableHtml, 'data-flex-upload'), 'table Image preview owns the existing native upload field');
+foreach(['image', 'file'] as $preview) {
+	$assert(str_contains($imageTableHtml, 'data-flex-preview="' . $preview . '"') && str_contains($imageTableHtml, 'data-flex-upload'), "table $preview preview owns the existing native upload field");
+}
 
 // Every released cell widget renders under the table's native wrappers.
 $cellTypes = ['Text', 'Email', 'URL', 'Integer', 'Float', 'Textarea', 'Checkbox', 'Toggle', 'Select', 'Radios', 'Checkboxes', 'SelectMultiple', 'AsmSelect', 'TextTags', 'Datetime'];
@@ -108,8 +111,8 @@ foreach($cellTypes as $i => $inputType) {
  if($inputType === 'Datetime') $columns['cell_' . $i]['dateInputFormat'] = 'Y-m-d';
  if(in_array($inputType, ['Select', 'Radios', 'Checkboxes', 'SelectMultiple', 'AsmSelect'])) $columns['cell_' . $i]['options'] = ['a' => 'Alpha', 'b' => 'Beta'];
 }
-foreach(['InputfieldSelect', 'InputfieldSelectMultiple', 'InputfieldAsmSelect', 'InputfieldPageAutocomplete', 'InputfieldCheckboxes', 'InputfieldRadios', 'InputfieldTextTags', 'InputfieldTextTags'] as $i => $widget) {
- $columns['page_' . $i] = ['type' => 'page', 'inputfield' => $widget, 'parent_id' => 1, 'derefAsPage' => in_array($i, [0, 5, 7], true) ? 2 : 0];
+foreach(['InputfieldSelect', 'InputfieldSelectMultiple', 'InputfieldAsmSelect', 'InputfieldPageAutocomplete', 'InputfieldCheckboxes', 'InputfieldRadios', 'InputfieldTextTags', 'InputfieldTextTags', 'InputfieldPageListSelect', 'InputfieldPageListSelectMultiple'] as $i => $widget) {
+ $columns['page_' . $i] = ['type' => 'page', 'inputfield' => $widget, 'parent_id' => 1, 'derefAsPage' => in_array($i, [0, 5, 7, 8], true) ? 2 : 0];
 }
 $widgets = $createField('flex_table_widgets', ['grid' => ['type' => 'table', 'columns' => $columns]]);
 $same('title', $widgets->defs($page)->getPropertyInputfield('grid.rows.row.page_3')->labelFieldName, 'PageAutocomplete table columns default to visible native Page titles');
@@ -124,8 +127,8 @@ foreach((new \DOMXPath($dom))->query('//input[@type="hidden"]') as $hidden) $pos
 $wp = FlexPath::inputPrefix($widgets->name, $wr->address());
 $submitted = ['Typed', 'editor@example.com', 'https://example.com/', '42', '3.25', "Line one\nLine two", '1', '1', 'b', 'b', ['a', 'b'], ['a', 'b'], ['b'], 'one two', '2026-11-10'];
 foreach($submitted as $i => $cellValue) $post[$wp . 'cell_' . $i] = $cellValue;
-foreach(range(0, 7) as $i) $post[$wp . 'page_' . $i] = match($i) {
- 0, 5 => (string) $second->id,
+foreach(range(0, 9) as $i) $post[$wp . 'page_' . $i] = match($i) {
+ 0, 5, 8, 9 => (string) $second->id,
  6, 7 => '_' . $second->id, // Native TextTags prefixes numeric IDs.
  default => [$second->id],
 };
@@ -135,8 +138,8 @@ $processed = $wi->value->grid->rows->first();
 foreach([0 => 'Typed', 1 => 'editor@example.com', 2 => 'https://example.com/', 3 => 42, 4 => 3.25, 5 => "Line one\nLine two", 6 => 1, 7 => 1, 8 => 'b', 9 => 'b', 10 => ['a', 'b'], 11 => ['a', 'b'], 12 => ['b'], 13 => 'one two'] as $i => $expected) $same($expected, $processed->get('cell_' . $i), "native cell_$i uses its existing value normalization");
 $same(strtotime('2026-11-10'), $processed->cell_14, 'table Datetime uses native timestamp reads');
 $same($second->id, $processed->page_0->id, 'single Page table cell resolves the selected page');
-foreach([1, 2, 3, 4, 6] as $i) $same([$second->id], array_values($processed->get('page_' . $i)->explode('id')), "Page widget $i replaces the selected PageArray");
-foreach([5, 7] as $i) $same($second->id, $processed->get('page_' . $i)->id, "Page widget $i resolves the single selected page");
+foreach([1, 2, 3, 4, 6, 9] as $i) $same([$second->id], array_values($processed->get('page_' . $i)->explode('id')), "Page widget $i replaces the selected PageArray");
+foreach([5, 7, 8] as $i) $same($second->id, $processed->get('page_' . $i)->id, "Page widget $i resolves the single selected page");
 $page->set($widgets->name, $wi->value); $page->save($widgets->name);
 $same(42, $wire->pages->getFresh($id)->getUnformatted($widgets->name)->grid->rows->first()->cell_3, 'processed native widget row persists independently');
 

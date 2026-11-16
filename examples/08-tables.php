@@ -3,7 +3,8 @@
 // Supported cells: Text, Email, URL, Integer, Float, plain Textarea, Checkbox,
 // Toggle, Select, Radios, Checkboxes, SelectMultiple, AsmSelect, TextTags and Datetime.
 // Page references use Select, SelectMultiple, AsmSelect, PageAutocomplete,
-// Checkboxes, Radios or TextTags.
+// Checkboxes, Radios, TextTags, PageListSelect or PageListSelectMultiple.
+// File, Image and PageList inputs use a detail row.
 
 return [
     // Fixed headings use the column labels.

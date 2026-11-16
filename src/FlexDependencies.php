@@ -78,6 +78,18 @@ final class FlexDependencies {
 				if($previous !== '') $toggle->trackChange('value', $previous, '');
 			});
 		}
+		if($copy instanceof InputfieldPage && ltrim((string) $copy->inputfield, '_') === 'InputfieldPageListSelectMultiple') {
+			$copy->addHookBefore('processInput', static function(HookEvent $event): void {
+				$pageInput = $event->object;
+				$post = $event->arguments(0);
+				$value = $post[$pageInput->name];
+				// The native tree posts one CSV string, but the base input expects an array.
+				if(!is_string($value) || !$pageInput->getInputfield() instanceof InputfieldHasArrayValue) return;
+				$data = $post->getArray();
+				$data[$pageInput->name] = [$value];
+				$event->arguments(0, $pageInput->wire(new WireInputData($data)));
+			});
+		}
 		foreach($source->getAttributes() as $key => $value) $copy->attr($key, $value);
 		// Text exports minlength as data-minlength and omits maxlength=0 for HTML.
 		// A processing copy needs the original semantic limits, not those defaults.

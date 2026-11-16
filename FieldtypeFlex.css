@@ -137,12 +137,13 @@
     cursor: pointer;
 }
 .flex-table-preview[hidden],
-.flex-table-cell:has(> .flex-table-editor .InputfieldImage.InputfieldStateHidden) > .flex-table-preview { display: none; }
+.flex-table-cell:has(> .flex-table-editor > .Inputfields > .Inputfield.InputfieldStateHidden) > .flex-table-preview { display: none; }
+.flex-table-preview > span { max-inline-size: 14rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .flex-table-preview > img { flex: none; width: 1.4rem; height: 1.4rem; object-fit: cover; }
 .flex-table-grid > tbody > .flex-table-detail > td { padding: .75rem; }
 .flex-table-detail > td > .flex-table-editor { contain: inline-size; }
-.flex-table-detail .flex-table-editor > .Inputfields > .InputfieldImage > .InputfieldHeader { padding-block: 0 .5rem; }
-.flex-table-detail .flex-table-editor > .Inputfields > .InputfieldImage > .InputfieldContent { padding-block-end: 0; }
+.flex-table-detail .flex-table-editor > .Inputfields > .Inputfield > .InputfieldHeader { padding-block: 0 .5rem; }
+.flex-table-detail .flex-table-editor > .Inputfields > .Inputfield > .InputfieldContent { padding-block-end: 0; }
 .flex-table-detail .flex-table-editor-close { margin-top: .5rem; }
 
 .flex-rows > .flex-rows-items {

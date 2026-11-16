@@ -65,7 +65,7 @@ test('AJAX table duplication includes unsaved cells and inserts a native table r
     assert.equal(d.querySelector('tbody').lastElementChild.tagName, 'TR'); assert.equal(d.querySelector('.flex-rows-order').value, 'a,copy'); h.close();
 });
 test('table detail editor keeps thumbnails and unsaved form values through focus, duplication and undo', async () => {
-    const content = tableRow('a').replace('<ul class="Inputfields">', `<button class="flex-table-preview" type="button" aria-label="Image" hidden></button><div class="flex-table-editor"><button class="flex-table-editor-close" type="button" hidden>Done</button><ul class="InputfieldImageList">
+    const content = tableRow('a').replace('<ul class="Inputfields">', `<button class="flex-table-preview" type="button" aria-label="Image" data-flex-preview="image" hidden></button><div class="flex-table-editor"><button class="flex-table-editor-close" type="button" hidden>Done</button><ul class="InputfieldImageList">
         <li class="gridImage"><img src="/first.jpg"></li><li class="gridImage"><img src="/second.jpg"></li>
         <li class="gridImage"><img src="/removed.jpg"><input type="checkbox" class="gridImage__deletebox" checked></li>
         </ul><ul class="Inputfields">`).replace('</li></ul></td>', '</li></ul></div></td>');

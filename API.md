@@ -212,7 +212,7 @@ Formatting, languages, change tracking and renames apply recursively. Names and 
 
 Read `$page->content->prices->rows` (`FlexRows`) or add a row with `$table->rows->addRow('row', ['service' => 'Advice'])`. Column labels are fixed by default. `editableHeaders => true` exposes `$table->headers->service` with the column label as its initial value. `rowLabels => true` adds the reserved `$row->row_label` property. Disabling either option or removing a column retains its stored values. Table `useLanguages` applies to generated headings and row labels. Set it on each data column separately as needed.
 
-Cells support Text, Email, URL, Integer, Float, plain Textarea, Checkbox, Toggle, Select, Radios, Checkboxes, SelectMultiple, AsmSelect, TextTags and Datetime. Page references support Select, SelectMultiple, AsmSelect, PageAutocomplete, Checkboxes, Radios and TextTags. [Examples with fixed and editable headings](examples/08-tables.php).
+Cells support Text, Email, URL, Integer, Float, plain Textarea, Checkbox, Toggle, Select, Radios, Checkboxes, SelectMultiple, AsmSelect, TextTags and Datetime. Page references support Select, SelectMultiple, AsmSelect, PageAutocomplete, Checkboxes, Radios, TextTags, PageListSelect and PageListSelectMultiple. File, Image and PageList editors open in a full-width row. [Examples with fixed and editable headings](examples/08-tables.php).
 
 ## Rows
 

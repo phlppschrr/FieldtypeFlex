@@ -614,6 +614,32 @@ var FieldtypeFlex;
             return [thumb];
         });
         button.replaceChildren(...thumbnails);
+    }
+    function updateTablePreview(button, editor) {
+        const kind = FieldtypeFlex.attr(button, 'data-flex-preview');
+        if (kind === 'image') {
+            updateImagePreview(button, editor);
+        }
+        else {
+            const text = FieldtypeFlex.one(button, 'span');
+            if (kind === 'page') {
+                const id = editor.querySelector('.InputfieldPageListSelectData')?.value;
+                const label = editor.querySelector('.PageListSelectName');
+                if (!Number(id))
+                    text.textContent = '';
+                else if (label?.textContent?.trim())
+                    text.textContent = label.textContent.trim();
+            }
+            else {
+                const labels = kind === 'file'
+                    ? FieldtypeFlex.all(editor, '.InputfieldFileList > li:not(:has(.InputfieldFileDelete input:checked)) .InputfieldFileName')
+                    : FieldtypeFlex.all(editor, '.InputfieldPage > .InputfieldContent ol > li:not(.itemTemplate) > .itemLabel');
+                text.textContent = labels.length ? (labels[0].textContent || '').trim() : '';
+                if (labels.length > 1)
+                    text.textContent += ' +' + (labels.length - 1);
+            }
+            button.title = text.textContent || '';
+        }
         button.classList.toggle('ui-state-error', !!editor.querySelector('.InputfieldStateError, .InputfieldError'));
     }
     function closeTableEditor(set, focus = false) {
@@ -621,7 +647,7 @@ var FieldtypeFlex;
         if (!active)
             return;
         const { button, editor, detail } = active;
-        updateImagePreview(button, editor);
+        updateTablePreview(button, editor);
         editor.hidden = true;
         FieldtypeFlex.one(editor, '.flex-table-editor-close').hidden = true;
         button.after(editor);
@@ -681,7 +707,7 @@ var FieldtypeFlex;
             rows(set).forEach(row => {
                 FieldtypeFlex.all(row, ':scope > .flex-table-cell > .flex-table-preview[hidden]').forEach(button => {
                     const editor = FieldtypeFlex.one(button.parentElement, ':scope > .flex-table-editor');
-                    updateImagePreview(button, editor);
+                    updateTablePreview(button, editor);
                     editor.hidden = true;
                     button.hidden = false;
                     if (!row.matches('.flex-row-remove-pending') && button.matches('.ui-state-error'))
