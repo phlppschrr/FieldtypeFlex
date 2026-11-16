@@ -197,18 +197,15 @@ namespace FieldtypeFlex {
     function updateImagePreview(button: HTMLButtonElement, editor: HTMLElement): void {
         const images = all(editor, '.InputfieldImageList > li.gridImage, .InputfieldImageEditSingle')
             .filter(item => !item.querySelector('.gridImage__deletebox:checked'));
-        const label = attr(button, 'aria-label');
-        const text = document.createElement('span');
-        text.textContent = label;
-        button.replaceChildren(text);
-        const source = images[0]?.querySelector<HTMLImageElement>('img');
-        if(source?.getAttribute('src')) {
+        const thumbnails = images.flatMap(item => {
+            const source = item.querySelector<HTMLImageElement>('img[src]:not([src=""])');
+            if(!source) return [];
             const thumb = document.createElement('img');
             thumb.src = source.src;
             thumb.alt = '';
-            button.prepend(thumb);
-        }
-        if(images.length > 1) text.textContent += ` +${images.length - 1}`;
+            return [thumb];
+        });
+        button.replaceChildren(...thumbnails);
         button.classList.toggle('ui-state-error', !!editor.querySelector('.InputfieldStateError, .InputfieldError'));
     }
     function closeTableEditor(set: HTMLElement, focus = false): void {
@@ -362,6 +359,30 @@ namespace FieldtypeFlex {
         control?.focus({preventScroll: true});
     });
     delegate('click', '.flex-row-retry', (event, button) => { event.preventDefault(); void loadRow(closest(button, '.flex-row')); });
+    const tableCells = '.flex-table-grid > tbody > .flex-row > :is(td, th), .flex-table-grid > thead > tr > th';
+    let tablePointer: number | undefined;
+    let closeAfterPointer: (() => void) | undefined;
+    delegate('pointerdown', tableCells, event => {
+        if(event.isPrimary && event.button === 0) tablePointer = event.pointerId;
+    });
+    for(const type of ['pointerup', 'pointercancel'] as const) {
+        document.addEventListener(type, event => {
+            if(tablePointer !== event.pointerId) return;
+            // Let the click finish before collapsing a detail row above the clicked cell.
+            if(closeAfterPointer) window.setTimeout(closeAfterPointer, 0);
+            tablePointer = undefined;
+            closeAfterPointer = undefined;
+        }, true);
+    }
+    delegate('focusin', tableCells, (_event, cell) => {
+        const set = closest(cell, '.flex-table');
+        const active = tableEditors.get(set);
+        if(!active || active.button.parentElement === cell) return;
+        const close = () => {
+            if(tableEditors.get(set) === active && cell.contains(document.activeElement) && !treeBusy(set)) closeTableEditor(set);
+        };
+        if(tablePointer === undefined) close(); else closeAfterPointer = close;
+    });
     delegate('click', '.flex-table-preview', (_event, button) => openTableEditor(button as HTMLButtonElement));
     delegate('click', '.flex-table-editor-close', (_event, button) => {
         if(!treeBusy(button)) closeTableEditor(closest(button, '.flex-table'), true);

@@ -64,15 +64,21 @@ test('AJAX table duplication includes unsaved cells and inserts a native table r
     assert.equal(h.calls[0].body.get('cell_a'), 'Unsaved cell'); assert.equal(d.querySelector('tbody').children.length, 2);
     assert.equal(d.querySelector('tbody').lastElementChild.tagName, 'TR'); assert.equal(d.querySelector('.flex-rows-order').value, 'a,copy'); h.close();
 });
-test('table detail editor preserves the form input through opening, duplication and removal undo', async () => {
-    const content = tableRow('a').replace('<ul class="Inputfields">', `<button class="flex-table-preview" type="button" aria-label="Image" hidden></button><div class="flex-table-editor"><button class="flex-table-editor-close" type="button" hidden>Done</button><ul class="Inputfields">`).replace('</li></ul>', '</li></ul></div>');
+test('table detail editor keeps thumbnails and unsaved form values through focus, duplication and undo', async () => {
+    const content = tableRow('a').replace('<ul class="Inputfields">', `<button class="flex-table-preview" type="button" aria-label="Image" hidden></button><div class="flex-table-editor"><button class="flex-table-editor-close" type="button" hidden>Done</button><ul class="InputfieldImageList">
+        <li class="gridImage"><img src="/first.jpg"></li><li class="gridImage"><img src="/second.jpg"></li>
+        <li class="gridImage"><img src="/removed.jpg"><input type="checkbox" class="gridImage__deletebox" checked></li>
+        </ul><ul class="Inputfields">`).replace('</li></ul></td>', '</li></ul></div></td>');
     const h = await harness(tableSet(content), {response:async () => ({ok:true,json:async () => ({html:tableRow('copy')})})});
     const d = h.document, row = d.querySelector('[data-flex-row="a"]');
+    d.querySelector('table').classList.add('flex-table-grid');
     const input = row.querySelector('[name="cell_a"]'), button = row.querySelector('.flex-table-preview');
     assert.equal(button.hidden, false);
+    assert.equal(button.textContent, '');
+    assert.deepEqual([...button.querySelectorAll('img')].map(image => new URL(image.src).pathname), ['/first.jpg', '/second.jpg']);
     button.click();
     assert.equal(row.nextElementSibling.cells[0].colSpan, row.cells.length);
-    assert.equal(d.querySelector('.flex-table-detail input'), input);
+    assert.equal(d.querySelector('.flex-table-detail [name="cell_a"]'), input);
     assert.equal(input.form.id, 'ProcessPageEdit');
     input.value = 'Pending';
     row.querySelector('[data-flex-row-action="duplicate"]').click();
@@ -91,6 +97,13 @@ test('table detail editor preserves the form input through opening, duplication 
     assert.equal(row.querySelector('[name="cell_a"]'), input);
     assert.equal(input.value, 'Pending');
     assert.equal(d.activeElement, button);
+    button.click();
+    input.focus();
+    assert.notEqual(d.querySelector('.flex-table-detail'), null);
+    const other = d.querySelector('[name="cell_copy"]');
+    other.focus();
+    assert.equal(d.querySelector('.flex-table-detail'), null);
+    assert.equal(d.activeElement, other);
     button.click();
     const sort = row.querySelector('.flex-row-sort');
     sort.dispatchEvent(new h.window.KeyboardEvent('keydown', {key:'ArrowDown', bubbles: true}));

@@ -133,15 +133,12 @@
     padding: .15rem .4rem;
     border: 0;
     background: transparent;
-    color: inherit;
-    font: inherit;
-    text-align: start;
+    overflow-x: auto;
     cursor: pointer;
 }
 .flex-table-preview[hidden],
 .flex-table-cell:has(> .flex-table-editor .InputfieldImage.InputfieldStateHidden) > .flex-table-preview { display: none; }
-.flex-table-preview > img { width: 1.4rem; height: 1.4rem; object-fit: cover; }
-.flex-table-preview > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.flex-table-preview > img { flex: none; width: 1.4rem; height: 1.4rem; object-fit: cover; }
 .flex-table-grid > tbody > .flex-table-detail > td { padding: .75rem; }
 .flex-table-detail > td > .flex-table-editor { contain: inline-size; }
 .flex-table-detail .flex-table-editor-close { margin-top: .5rem; }

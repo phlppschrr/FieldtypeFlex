@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Add a compact Image cell editor that opens in a full-width detail row.
+- Show image thumbnails in table cells and open the native editor in a full-width detail row that closes when focus moves to another cell.
 
 ## 0.7.0 — 2026-11-11
 

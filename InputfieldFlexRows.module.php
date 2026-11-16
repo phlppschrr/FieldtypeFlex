@@ -353,7 +353,7 @@ class InputfieldFlexRows extends Inputfield implements BridgeComponent {
 		$entities = fn($value) => $this->wire()->sanitizer->entities((string) $value);
 		$id = $entities($input->id . '_detail');
 		$label = $entities($input->label);
-		return '<button type="button" class="flex-table-preview" aria-expanded="false" aria-controls="' . $id . '" aria-label="' . $label . '" hidden><span>' . $label . '</span></button>'
+		return '<button type="button" class="flex-table-preview" aria-expanded="false" aria-controls="' . $id . '" aria-label="' . $label . '" hidden></button>'
 			. '<div id="' . $id . '" class="flex-table-editor">' . $html
 			. '<button type="button" class="ui-button flex-table-editor-close" hidden>' . $entities($this->_('Done')) . '</button></div>';
 	}
