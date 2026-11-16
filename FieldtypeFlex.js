@@ -512,11 +512,12 @@ var FieldtypeFlex;
         rows(set).forEach(row => {
             const header = FieldtypeFlex.one(row, ':scope > .flex-row-header');
             const toggle = header.querySelector('.flex-row-toggle');
+            const removed = row.matches('.flex-row-remove-pending');
             if (toggle)
                 toggle.disabled = busy;
             FieldtypeFlex.one(header, '[data-flex-row-action="duplicate"]').disabled = busy || (max > 0 && count >= max);
-            FieldtypeFlex.one(header, '[data-flex-row-action="remove"]').disabled = busy || (!row.matches('.flex-row-remove-pending') && count <= min);
-            FieldtypeFlex.one(header, '.flex-row-sort').disabled = busy || count < 2;
+            FieldtypeFlex.one(header, '[data-flex-row-action="remove"]').disabled = busy || (!removed && count <= min);
+            FieldtypeFlex.one(row, ':scope > .flex-row-header .flex-row-sort, :scope > .flex-table-sort > .flex-row-sort').disabled = busy || removed || count < 2;
         });
         FieldtypeFlex.sortable.disabled(rowList(set), busy || count < 2);
     }
@@ -910,6 +911,24 @@ var FieldtypeFlex;
         if (!treeBusy(button))
             closeTableEditor(FieldtypeFlex.closest(button, '.flex-table'), true);
     });
+    for (const name of ['click', 'focusin'])
+        document.addEventListener(name, event => {
+            const target = event.target;
+            if (!(target instanceof Node))
+                return;
+            FieldtypeFlex.all(document, '.flex-table-more[open]').forEach(details => {
+                if (!details.contains(target))
+                    details.open = false;
+            });
+        }, true);
+    FieldtypeFlex.delegate('keydown', '.flex-table-more[open]', (event, details) => {
+        if (event.key !== 'Escape')
+            return;
+        event.preventDefault();
+        event.stopPropagation();
+        details.open = false;
+        FieldtypeFlex.one(details, 'summary').focus();
+    });
     FieldtypeFlex.delegate('click', '.flex-row-toggle', (event, button) => {
         event.preventDefault();
         event.stopPropagation();
@@ -942,7 +961,7 @@ var FieldtypeFlex;
             target.after(row);
         order(set);
         await FieldtypeFlex.classic.setup(row);
-        FieldtypeFlex.one(row, ':scope > .flex-row-header .flex-row-sort').focus();
+        button.focus();
         moved(set, row);
     });
     function labelChanged(input) {
@@ -1008,6 +1027,11 @@ var FieldtypeFlex;
         const set = FieldtypeFlex.closest(button, '.flex-rows'), row = button.closest('.flex-row');
         if (button.disabled || treeBusy(set))
             return;
+        const more = button.closest('.flex-table-more');
+        if (more) {
+            more.open = false;
+            FieldtypeFlex.one(more, 'summary').focus();
+        }
         const action = button.matches('.flex-row-add') ? 'add' : FieldtypeFlex.attr(button, 'data-flex-row-action');
         const error = FieldtypeFlex.one(set, ':scope > .flex-rows-error');
         error.textContent = '';
@@ -1040,6 +1064,7 @@ var FieldtypeFlex;
         if (action === 'duplicate' && row && FieldtypeFlex.attr(row, 'data-flex-loaded') === '0' && !(await loadRow(row)))
             return;
         setTreeBusy(set, true);
+        let focus;
         try {
             window.tinymce?.triggerSave();
             const data = new URLSearchParams({ flex_action: action, flex_set: FieldtypeFlex.attr(set, 'data-flex-set'), flex_order: activeRows(set).map(row => FieldtypeFlex.attr(row, 'data-flex-row')).join(',') });
@@ -1076,8 +1101,8 @@ var FieldtypeFlex;
             order(set);
             initRows(set);
             await FieldtypeFlex.classic.setup(fresh);
-            (fresh.querySelector(':scope > .flex-row-header .flex-row-toggle') || FieldtypeFlex.one(fresh, ':scope > .flex-row-header .flex-row-sort')).focus();
             FieldtypeFlex.classic.added(fresh);
+            focus = fresh.querySelector(':scope > .flex-row-header .flex-row-toggle, :scope > .flex-table-actions summary') || undefined;
         }
         catch (problem) {
             error.textContent = errorMessage(problem);
@@ -1085,6 +1110,7 @@ var FieldtypeFlex;
         finally {
             setTreeBusy(set, false);
         }
+        focus?.focus();
     }
     function metadataProperty(element) { return element.closest('[data-flex-metadata-property]')?.getAttribute('data-flex-metadata-property') || ''; }
     function nativeMetadataName(name) { return (name.match(/^(description[0-9]*|tags)_/) || [])[1] || ''; }

@@ -135,10 +135,11 @@ namespace FieldtypeFlex {
         rows(set).forEach(row => {
             const header = one(row, ':scope > .flex-row-header');
             const toggle = header.querySelector<HTMLButtonElement>('.flex-row-toggle');
+            const removed = row.matches('.flex-row-remove-pending');
             if(toggle) toggle.disabled = busy;
             one<HTMLButtonElement>(header, '[data-flex-row-action="duplicate"]').disabled = busy || (max > 0 && count >= max);
-            one<HTMLButtonElement>(header, '[data-flex-row-action="remove"]').disabled = busy || (!row.matches('.flex-row-remove-pending') && count <= min);
-            one<HTMLButtonElement>(header, '.flex-row-sort').disabled = busy || count < 2;
+            one<HTMLButtonElement>(header, '[data-flex-row-action="remove"]').disabled = busy || (!removed && count <= min);
+            one<HTMLButtonElement>(row, ':scope > .flex-row-header .flex-row-sort, :scope > .flex-table-sort > .flex-row-sort').disabled = busy || removed || count < 2;
         });
         sortable.disabled(rowList(set), busy || count < 2);
     }
@@ -436,6 +437,19 @@ namespace FieldtypeFlex {
     delegate('click', '.flex-table-editor-close', (_event, button) => {
         if(!treeBusy(button)) closeTableEditor(closest(button, '.flex-table'), true);
     });
+    for(const name of ['click', 'focusin']) document.addEventListener(name, event => {
+        const target = event.target;
+        if(!(target instanceof Node)) return;
+        all<HTMLDetailsElement>(document, '.flex-table-more[open]').forEach(details => {
+            if(!details.contains(target)) details.open = false;
+        });
+    }, true);
+    delegate('keydown', '.flex-table-more[open]', (event, details) => {
+        if(event.key !== 'Escape') return;
+        event.preventDefault(); event.stopPropagation();
+        (details as HTMLDetailsElement).open = false;
+        one(details, 'summary').focus();
+    });
     delegate('click', '.flex-row-toggle', (event, button) => {
         event.preventDefault(); event.stopPropagation(); const row = closest(button, '.flex-row'); openRow(row, row.matches('.InputfieldStateCollapsed'));
     });
@@ -451,7 +465,7 @@ namespace FieldtypeFlex {
         if(!target?.matches('.flex-row') || target === row) return;
         teardown(row);
         if(event.key === 'ArrowUp' || event.key === 'Home') target.before(row); else target.after(row);
-        order(set); await classic.setup(row); one(row, ':scope > .flex-row-header .flex-row-sort').focus(); moved(set, row);
+        order(set); await classic.setup(row); button.focus(); moved(set, row);
     });
     function labelChanged(input: Control): void {
         const property = input.closest<HTMLElement>('[data-flex-label-property]'), row = property?.closest<HTMLElement>('.flex-row');
@@ -497,6 +511,11 @@ namespace FieldtypeFlex {
         event.preventDefault(); event.stopPropagation();
         const set = closest(button, '.flex-rows'), row = button.closest<HTMLElement>('.flex-row');
         if(button.disabled || treeBusy(set)) return;
+        const more = button.closest<HTMLDetailsElement>('.flex-table-more');
+        if(more) {
+            more.open = false;
+            one(more, 'summary').focus();
+        }
         const action = button.matches('.flex-row-add') ? 'add' : attr(button, 'data-flex-row-action');
         const error = one(set, ':scope > .flex-rows-error'); error.textContent = '';
         if(action === 'visibility' && row) {
@@ -513,6 +532,7 @@ namespace FieldtypeFlex {
         if(row) closeRowEditors(row);
         if(action === 'duplicate' && row && attr(row, 'data-flex-loaded') === '0' && !(await loadRow(row))) return;
         setTreeBusy(set, true);
+        let focus: HTMLElement | undefined;
         try {
             window.tinymce?.triggerSave();
             const data = new URLSearchParams({flex_action: action, flex_set: attr(set, 'data-flex-set'), flex_order: activeRows(set).map(row => attr(row, 'data-flex-row')).join(',')});
@@ -534,9 +554,11 @@ namespace FieldtypeFlex {
             if(!set.isConnected) return;
             const fresh = parseHTML(result.html);
             if(action === 'duplicate' && row) row.after(fresh); else rowList(set).append(fresh);
-            await activateScripts(fresh, response); order(set); initRows(set); await classic.setup(fresh); (fresh.querySelector<HTMLElement>(':scope > .flex-row-header .flex-row-toggle') || one<HTMLElement>(fresh, ':scope > .flex-row-header .flex-row-sort')).focus(); classic.added(fresh);
+            await activateScripts(fresh, response); order(set); initRows(set); await classic.setup(fresh); classic.added(fresh);
+            focus = fresh.querySelector<HTMLElement>(':scope > .flex-row-header .flex-row-toggle, :scope > .flex-table-actions summary') || undefined;
         } catch(problem) { error.textContent = errorMessage(problem); }
         finally { setTreeBusy(set, false); }
+        focus?.focus();
     }
     interface MetadataSnapshot {
         controls: {name: string; value: string | string[]; type: string; checked: boolean; property: string; suffix: string; native: string}[];

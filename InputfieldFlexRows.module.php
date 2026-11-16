@@ -313,13 +313,13 @@ class InputfieldFlexRows extends Inputfield implements BridgeComponent {
 	}
 
 	/** Shared actions for cards and table rows. */
-	private function rowActions(FlexRow $row, bool $removed): string {
+	private function rowActions(FlexRow $row, bool $removed, bool $table = false): string {
 		$entities = fn($value) => $this->wire()->sanitizer->entities((string) $value);
 		$hideLabel = $this->_('Hide item');
 		$showLabel = $this->_('Show item');
 		$removeLabel = $this->_('Remove');
 		$undoLabel = $this->_('Undo removal');
-		$buttons = '';
+		$buttons = [];
 		foreach([
 			'duplicate' => ['copy', $this->_('Duplicate')],
 			'visibility' => [$row->isHidden() ? 'eye-slash' : 'eye', $row->isHidden() ? $showLabel : $hideLabel],
@@ -328,9 +328,12 @@ class InputfieldFlexRows extends Inputfield implements BridgeComponent {
 			$state = '';
 			if($action === 'remove') $state = ' aria-pressed="' . ($removed ? 'true' : 'false') . '" data-flex-remove-label="' . $entities($removeLabel) . '" data-flex-undo-label="' . $entities($undoLabel) . '"';
 			if($action === 'visibility') $state = ' aria-pressed="' . ($row->isHidden() ? 'true' : 'false') . '" data-flex-hide-label="' . $entities($hideLabel) . '" data-flex-show-label="' . $entities($showLabel) . '"';
-			$buttons .= '<button type="button" class="flex-row-action" data-flex-row-action="' . $action . '" title="' . $entities($actionLabel) . '" aria-label="' . $entities($actionLabel) . '"' . $state . '><i class="fa fa-fw fa-' . $icon . '" aria-hidden="true"></i></button>';
+			$buttons[$action] = '<button type="button" class="flex-row-action" data-flex-row-action="' . $action . '" title="' . $entities($actionLabel) . '" aria-label="' . $entities($actionLabel) . '"' . $state . '><i class="fa fa-fw fa-' . $icon . '" aria-hidden="true"></i></button>';
 		}
-		return $buttons;
+		if(!$table) return implode('', $buttons);
+		$label = $entities($this->_('More row actions'));
+		return '<details class="flex-table-more"><summary title="' . $label . '"><i class="fa fa-fw fa-ellipsis-h" aria-hidden="true"></i><span class="flex-table-sr">' . $label . '</span></summary>' .
+			'<div class="flex-table-secondary">' . $buttons['duplicate'] . $buttons['visibility'] . '</div></details>' . $buttons['remove'];
 	}
 
 	/** Render a native cell without changing global markup or its processing parent. */
@@ -399,8 +402,9 @@ class InputfieldFlexRows extends Inputfield implements BridgeComponent {
 		foreach(['remove' => $removed, 'hidden' => $row->isHidden()] as $control => $state) {
 			$transport .= '<input type="hidden" class="flex-row-' . $control . '-value" name="' . $entities(FlexPath::controlName($this->flexInputName ?: $this->name, $row->address(), $control)) . '" value="' . ($state ? '1' : '0') . '">';
 		}
-		return '<tr class="flex-row' . ($row->isHidden() ? ' flex-row-hidden' : '') . ($removed ? ' flex-row-remove-pending' : '') . '" data-flex-row="' . $id . '" data-flex-type="' . $entities($row->rowType()) . '">' . $cells .
-			'<td class="flex-row-header flex-table-actions"><div class="flex-row-controls"><button type="button" class="flex-row-sort" title="' . $sortLabel . '" aria-label="' . $sortLabel . '"><i class="fa fa-fw fa-arrows" aria-hidden="true"></i></button>' . $this->rowActions($row, $removed) . '</div><span class="flex-row-transport">' . $transport . '</span></td></tr>';
+		return '<tr class="flex-row' . ($row->isHidden() ? ' flex-row-hidden' : '') . ($removed ? ' flex-row-remove-pending' : '') . '" data-flex-row="' . $id . '" data-flex-type="' . $entities($row->rowType()) . '">' .
+			'<td class="flex-table-sort"><button type="button" class="flex-row-sort" title="' . $sortLabel . '" aria-label="' . $sortLabel . '"><i class="fa fa-fw fa-arrows" aria-hidden="true"></i></button></td>' . $cells .
+			'<td class="flex-row-header flex-table-actions"><div class="flex-row-controls">' . $this->rowActions($row, $removed, true) . '</div><span class="flex-row-transport">' . $transport . '</span></td></tr>';
 	}
 
 	/** Headers use the same prepared inputs as normal Object form processing. */
@@ -427,8 +431,12 @@ class InputfieldFlexRows extends Inputfield implements BridgeComponent {
 			}
 			$head .= '<th scope="col"' . ($readOnly ? '' : ' class="flex-table-resizable"') . '>' . $text . '</th>';
 		}
-		$actions = $readOnly ? '' : '<th class="flex-table-actions" scope="col"><span class="flex-table-sr">' . $entities($this->_('Row actions')) . '</span></th>';
-		return '<div class="flex-table-scroll" role="region" aria-label="' . $entities($this->label ?: $this->_('Table')) . '" tabindex="0"><table class="flex-table-grid"><colgroup>' . $cols . ($readOnly ? '' : '<col>') . '</colgroup><thead><tr>' . $head . $actions . '</tr></thead><tbody class="flex-rows-items">' . $rows . '</tbody></table></div>';
+		if(!$readOnly) {
+			$cols = '<col>' . $cols . '<col>';
+			$head = '<th class="flex-table-sort" scope="col"><span class="flex-table-sr">' . $entities($this->_('Reorder rows')) . '</span></th>' . $head .
+				'<th class="flex-table-actions" scope="col"><span class="flex-table-sr">' . $entities($this->_('Row actions')) . '</span></th>';
+		}
+		return '<div class="flex-table-scroll" role="region" aria-label="' . $entities($this->label ?: $this->_('Table')) . '" tabindex="0"><table class="flex-table-grid"><colgroup>' . $cols . '</colgroup><thead><tr>' . $head . '</tr></thead><tbody class="flex-rows-items">' . $rows . '</tbody></table></div>';
 	}
 
 	/**

@@ -22,14 +22,17 @@ $editor = $tf->getInputfield($page);
 $editor->value = $page->$tn;
 $html = $editor->render();
 $assert(str_contains($html, '<table') && str_contains($html, '<thead>') && str_contains($html, '<tbody class="flex-rows-items">'), 'editor renders semantic table sections');
+$assert(str_contains($html, '<thead><tr><th class="flex-table-sort" scope="col"><span class="flex-table-sr">'), 'the first column has an accessible reorder heading');
 $assert(str_contains($html, '<th class="flex-table-actions" scope="col"><span class="flex-table-sr">'), 'the actions column keeps a screen-reader heading with its own styling hook');
+$assert((bool) preg_match('~<tbody[^>]*><tr[^>]*><td class="flex-table-sort"><button[^>]*class="flex-row-sort"~', $html), 'the sort handle is in the first cell of each editable row');
+$assert((bool) preg_match('~<details class="flex-table-more">.*?data-flex-row-action="duplicate".*?data-flex-row-action="visibility".*?</details><button[^>]*data-flex-row-action="remove"~s', $html), 'the disclosure contains secondary actions and keeps removal directly available');
 $assert(str_contains($html, 'width:22rem') && str_contains($html, 'width:90px'), 'column widths are shared by table head and body');
 $assert(str_contains($html, 'data-flex-row="' . $row->rowId() . '"'), 'table renders the existing row identity');
 $assert(str_contains($html, 'InputfieldText') && str_contains($html, 'flex-table-input'), 'cells retain native Inputfield wrappers');
 preg_match('~<table\b.*?</table>~s', $html, $tableMarkup);
 $assert(isset($tableMarkup[0]) && !str_contains($tableMarkup[0], 'toggle-icon'), 'open table cells and editable headers have no collapse controls');
 $readonly = $editor->renderValue();
-$assert(str_contains($readonly, '<table') && !str_contains($readonly, 'flex-table-actions'), 'native read-only rendering keeps the table without the actions column');
+$assert(str_contains($readonly, '<table') && !str_contains($readonly, 'flex-table-actions') && !str_contains($readonly, 'flex-table-sort'), 'native read-only rendering keeps only the data columns');
 
 // Definition changes retain data outside the visible schema, including headers.
 $table->headers->service = '';

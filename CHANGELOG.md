@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Keep the card sort handle visible and reveal the compact row actions and chevron on hover or keyboard focus. Dim individual action icons on hover.
+- Move the table sort handle to the first column and group Duplicate and Hide/Show in a disclosure next to Remove.
 - Edit iframe and inline TinyMCE fields in a full-width table detail row.
 - Open File and PageList editors in a full-width table detail row.
 - Support Checkboxes, Radios and TextTags for Page references in table cells.

@@ -16,7 +16,7 @@
 }
 .flex-table-grid > thead > tr > th:has(> .Inputfields) { padding: 0; }
 .AdminThemeUikitOriginal .flex-table-grid > thead > tr > th { border-bottom-width: 2px; }
-.flex-table-grid > thead > tr > .flex-table-actions { border: 0; background: transparent; }
+.flex-table-grid > thead > tr > :is(.flex-table-sort, .flex-table-actions) { border: 0; background: transparent; }
 .flex-table-grid > tbody { background-color: var(--pw-blocks-background, #fff); }
 .flex-table-grid > tbody > tr > :is(th, td) { padding: 0; }
 .flex-table-grid.flex-table-resized { table-layout: fixed; min-width: 0; }
@@ -116,9 +116,20 @@
     flex-grow: 1;
 }
 .flex-table-grid .flex-table-cell .flex-table-text :is(.InputfieldContent, .LanguageSupport) > input:not([type="hidden"]) { min-height: 2rem; }
-.flex-table-grid .flex-table-actions { width: 1%; white-space: nowrap; }
+.flex-table-grid :is(.flex-table-sort, .flex-table-actions) { width: 1%; white-space: nowrap; }
 .flex-table-actions > .flex-row-controls { display: flex; }
-.flex-table-grid .flex-table-actions .flex-row-controls > button { min-height: 2rem; color: inherit; }
+.flex-table-more { position: relative; margin: 0; }
+.flex-table-more > summary::-webkit-details-marker { display: none; }
+.flex-table-secondary {
+    display: flex;
+    position: absolute;
+    z-index: 2;
+    inset-block-start: 0;
+    inset-inline-end: 100%;
+    background: var(--pw-blocks-background, #fff);
+    box-shadow: 0 0 0 1px var(--pw-border-color, rgba(0, 0, 0, .15));
+}
+.flex-table-more:not([open]) > .flex-table-secondary { display: none; }
 .flex-table-grid > tbody > .flex-row { display: table-row; float: none; }
 .flex-table-grid > tbody > .flex-row-hidden > .flex-table-cell { opacity: .6; }
 .flex-table-grid > tbody > .flex-row-remove-pending { background: var(--pw-error-background-color, #fff0ef); }
@@ -183,7 +194,9 @@
     color: var(--pw-text-color);
 }
 .flex-row-bar > button,
-.flex-row-header .flex-row-controls > button {
+.flex-row-controls .flex-row-action,
+.flex-table-more > summary,
+.flex-table-sort > button {
     appearance: none;
     display: inline-flex;
     align-items: center;
@@ -201,6 +214,16 @@
     line-height: 1.4;
     text-transform: none;
     cursor: pointer;
+}
+.flex-row-bar > .flex-row-sort,
+.flex-row-controls .flex-row-action,
+.flex-table-more > summary,
+.flex-table-sort > button {
+    min-width: 1.625rem;
+    padding-inline: .125rem;
+}
+.flex-table-grid :is(.flex-table-actions .flex-row-action, .flex-table-more > summary, .flex-table-sort > button) {
+    min-height: 2rem;
 }
 .flex-row-bar > .flex-row-toggle {
     flex: 1;
@@ -261,20 +284,26 @@
 .flex-row-controls {
     display: inline-flex;
     flex: none;
-    gap: .125rem;
 }
-.flex-row-bar > .flex-row-sort {
+.flex-row-bar > .flex-row-sort,
+.flex-table-sort > .flex-row-sort {
     flex: none;
     cursor: grab;
     touch-action: none;
 }
-.flex-row-header button:hover:not(:disabled):not(.flex-row-toggle) {
-    outline: 1px solid currentColor;
-    outline-offset: -1px;
+:is(.flex-row-action, .flex-row-sort, .flex-table-more > summary):hover:not(:disabled) > .fa {
+    opacity: .65;
 }
-.flex-row-header button:disabled {
+:is(.flex-row-header, .flex-table-sort) button:disabled {
     opacity: .3;
     cursor: default;
+}
+@media (hover: hover) and (pointer: fine) {
+    .flex-row:not(:hover, .flex-row-remove-pending) > .flex-row-header:not(:focus-within) > .flex-row-bar > .flex-row-controls,
+    .flex-row:not(:hover) > .flex-row-header:not(:focus-within) > .flex-row-bar > .flex-row-toggle > .flex-row-chevron {
+        opacity: 0;
+        pointer-events: none;
+    }
 }
 .flex-row.InputfieldStateCollapsed > .flex-row-header .flex-row-chevron {
     transform: rotate(-90deg);
@@ -345,13 +374,13 @@
     opacity: 1;
 }
 .AdminThemeUikitOriginal .flex-row-bar > button,
-.AdminThemeUikitOriginal .flex-row-header .flex-row-controls > button {
+.AdminThemeUikitOriginal .flex-row-bar .flex-row-action {
     min-height: 2rem;
 }
 .flex-row-hidden > .flex-row-header .flex-row-title {
     text-decoration: line-through;
 }
-.flex-row-header button:focus-visible {
+:is(.flex-row-header, .flex-table-sort) :is(button, summary):focus-visible {
     outline: 2px solid currentColor;
     outline-offset: -3px;
 }
@@ -368,7 +397,7 @@
 .flex-row-remove-pending > .flex-row-header .flex-row-title {
     text-decoration: line-through;
 }
-.flex-row-remove-pending > .flex-row-header .flex-row-sort,
+.flex-row-remove-pending > .flex-table-actions .flex-table-more,
 .flex-row-remove-pending > .flex-row-header .flex-row-action:not([data-flex-row-action="remove"]) {
     display: none;
 }

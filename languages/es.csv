@@ -351,3 +351,5 @@ Row actions,Acciones de fila,,site/modules/FieldtypeFlex/InputfieldFlexRows.modu
 Done,Listo,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,f92965e2c8a7afb3c1b9a5c09a263636
 Table,Tabla,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,51c45b795d5d18a3e4e0c37e8b20a141
 Resize column %s,Cambiar el ancho de la columna %s,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,21d53025776dcafda3783d5d72b15433
+More row actions,Más acciones de fila,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,e2a4efbc8b757af6e753f6a12bb575c7
+Reorder rows,Reordenar filas,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,314e8f6c00327e6455394d06ba2478bb

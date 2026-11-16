@@ -18,10 +18,10 @@ function set(content = row('a') + row('b'), attributes = '') {
     return `<div class="flex-rows" data-flex-set="blocks" data-flex-draft="draft" data-flex-field="content" data-flex-page-url="/edit/?id=42" data-flex-type="text" ${attributes}><ul class="flex-rows-items">${content}</ul><input class="flex-rows-order" name="order"><button type="button" class="flex-row-add">Add</button><p class="flex-rows-error"></p><p class="flex-rows-status"></p></div>`;
 }
 function tableRow(id, text = id) {
-    return `<tr class="flex-row" data-flex-row="${id}" data-flex-type="row"><td class="flex-table-cell"><ul class="Inputfields"><li class="Inputfield"><input name="cell_${id}" value="${text}" required></li></ul></td><td class="flex-row-header flex-table-actions"><button type="button" class="flex-row-sort">Sort</button><button type="button" data-flex-row-action="duplicate" class="flex-row-action">Duplicate</button><button type="button" data-flex-row-action="remove" class="flex-row-action" data-flex-remove-label="Remove" data-flex-undo-label="Undo">Remove</button><button type="button" data-flex-row-action="visibility" class="flex-row-action" data-flex-hide-label="Hide" data-flex-show-label="Show"><i></i></button><span class="flex-row-transport"><input class="flex-row-remove-value" value="0"><input class="flex-row-hidden-value" value="0"></span></td></tr>`;
+    return `<tr class="flex-row" data-flex-row="${id}" data-flex-type="row"><td class="flex-table-sort"><button type="button" class="flex-row-sort">Sort</button></td><td class="flex-table-cell"><ul class="Inputfields"><li class="Inputfield"><input name="cell_${id}" value="${text}" required></li></ul></td><td class="flex-row-header flex-table-actions"><details class="flex-table-more"><summary>More</summary><button type="button" data-flex-row-action="duplicate" class="flex-row-action">Duplicate</button><button type="button" data-flex-row-action="visibility" class="flex-row-action" data-flex-hide-label="Hide" data-flex-show-label="Show"><i></i></button></details><button type="button" data-flex-row-action="remove" class="flex-row-action" data-flex-remove-label="Remove" data-flex-undo-label="Undo">Remove</button><span class="flex-row-transport"><input class="flex-row-remove-value" value="0"><input class="flex-row-hidden-value" value="0"></span></td></tr>`;
 }
 function tableSet(content = tableRow('a') + tableRow('b')) {
-    return set('').replace('class="flex-rows"', 'class="flex-rows flex-table"').replace('<ul class="flex-rows-items"></ul>', `<div class="flex-table-scroll"><table><thead><tr><th>Cell</th><th>Actions</th></tr></thead><tbody class="flex-rows-items">${content}</tbody></table></div>`);
+    return set('').replace('class="flex-rows"', 'class="flex-rows flex-table"').replace('<ul class="flex-rows-items"></ul>', `<div class="flex-table-scroll"><table><thead><tr><th>Sort</th><th>Cell</th><th>Actions</th></tr></thead><tbody class="flex-rows-items">${content}</tbody></table></div>`);
 }
 async function harness(content = set(), options = {}) {
     const errors = [];
@@ -49,20 +49,37 @@ test('native initialization, live labels, safe text and keyboard order without j
 test('table rows share keyboard order, visibility, removal and undo without card headers', async () => {
     const h = await harness(tableSet()); const d = h.document, a = d.querySelector('[data-flex-row="a"]');
     const handle = a.querySelector('.flex-row-sort');
+    assert.equal(handle.parentElement, a.firstElementChild);
     handle.dispatchEvent(new h.window.KeyboardEvent('keydown', {key:'End', bubbles:true})); await tick();
     assert.equal(d.querySelector('.flex-rows-order').value, 'b,a'); assert.equal(d.activeElement, handle);
+    const more = a.querySelector('.flex-table-more'), trigger = more.querySelector('summary');
+    assert.equal(more.open, false);
+    trigger.click();
+    assert.equal(more.open, true);
     a.querySelector('[data-flex-row-action="visibility"]').click(); assert.equal(a.querySelector('.flex-row-hidden-value').value, '1');
+    assert.equal(more.open, false); assert.equal(d.activeElement, trigger);
+    trigger.click();
+    more.querySelector('button').dispatchEvent(new h.window.KeyboardEvent('keydown', {key:'Escape', bubbles:true}));
+    assert.equal(more.open, false); assert.equal(d.activeElement, trigger);
+    trigger.click();
+    d.querySelector('[name="cell_b"]').focus();
+    assert.equal(more.open, false);
     a.querySelector('[data-flex-row-action="remove"]').click();
+    assert.equal(handle.disabled, true);
     assert(a.querySelector('[name="cell_a"]').disabled); assert.equal(a.querySelector('.flex-row-remove-mirror').value, 'a');
     assert.equal(a.querySelectorAll(':scope > input').length, 0, 'transport remains valid table markup');
-    a.querySelector('[data-flex-row-action="remove"]').click(); assert(!a.querySelector('[name="cell_a"]').disabled); h.close();
+    a.querySelector('[data-flex-row-action="remove"]').click(); assert(!a.querySelector('[name="cell_a"]').disabled);
+    assert.equal(handle.disabled, false); h.close();
 });
 test('AJAX table duplication includes unsaved cells and inserts a native table row', async () => {
     const h = await harness(tableSet(tableRow('a')), {response:async () => ({ok:true,json:async () => ({html:tableRow('copy','Copied')})})});
     const d = h.document; d.querySelector('[name="cell_a"]').value = 'Unsaved cell';
+    d.querySelector('.flex-table-more summary').click();
     d.querySelector('[data-flex-row-action="duplicate"]').click(); await tick();
     assert.equal(h.calls[0].body.get('cell_a'), 'Unsaved cell'); assert.equal(d.querySelector('tbody').children.length, 2);
-    assert.equal(d.querySelector('tbody').lastElementChild.tagName, 'TR'); assert.equal(d.querySelector('.flex-rows-order').value, 'a,copy'); h.close();
+    assert.equal(d.querySelector('tbody').lastElementChild.tagName, 'TR'); assert.equal(d.querySelector('.flex-rows-order').value, 'a,copy');
+    assert.equal(d.activeElement, d.querySelector('[data-flex-row="copy"] summary'));
+    h.close();
 });
 test('table detail editor keeps thumbnails and unsaved form values through focus, duplication and undo', async () => {
     const content = tableRow('a').replace('<ul class="Inputfields">', `<button class="flex-table-preview" type="button" aria-label="Image" data-flex-preview="image" hidden></button><div class="flex-table-editor"><button class="flex-table-editor-close" type="button" hidden>Done</button><ul class="InputfieldImageList">
@@ -154,7 +171,7 @@ test('clicking a table cell focuses its visible enabled field and leaves tabs an
     const active = cell.querySelector('textarea');
     for(const field of [disabled, active]) field.getClientRects = () => [{width: 100, height: 30}];
     const tab = cell.querySelector('[role="tab"]');
-    const actionButton = d.querySelector('[data-flex-row-action="duplicate"]');
+    const actionButton = d.querySelector('[data-flex-row-action="remove"]');
     tab.focus(); tab.click();
     assert.equal(d.activeElement, tab);
     actionButton.focus();
