@@ -340,7 +340,7 @@ Apply property renames,Appliquer les changements de nom des propriétés,,site/m
 %s must be a boolean,%s doit être un booléen,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,8f43197ee7bf39c7de4f4de7deb94b60
 Each table column must be an Inputfield definition,Chaque colonne doit être une définition Inputfield,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,fff9007c63960e2891eaee20213e928e
 Label,Libellé,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,b021df6aac4654c454f46c77646e745f
-"Table Page columns require Select, SelectMultiple, AsmSelect or PageAutocomplete","Les colonnes Page nécessitent Select, SelectMultiple, AsmSelect ou PageAutocomplete",,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,002754012e89984cabcb930d06cebca5
+"Unsupported table Page widget: %s","Widget Page non pris en charge dans le tableau : %s",,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,d5ce97cd2028480513c5793cd2a55a94
 Table cells cannot use AJAX collapse or tabs,Les cellules ne peuvent pas utiliser le repli AJAX ni les onglets,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,40e44a53d749a267ff6cafb837f0591f
 Table column width must be a positive rem or px length,La largeur de colonne doit être une longueur positive en rem ou px,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,bc77fe042f21b79c170edebe192cab48
 Table columns must be a non-empty property map,Les colonnes du tableau doivent former une liste de propriétés nommées non vide,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,f527432e7133c23cd6c50404c0e4e7a7

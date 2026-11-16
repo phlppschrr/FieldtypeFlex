@@ -108,8 +108,8 @@ foreach($cellTypes as $i => $inputType) {
  if($inputType === 'Datetime') $columns['cell_' . $i]['dateInputFormat'] = 'Y-m-d';
  if(in_array($inputType, ['Select', 'Radios', 'Checkboxes', 'SelectMultiple', 'AsmSelect'])) $columns['cell_' . $i]['options'] = ['a' => 'Alpha', 'b' => 'Beta'];
 }
-foreach(['InputfieldSelect', 'InputfieldSelectMultiple', 'InputfieldAsmSelect', 'InputfieldPageAutocomplete'] as $i => $widget) {
- $columns['page_' . $i] = ['type' => 'page', 'inputfield' => $widget, 'parent_id' => 1, 'derefAsPage' => $i === 0 ? 2 : 0];
+foreach(['InputfieldSelect', 'InputfieldSelectMultiple', 'InputfieldAsmSelect', 'InputfieldPageAutocomplete', 'InputfieldCheckboxes', 'InputfieldRadios', 'InputfieldTextTags', 'InputfieldTextTags'] as $i => $widget) {
+ $columns['page_' . $i] = ['type' => 'page', 'inputfield' => $widget, 'parent_id' => 1, 'derefAsPage' => in_array($i, [0, 5, 7], true) ? 2 : 0];
 }
 $widgets = $createField('flex_table_widgets', ['grid' => ['type' => 'table', 'columns' => $columns]]);
 $same('title', $widgets->defs($page)->getPropertyInputfield('grid.rows.row.page_3')->labelFieldName, 'PageAutocomplete table columns default to visible native Page titles');
@@ -124,14 +124,19 @@ foreach((new \DOMXPath($dom))->query('//input[@type="hidden"]') as $hidden) $pos
 $wp = FlexPath::inputPrefix($widgets->name, $wr->address());
 $submitted = ['Typed', 'editor@example.com', 'https://example.com/', '42', '3.25', "Line one\nLine two", '1', '1', 'b', 'b', ['a', 'b'], ['a', 'b'], ['b'], 'one two', '2026-11-10'];
 foreach($submitted as $i => $cellValue) $post[$wp . 'cell_' . $i] = $cellValue;
-foreach(range(0, 3) as $i) $post[$wp . 'page_' . $i] = $i === 0 ? (string) $second->id : [$second->id];
+foreach(range(0, 7) as $i) $post[$wp . 'page_' . $i] = match($i) {
+ 0, 5 => (string) $second->id,
+ 6, 7 => '_' . $second->id, // Native TextTags prefixes numeric IDs.
+ default => [$second->id],
+};
 $wi->processInput($wire->wire(new WireInputData($post)));
 $same([], $wi->getErrors(), 'all released native cell widgets process a submitted table row');
 $processed = $wi->value->grid->rows->first();
 foreach([0 => 'Typed', 1 => 'editor@example.com', 2 => 'https://example.com/', 3 => 42, 4 => 3.25, 5 => "Line one\nLine two", 6 => 1, 7 => 1, 8 => 'b', 9 => 'b', 10 => ['a', 'b'], 11 => ['a', 'b'], 12 => ['b'], 13 => 'one two'] as $i => $expected) $same($expected, $processed->get('cell_' . $i), "native cell_$i uses its existing value normalization");
 $same(strtotime('2026-11-10'), $processed->cell_14, 'table Datetime uses native timestamp reads');
 $same($second->id, $processed->page_0->id, 'single Page table cell resolves the selected page');
-foreach(range(1, 3) as $i) $same([$second->id], array_values($processed->get('page_' . $i)->explode('id')), "Page widget $i replaces the selected PageArray");
+foreach([1, 2, 3, 4, 6] as $i) $same([$second->id], array_values($processed->get('page_' . $i)->explode('id')), "Page widget $i replaces the selected PageArray");
+foreach([5, 7] as $i) $same($second->id, $processed->get('page_' . $i)->id, "Page widget $i resolves the single selected page");
 $page->set($widgets->name, $wi->value); $page->save($widgets->name);
 $same(42, $wire->pages->getFresh($id)->getUnformatted($widgets->name)->grid->rows->first()->cell_3, 'processed native widget row persists independently');
 
