@@ -784,16 +784,24 @@ class FlexAdmin extends Wire {
 				if($input->getErrors()) {
 					throw new WireException(implode('; ', $input->getErrors()));
 				}
+				// WireUpload reports AJAX rejections in its response without adding Inputfield errors.
+				$response = json_decode($native, true, 64);
+				if(is_array($response)) {
+					foreach($response as $item) {
+						if(!empty($item['error'])) {
+							throw new WireException($item['message']);
+						}
+					}
+				}
 				$uploaded = $files->get($basename);
 				if(!$uploaded || !is_file($uploaded->filename())) {
 					throw new WireException($this->_('Native upload did not produce the reserved file'));
 				}
-				$this->type->media()->finishUpload($uploaded);
-				$this->stageMedia($token, $address, $files);
-				$response = json_decode($native, true, 64, JSON_THROW_ON_ERROR);
 				if(!is_array($response)) {
 					throw new WireException($this->_('Invalid native upload response'));
 				}
+				$this->type->media()->finishUpload($uploaded);
+				$this->stageMedia($token, $address, $files);
 			} else {
 				throw new WireException($this->_('Invalid Flex editor context'));
 			}

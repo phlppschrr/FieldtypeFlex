@@ -221,6 +221,44 @@ try {
 } finally {
 	$_FILES = $savedUploads;
 }
+// A full draft is rejected by the native raw upload handler before it reads the body.
+$savedGet = $wire->input->get->getArray();
+$savedPost = $wire->input->post->getArray();
+$savedServer = $_SERVER;
+$wire->input->get->set('InputfieldFileAjax', 1);
+$limited = $createField('flex_upload_limit', [
+	'files' => ['type' => 'file', 'extensions' => 'txt', 'maxFiles' => 3],
+]);
+$pending = $page->getUnformatted($limited->name);
+$token = $type->admin()->open($pending, $limited->name);
+try {
+	$pending->files->draft($token);
+	for($i = 0; $i < 3; $i++) $pending->files->add($fixtureFile);
+	$type->admin()->stageMedia($token, 'files', $pending->files);
+	$expectedMedia = $type->admin()->draft($token)['media']['files'];
+	$wire->input->post->removeAll()->setArray([
+		$wire->session->CSRF->getTokenName() => $wire->session->CSRF->getTokenValue(),
+	]);
+	$_SERVER['HTTP_X_FLEX_DRAFT'] = $token;
+	$_SERVER['HTTP_X_FIELDNAME'] = $limited->name;
+	$_SERVER['HTTP_X_FLEX_PATH'] = 'files';
+	$_SERVER['HTTP_X_FILENAME'] = 'fourth.txt';
+	ob_start();
+	try {
+		$type->admin()->ajax(new HookEvent(['arguments' => [$page]]));
+		$response = json_decode(ob_get_contents(), true, 64, JSON_THROW_ON_ERROR);
+	} finally {
+		ob_end_clean();
+	}
+	$same(['error' => true, 'message' => 'Max file upload limit reached'], $response, 'fourth upload returns the native maximum-file error');
+	$same($expectedMedia, $type->admin()->draft($token)['media']['files'], 'rejected upload preserves the three already staged files');
+	$same(0, count($wire->pages->getFresh($id)->getUnformatted($limited->name)->files), 'maximum-file error does not write canonical media');
+} finally {
+	$type->admin()->forget($token);
+	$wire->input->get->removeAll()->setArray($savedGet);
+	$wire->input->post->removeAll()->setArray($savedPost);
+	$_SERVER = $savedServer;
+}
 // Targeted metadata saves, conflict checks and directory cloning.
 $assert(FlexStorage::revision([
 	'filedata' => [

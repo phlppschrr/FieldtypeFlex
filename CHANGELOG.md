@@ -2,6 +2,10 @@
 
 ## WIP
 
+### Fixed
+
+- Show native upload errors, including the configured file limit, when a Flex upload is rejected.
+
 ## 1.0.0-beta.1 - 2026-11-16
 
 ### Added
