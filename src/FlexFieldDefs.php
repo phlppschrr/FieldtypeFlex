@@ -656,7 +656,7 @@ class FlexFieldDefs extends Wire {
 			}
 			$schema = new self($this->flexField, $this->flexPage, $children, $this->depth + 1);
 			if(isset($settings['_flexTable'])) {
-				$allowed = ['InputfieldText', 'InputfieldEmail', 'InputfieldURL', 'InputfieldInteger', 'InputfieldFloat', 'InputfieldTextarea', 'InputfieldCheckbox', 'InputfieldToggle', 'InputfieldSelect', 'InputfieldRadios', 'InputfieldCheckboxes', 'InputfieldSelectMultiple', 'InputfieldAsmSelect', 'InputfieldTextTags', 'InputfieldDatetime', 'InputfieldPage', 'InputfieldImage', 'InputfieldFile'];
+				$allowed = ['InputfieldText', 'InputfieldEmail', 'InputfieldURL', 'InputfieldInteger', 'InputfieldFloat', 'InputfieldTextarea', 'InputfieldCheckbox', 'InputfieldToggle', 'InputfieldSelect', 'InputfieldRadios', 'InputfieldCheckboxes', 'InputfieldSelectMultiple', 'InputfieldAsmSelect', 'InputfieldTextTags', 'InputfieldDatetime', 'InputfieldPage', 'InputfieldImage', 'InputfieldFile', 'InputfieldTinyMCE'];
 				foreach($schema->properties() as $column => $definition) {
 					$cell = $definition['input'];
 					if(!in_array($cell->className(), $allowed, true) || in_array($definition['kind'], ['object', 'rows'], true)) throw new WireException(sprintf($this->_('Unsupported table column input: %s'), $cell->className()));

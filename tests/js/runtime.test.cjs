@@ -112,6 +112,33 @@ test('table detail editor keeps thumbnails and unsaved form values through focus
     assert.equal(d.querySelector('.flex-rows-order').value, 'copy,a');
     h.close();
 });
+test('iframe table editors keep pending text and clear the native loaded marker on close', async () => {
+    const content = tableRow('a').replace('<ul class="Inputfields">', `<button class="flex-table-preview" type="button" data-flex-preview="richtext" hidden><span></span></button>
+        <div class="flex-table-editor"><div class="InputfieldTinyMCE"><div class="InputfieldTinyMCEPlaceholder"></div>
+        <textarea class="InputfieldTinyMCEEditor InputfieldTinyMCENormal" name="rich_a">&lt;p&gt;Initial&lt;/p&gt;</textarea></div>
+        <button class="flex-table-editor-close" type="button" hidden>Done</button><ul class="Inputfields">`).replace('</li></ul></td>', '</li></ul></div></td>');
+    const h = await harness(tableSet(content));
+    const {document: d, flex} = h;
+    const preview = d.querySelector('.flex-table-preview');
+    const input = d.querySelector('[name="rich_a"]');
+    const close = d.querySelector('.flex-table-editor-close');
+    let setups = 0;
+    flex.classic.setup = async () => { setups++; input.classList.add('InputfieldTinyMCELoaded'); };
+    flex.classic.saveReady = () => { input.value = '<p>Pending &amp; saved</p>'; };
+    flex.classic.destroyEditors = () => { assert.equal(input.value, '<p>Pending &amp; saved</p>'); };
+    assert.equal(preview.textContent, 'Initial');
+    preview.click();
+    assert.equal(d.querySelector('.InputfieldTinyMCEPlaceholder'), null);
+    assert.equal(input.closest('tr').className, 'flex-table-detail');
+    close.click();
+    assert.equal(preview.textContent, 'Pending & saved');
+    assert(input.classList.contains('InputfieldTinyMCELazy'));
+    assert(!input.classList.contains('InputfieldTinyMCELoaded'));
+    assert.equal(new h.window.FormData(input.form).get('rich_a'), '<p>Pending &amp; saved</p>');
+    preview.click();
+    assert.equal(setups, 2);
+    h.close();
+});
 test('clicking a table cell focuses its visible enabled field and leaves tabs and actions alone', async () => {
     const h = await harness(tableSet(tableRow('a')));
     const d = h.document;

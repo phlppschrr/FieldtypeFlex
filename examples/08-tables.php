@@ -4,7 +4,7 @@
 // Toggle, Select, Radios, Checkboxes, SelectMultiple, AsmSelect, TextTags and Datetime.
 // Page references use Select, SelectMultiple, AsmSelect, PageAutocomplete,
 // Checkboxes, Radios, TextTags, PageListSelect or PageListSelectMultiple.
-// File, Image and PageList inputs use a detail row.
+// File, Image, PageList and TinyMCE inputs use a detail row.
 
 return [
     // Fixed headings use the column labels.

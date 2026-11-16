@@ -76,7 +76,7 @@ $badTables = [
  ['columns' => ['row_label' => ['type' => 'text']]],
 ];
 foreach(['100%', 'auto', '-2rem', '0px', '1em', '1rem;display:none', 12] as $width) $badTables[] = ['columns' => ['value' => ['width' => $width]]];
-foreach(['TinyMCE', 'fieldset', 'Markup', 'Hidden', 'Icon', 'Selector'] as $inputType) $badTables[] = ['columns' => ['value' => ['type' => $inputType]]];
+foreach(['fieldset', 'Markup', 'Hidden', 'Icon', 'Selector'] as $inputType) $badTables[] = ['columns' => ['value' => ['type' => $inputType]]];
 foreach([10, 11, 20, 21, 22] as $collapsed) $badTables[] = ['columns' => ['value' => ['type' => 'text', 'collapsed' => $collapsed]]];
 $badTables[] = ['columns' => ['value' => ['type' => 'object', 'children' => []]]];
 $badTables[] = ['columns' => ['value' => ['type' => 'rows', 'types' => ['item' => ['children' => []]]]]];
@@ -87,7 +87,7 @@ foreach($badTables as $index => $override) {
 }
 $bad = clone $tf;
 $bad->flexDefinition = json_encode(['prices' => ['type' => 'table', 'columns' => ['body' => ['type' => 'TinyMCE', 'inheritField' => $sourceField->name]]]]);
-$throws(fn() => $type->getDefinitions($bad, $page), 'inherited rich text is rejected', FlexDefinitionException::class, 'Unsupported table');
+$same('InputfieldTinyMCE', $type->getDefinitions($bad, $page)->getPropertyInputfield('prices.rows.row.body')->className(), 'table supports inherited TinyMCE settings');
 
 $imageTable = $createField('flex_table_images', ['grid' => ['type' => 'table', 'columns' => [
 	'photo' => ['type' => 'image', 'maxFiles' => 3],
@@ -103,7 +103,7 @@ foreach(['image', 'file'] as $preview) {
 }
 
 // Every released cell widget renders under the table's native wrappers.
-$cellTypes = ['Text', 'Email', 'URL', 'Integer', 'Float', 'Textarea', 'Checkbox', 'Toggle', 'Select', 'Radios', 'Checkboxes', 'SelectMultiple', 'AsmSelect', 'TextTags', 'Datetime'];
+$cellTypes = ['Text', 'Email', 'URL', 'Integer', 'Float', 'Textarea', 'Checkbox', 'Toggle', 'Select', 'Radios', 'Checkboxes', 'SelectMultiple', 'AsmSelect', 'TextTags', 'Datetime', 'TinyMCE'];
 $columns = [];
 foreach($cellTypes as $i => $inputType) {
  $columns['cell_' . $i] = ['type' => $inputType];
@@ -114,10 +114,12 @@ foreach($cellTypes as $i => $inputType) {
 foreach(['InputfieldSelect', 'InputfieldSelectMultiple', 'InputfieldAsmSelect', 'InputfieldPageAutocomplete', 'InputfieldCheckboxes', 'InputfieldRadios', 'InputfieldTextTags', 'InputfieldTextTags', 'InputfieldPageListSelect', 'InputfieldPageListSelectMultiple'] as $i => $widget) {
  $columns['page_' . $i] = ['type' => 'page', 'inputfield' => $widget, 'parent_id' => 1, 'derefAsPage' => in_array($i, [0, 5, 7, 8], true) ? 2 : 0];
 }
+$columns['inline'] = ['type' => 'TinyMCE', 'inlineMode' => 1, 'useLanguages' => true];
 $widgets = $createField('flex_table_widgets', ['grid' => ['type' => 'table', 'columns' => $columns]]);
 $same('title', $widgets->defs($page)->getPropertyInputfield('grid.rows.row.page_3')->labelFieldName, 'PageAutocomplete table columns default to visible native Page titles');
 $wv = $type->getBlankValue($page, $widgets); $wr = $wv->grid->rows->addRow('row');
 $wi = $widgets->getInputfield($page); $wi->value = $wv; $wh = $wi->render();
+$same(2, substr_count($wh, 'data-flex-preview="richtext"'), 'both TinyMCE modes use a table detail preview');
 foreach(array_keys($columns) as $column) $assert(str_contains($wh, FlexPath::inputPrefix($widgets->name, $wr->address()) . $column), "$column renders as a native table input");
 
 
@@ -125,8 +127,10 @@ $dom = new \DOMDocument(); $old = libxml_use_internal_errors(true); $dom->loadHT
 $post = [];
 foreach((new \DOMXPath($dom))->query('//input[@type="hidden"]') as $hidden) $post[$hidden->getAttribute('name')] = $hidden->getAttribute('value');
 $wp = FlexPath::inputPrefix($widgets->name, $wr->address());
-$submitted = ['Typed', 'editor@example.com', 'https://example.com/', '42', '3.25', "Line one\nLine two", '1', '1', 'b', 'b', ['a', 'b'], ['a', 'b'], ['b'], 'one two', '2026-11-10'];
+$submitted = ['Typed', 'editor@example.com', 'https://example.com/', '42', '3.25', "Line one\nLine two", '1', '1', 'b', 'b', ['a', 'b'], ['a', 'b'], ['b'], 'one two', '2026-11-10', '<p>Rich <strong>text</strong></p>'];
 foreach($submitted as $i => $cellValue) $post[$wp . 'cell_' . $i] = $cellValue;
+$post['Inputfield_' . $wp . 'inline'] = '<p>Default inline</p>';
+$post['Inputfield_' . $wp . 'inline__' . $language->id] = '<p>German inline</p>';
 foreach(range(0, 9) as $i) $post[$wp . 'page_' . $i] = match($i) {
  0, 5, 8, 9 => (string) $second->id,
  6, 7 => '_' . $second->id, // Native TextTags prefixes numeric IDs.
@@ -136,12 +140,17 @@ $wi->processInput($wire->wire(new WireInputData($post)));
 $same([], $wi->getErrors(), 'all released native cell widgets process a submitted table row');
 $processed = $wi->value->grid->rows->first();
 foreach([0 => 'Typed', 1 => 'editor@example.com', 2 => 'https://example.com/', 3 => 42, 4 => 3.25, 5 => "Line one\nLine two", 6 => 1, 7 => 1, 8 => 'b', 9 => 'b', 10 => ['a', 'b'], 11 => ['a', 'b'], 12 => ['b'], 13 => 'one two'] as $i => $expected) $same($expected, $processed->get('cell_' . $i), "native cell_$i uses its existing value normalization");
+$same('<p>Rich <strong>text</strong></p>', $processed->cell_15, 'table TinyMCE submits native rich text');
 $same(strtotime('2026-11-10'), $processed->cell_14, 'table Datetime uses native timestamp reads');
 $same($second->id, $processed->page_0->id, 'single Page table cell resolves the selected page');
 foreach([1, 2, 3, 4, 6, 9] as $i) $same([$second->id], array_values($processed->get('page_' . $i)->explode('id')), "Page widget $i replaces the selected PageArray");
 foreach([5, 7, 8] as $i) $same($second->id, $processed->get('page_' . $i)->id, "Page widget $i resolves the single selected page");
 $page->set($widgets->name, $wi->value); $page->save($widgets->name);
-$same(42, $wire->pages->getFresh($id)->getUnformatted($widgets->name)->grid->rows->first()->cell_3, 'processed native widget row persists independently');
+$reloaded = $wire->pages->getFresh($id)->getUnformatted($widgets->name)->grid->rows->first();
+$same(42, $reloaded->cell_3, 'processed native widget row persists independently');
+$inline = $reloaded->getUnformatted('inline');
+$same('<p>Default inline</p>', $inline->getLanguageValue($wire->languages->getDefault()), 'native inline transport persists the default language');
+$same('<p>German inline</p>', $inline->getLanguageValue($language), 'native inline transport persists the alternate language');
 
 // Tables are valid descendants, with the normal language and dependency scopes.
 $nested = $createField('flex_nested_tables', ['sections' => ['type' => 'rows', 'types' => ['section' => ['children' => [

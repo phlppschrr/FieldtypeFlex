@@ -535,6 +535,8 @@ var FieldtypeFlex;
         if (!window.tinymce)
             return;
         FieldtypeFlex.all(row, 'textarea.InputfieldTinyMCEEditor').forEach(input => {
+            if (input.closest('.flex-table-editor[hidden]'))
+                return;
             const editor = window.tinymce.get(input.id);
             if (editor) {
                 editor.save();
@@ -576,6 +578,7 @@ var FieldtypeFlex;
                 await FieldtypeFlex.activateScripts(body, response);
                 row.setAttribute('data-flex-loaded', '1');
                 row.removeAttribute('data-flex-load-failed');
+                initRows(row);
                 await FieldtypeFlex.classic.setup(row);
                 if (row.matches('.flex-row-remove-pending'))
                     removalState(row, true);
@@ -615,6 +618,15 @@ var FieldtypeFlex;
         });
         button.replaceChildren(...thumbnails);
     }
+    function richTextPreview(editor) {
+        const field = editor.querySelector('.InputfieldTinyMCE');
+        const inputs = field ? FieldtypeFlex.all(field, '.InputfieldTinyMCEEditor') : [];
+        const source = inputs.find(input => input.closest('.LanguageSupportCurrent')) ?? inputs[0];
+        const html = source instanceof HTMLTextAreaElement ? source.value : source?.innerHTML || '';
+        const text = document.createElement('textarea');
+        FieldtypeFlex.setHTML(text, html.replace(/<[^>]*>/g, ' ').replace(/</g, '&lt;').replace(/>/g, '&gt;'));
+        return text.value.replace(/\s+/g, ' ').trim();
+    }
     function updateTablePreview(button, editor) {
         const kind = FieldtypeFlex.attr(button, 'data-flex-preview');
         if (kind === 'image') {
@@ -629,6 +641,9 @@ var FieldtypeFlex;
                     text.textContent = '';
                 else if (label?.textContent?.trim())
                     text.textContent = label.textContent.trim();
+            }
+            else if (kind === 'richtext') {
+                text.textContent = richTextPreview(editor);
             }
             else {
                 const labels = kind === 'file'
@@ -647,8 +662,19 @@ var FieldtypeFlex;
         if (!active)
             return;
         const { button, editor, detail } = active;
+        const richText = button.matches('[data-flex-preview="richtext"]');
+        if (richText)
+            FieldtypeFlex.classic.saveReady(editor);
         updateTablePreview(button, editor);
         editor.hidden = true;
+        if (richText && editor.querySelector('.InputfieldTinyMCENormal')) {
+            // TinyMCE iframes are recreated after moving back into the detail row.
+            FieldtypeFlex.classic.destroyEditors(editor);
+            FieldtypeFlex.all(editor, '.InputfieldTinyMCENormal').forEach(input => {
+                input.classList.remove('InputfieldTinyMCELoaded');
+                input.classList.add('InputfieldTinyMCELazy');
+            });
+        }
         FieldtypeFlex.one(editor, '.flex-table-editor-close').hidden = true;
         button.after(editor);
         button.setAttribute('aria-expanded', 'false');
@@ -693,7 +719,11 @@ var FieldtypeFlex;
             editor.tabIndex = -1;
             editor.focus();
         }
-        if (!initializedDetailEditors.has(editor)) {
+        if (button.matches('[data-flex-preview="richtext"]')) {
+            FieldtypeFlex.all(editor, '.InputfieldTinyMCEPlaceholder').forEach(placeholder => placeholder.remove());
+            void FieldtypeFlex.classic.setup(editor);
+        }
+        else if (!initializedDetailEditors.has(editor)) {
             initializedDetailEditors.add(editor);
             void FieldtypeFlex.classic.setup(editor);
         }
@@ -709,6 +739,9 @@ var FieldtypeFlex;
                     const editor = FieldtypeFlex.one(button.parentElement, ':scope > .flex-table-editor');
                     updateTablePreview(button, editor);
                     editor.hidden = true;
+                    if (button.matches('[data-flex-preview="richtext"]')) {
+                        FieldtypeFlex.all(editor, '.InputfieldTinyMCENormal').forEach(input => input.classList.add('InputfieldTinyMCELazy'));
+                    }
                     button.hidden = false;
                     if (!row.matches('.flex-row-remove-pending') && button.matches('.ui-state-error'))
                         errorPreview ?? (errorPreview = button);
@@ -1041,8 +1074,8 @@ var FieldtypeFlex;
                 rowList(set).append(fresh);
             await FieldtypeFlex.activateScripts(fresh, response);
             order(set);
-            await FieldtypeFlex.classic.setup(fresh);
             initRows(set);
+            await FieldtypeFlex.classic.setup(fresh);
             (fresh.querySelector(':scope > .flex-row-header .flex-row-toggle') || FieldtypeFlex.one(fresh, ':scope > .flex-row-header .flex-row-sort')).focus();
             FieldtypeFlex.classic.added(fresh);
         }

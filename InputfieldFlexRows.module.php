@@ -341,6 +341,7 @@ class InputfieldFlexRows extends Inputfield implements BridgeComponent {
 		$preview = match(true) {
 			$input instanceof InputfieldFlexImage => 'image',
 			$input instanceof InputfieldFlexFile => 'file',
+			$input instanceof InputfieldTinyMCE => 'richtext',
 			$widget === 'InputfieldPageListSelect' => 'page',
 			$widget === 'InputfieldPageListSelectMultiple' => 'pages',
 			default => '',
@@ -350,6 +351,10 @@ class InputfieldFlexRows extends Inputfield implements BridgeComponent {
 		if($detail) {
 			$input->themeBorder = 'none';
 			$input->themeOffset = 'none';
+			if($input instanceof InputfieldTinyMCE && !$input->inlineMode) {
+				// Use the native placeholder until the editor can be opened in a full-width row.
+				$input->lazyMode = 2;
+			}
 		} else {
 			$input->addClass('flex-table-input', 'wrapClass');
 		}
