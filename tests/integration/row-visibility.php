@@ -142,7 +142,7 @@ $def = json_decode($eager->flexDefinition, true); $def['items']['rowLazyLoad'] =
 $page = $wire->pages->getFresh($id); $page->of(false);
 $editor = $eager->getInputfield($page); $editor->value = $page->getUnformatted($name);
 $html = $editor->render();
-$dom->loadHTML('<html><body>' . $html . '</body></html>'); $post = [];
+$dom->loadHTML('<html><body>' . $html . '</body></html>', LIBXML_NOERROR); $post = [];
 foreach((new \DOMXPath($dom))->query('//input[@type="hidden"]') as $input) $post[$input->getAttribute('name')] = $input->getAttribute('value');
 $post[$name . '__heading'] = 'Rootneedle';
 $post[FlexPath::inputPrefix($name, $parent->address()) . 'heading'] = 'Parentneedle';

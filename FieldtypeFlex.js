@@ -650,6 +650,12 @@ var FieldtypeFlex;
     }
     function updateActions(set) {
         const count = activeRows(set).length, min = Number(FieldtypeFlex.attr(set, 'data-flex-min')) || 0, max = Number(FieldtypeFlex.attr(set, 'data-flex-max')) || 0, busy = treeBusy(set);
+        const typeControl = set.querySelector(':scope > .flex-row-type-control');
+        if (typeControl && set.hasAttribute('data-flex-type')) {
+            typeControl.hidden = count > 0;
+            if (typeControl.hidden)
+                FieldtypeFlex.one(typeControl, 'select').selectedIndex = 0;
+        }
         FieldtypeFlex.all(set, ':scope > .flex-row-add').forEach(button => button.disabled = busy || (max > 0 && count >= max));
         rows(set).forEach(row => {
             const header = FieldtypeFlex.one(row, ':scope > .flex-row-header');
@@ -658,6 +664,9 @@ var FieldtypeFlex;
             if (toggle)
                 toggle.disabled = busy;
             FieldtypeFlex.one(header, '[data-flex-row-action="duplicate"]').disabled = busy || (max > 0 && count >= max);
+            FieldtypeFlex.all(header, '.flex-clipboard-actions > button').forEach(button => {
+                button.disabled = busy || removed || FieldtypeFlex.attr(button, 'data-flex-row-action') !== 'clipboard-copy' && max > 0 && count >= max;
+            });
             FieldtypeFlex.one(header, '[data-flex-row-action="remove"]').disabled = busy || (!removed && count <= min);
             FieldtypeFlex.one(row, ':scope > .flex-row-header .flex-row-sort, :scope > .flex-table-sort > .flex-row-sort').disabled = busy || removed || count < 2;
         });
@@ -802,7 +811,9 @@ var FieldtypeFlex;
         }, 240);
     }
     function moved(set, row) {
-        FieldtypeFlex.one(set, ':scope > .flex-rows-status').textContent = message('itemMoved', 'Item moved to position {position} of {count}').replace('{position}', String(rows(set).indexOf(row) + 1)).replace('{count}', String(rows(set).length));
+        const status = FieldtypeFlex.one(set, ':scope > .flex-rows-status');
+        status.classList.add('uk-hidden-visually');
+        status.textContent = message('itemMoved', 'Item moved to position {position} of {count}').replace('{position}', String(rows(set).indexOf(row) + 1)).replace('{count}', String(rows(set).length));
     }
     function updateImagePreview(button, editor) {
         const images = FieldtypeFlex.all(editor, '.InputfieldImageList > li.gridImage, .InputfieldImageEditSingle')
@@ -1114,12 +1125,12 @@ var FieldtypeFlex;
             const target = event.target;
             if (!(target instanceof Node))
                 return;
-            FieldtypeFlex.all(document, '.flex-table-more[open]').forEach(details => {
+            FieldtypeFlex.all(document, ':is(.flex-table-more, .flex-row-clipboard)[open]').forEach(details => {
                 if (!details.contains(target))
                     details.open = false;
             });
         }, true);
-    FieldtypeFlex.delegate('keydown', '.flex-table-more[open]', (event, details) => {
+    FieldtypeFlex.delegate('keydown', ':is(.flex-table-more, .flex-row-clipboard)[open]', (event, details) => {
         if (event.key !== 'Escape')
             return;
         event.preventDefault();
@@ -1223,14 +1234,50 @@ var FieldtypeFlex;
         const set = FieldtypeFlex.closest(button, '.flex-rows'), row = button.closest('.flex-row');
         if (button.disabled || treeBusy(set))
             return;
-        const more = button.closest('.flex-table-more');
+        const more = button.closest('.flex-table-more, .flex-row-clipboard');
         if (more) {
             more.open = false;
             FieldtypeFlex.one(more, 'summary').focus();
         }
-        const action = button.matches('.flex-row-add') ? 'add' : FieldtypeFlex.attr(button, 'data-flex-row-action');
+        const type = set.querySelector(':scope > .flex-row-type-control .flex-row-type')?.value;
+        let action = FieldtypeFlex.attr(button, 'data-flex-row-action');
+        if (button.matches('.flex-row-add'))
+            action = type === '@clipboard' ? 'paste-end' : 'add';
+        const pasting = action.startsWith('paste-');
         const error = FieldtypeFlex.one(set, ':scope > .flex-rows-error');
+        const status = FieldtypeFlex.one(set, ':scope > .flex-rows-status');
         error.textContent = '';
+        status.textContent = '';
+        status.classList.toggle('uk-hidden-visually', action !== 'clipboard-copy' && !pasting);
+        if (action === 'clipboard-copy' && row) {
+            setTreeBusy(set, true);
+            try {
+                const clipboard = navigator.clipboard;
+                if (!clipboard?.writeText)
+                    throw new Error(message('clipboardUnavailable', 'The clipboard is unavailable. Open the editor over HTTPS.'));
+                const text = Promise.resolve().then(() => copyRow(set, row));
+                // WebKit needs the write to start in the click handler, before the AJAX result.
+                if (window.ClipboardItem && clipboard.write) {
+                    const blob = text.then(value => new Blob([value], { type: 'text/plain' }));
+                    const writing = clipboard.write([new ClipboardItem({ 'text/plain': blob })]);
+                    await Promise.all([text, writing.catch(async (problem) => {
+                            await text;
+                            throw problem;
+                        })]);
+                }
+                else {
+                    await clipboard.writeText(await text);
+                }
+                status.textContent = message('rowCopied', 'Row copied to the clipboard.');
+            }
+            catch (problem) {
+                error.textContent = clipboardError(problem);
+            }
+            finally {
+                setTreeBusy(set, false);
+            }
+            return;
+        }
         if (action === 'visibility' && row) {
             const hidden = !row.matches('.flex-row-hidden');
             row.classList.toggle('flex-row-hidden', hidden);
@@ -1263,6 +1310,7 @@ var FieldtypeFlex;
         setTreeBusy(set, true);
         let focus;
         try {
+            const clipboard = pasting ? await readClipboard() : '';
             window.tinymce?.triggerSave();
             const data = new URLSearchParams({ flex_action: action, flex_set: FieldtypeFlex.attr(set, 'data-flex-set'), flex_order: activeRows(set).map(row => FieldtypeFlex.attr(row, 'data-flex-row')).join(',') });
             const orders = {};
@@ -1272,12 +1320,13 @@ var FieldtypeFlex;
             });
             data.set('flex_orders', JSON.stringify(orders));
             if (action === 'add')
-                data.set('flex_type', FieldtypeFlex.attr(set, 'data-flex-type') || FieldtypeFlex.one(set, ':scope > .flex-row-type-control .flex-row-type').value);
-            else if (action === 'duplicate' && row) {
-                data.set('flex_source', FieldtypeFlex.attr(row, 'data-flex-row'));
-                // A Repeater's owner URL must not be overridden by the main PageEdit id.
-                FieldtypeFlex.serialize(FieldtypeFlex.closest(row, 'form')).forEach(([name, value]) => { if (name !== 'id')
-                    data.append(name, value); });
+                data.set('flex_type', type || FieldtypeFlex.attr(set, 'data-flex-type'));
+            else if (action === 'duplicate' && row)
+                appendSource(data, row);
+            if (pasting) {
+                data.set('flex_clipboard', clipboard);
+                if (action !== 'paste-end' && row)
+                    data.set('flex_source', FieldtypeFlex.attr(row, 'data-flex-row'));
             }
             const token = csrf();
             if (token)
@@ -1290,7 +1339,9 @@ var FieldtypeFlex;
             if (!set.isConnected)
                 return;
             const fresh = FieldtypeFlex.parseHTML(result.html);
-            if (action === 'duplicate' && row)
+            if (action === 'paste-above' && row)
+                row.before(fresh);
+            else if ((action === 'duplicate' || action === 'paste-below') && row)
                 row.after(fresh);
             else
                 rowList(set).append(fresh);
@@ -1302,14 +1353,51 @@ var FieldtypeFlex;
             queueTitleRefresh(FieldtypeFlex.closest(set, '.InputfieldFlex'));
             focus = fresh.querySelector(':scope > .flex-row-header .flex-row-toggle, :scope > .flex-table-actions summary') || undefined;
             FieldtypeFlex.classic.added(fresh);
+            if (pasting) {
+                status.textContent = [message('rowPasted', 'Row pasted.'), result.warning].filter(Boolean).join(' ');
+                const selection = set.querySelector(':scope > .flex-row-type-control .flex-row-type');
+                if (selection?.value === '@clipboard')
+                    selection.selectedIndex = 0;
+            }
         }
         catch (problem) {
-            error.textContent = errorMessage(problem);
+            error.textContent = pasting ? clipboardError(problem) : errorMessage(problem);
         }
         finally {
             setTreeBusy(set, false);
         }
         focus?.focus();
+    }
+    function appendSource(data, row) {
+        data.set('flex_source', FieldtypeFlex.attr(row, 'data-flex-row'));
+        // A Repeater owner URL must not be overridden by the main PageEdit id.
+        FieldtypeFlex.serialize(FieldtypeFlex.closest(row, 'form')).forEach(([name, value]) => { if (name !== 'id')
+            data.append(name, value); });
+    }
+    async function copyRow(set, row) {
+        window.tinymce?.triggerSave();
+        FieldtypeFlex.classic.saveReady(FieldtypeFlex.closest(set, '.InputfieldFlex'));
+        const data = new URLSearchParams({ flex_action: 'clipboard-copy', flex_set: FieldtypeFlex.attr(set, 'data-flex-set') });
+        appendSource(data, row);
+        const token = csrf();
+        if (token)
+            data.set(token.name, token.value);
+        data.set('flex_complete', FieldtypeFlex.attr(set, 'data-flex-draft'));
+        const response = await fetch(FieldtypeFlex.attr(set, 'data-flex-page-url'), { method: 'POST', credentials: 'same-origin', headers: requestHeaders(set), body: data });
+        const result = await response.json();
+        if (!response.ok || result.error || typeof result.clipboard !== 'string')
+            throw new Error(result.message || message('unableToLoad', 'Unable to load item'));
+        return result.clipboard;
+    }
+    function readClipboard() {
+        if (!navigator.clipboard?.readText)
+            throw new Error(message('clipboardUnavailable', 'The clipboard is unavailable. Open the editor over HTTPS.'));
+        return navigator.clipboard.readText();
+    }
+    function clipboardError(problem) {
+        return problem instanceof DOMException && (problem.name === 'NotAllowedError' || problem.name === 'SecurityError')
+            ? message('clipboardDenied', 'Clipboard access was denied. Allow access in your browser and try again.')
+            : errorMessage(problem);
     }
     function metadataProperty(element) { return element.closest('[data-flex-metadata-property]')?.getAttribute('data-flex-metadata-property') || ''; }
     function nativeMetadataName(name) { return (name.match(/^(description[0-9]*|tags)_/) || [])[1] || ''; }

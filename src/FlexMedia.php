@@ -475,6 +475,19 @@ trait FlexMediaCollection {
 		return $copy;
 	}
 
+	/** Stage a validated original under a new identity in the current editor draft. @internal */
+	public function importClipboardFile(string $source, string $basename): Pagefile {
+		$this->assertWritable();
+		$this->checkLimit(true);
+		$id = bin2hex(random_bytes(16));
+		try {
+			return $this->appendCopy(['id' => $id, 'basename' => $basename], $source);
+		} catch(\Throwable $error) {
+			$this->field->type->media()->abandon($id, $this->page, $this->field, $this->flexDraft);
+			throw $error;
+		}
+	}
+
 	/**
 	 * Add an item after validating its identity, owner and collection limits.
 	 *

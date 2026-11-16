@@ -113,8 +113,8 @@
 .flex-table-grid .flex-table-cell .flex-table-text :is(.InputfieldContent, .LanguageSupport) > input:not([type="hidden"]) { min-height: 2rem; }
 .flex-table-grid :is(.flex-table-sort, .flex-table-actions) { width: 1%; white-space: nowrap; }
 .flex-table-actions > .flex-row-controls { display: flex; }
-.flex-table-more { position: relative; margin: 0; }
-.flex-table-more > summary::-webkit-details-marker { display: none; }
+:is(.flex-table-more, .flex-row-clipboard) { position: relative; margin: 0; }
+:is(.flex-table-more, .flex-row-clipboard) > summary::-webkit-details-marker { display: none; }
 .flex-table-secondary {
     display: flex;
     position: absolute;
@@ -125,6 +125,37 @@
     box-shadow: 0 0 0 1px var(--pw-border-color, rgba(0, 0, 0, .15));
 }
 .flex-table-more:not([open]) > .flex-table-secondary { display: none; }
+.flex-table-more[open] .flex-table-secondary { display: grid; grid-template-columns: auto 1fr; }
+.flex-table-secondary > .flex-clipboard-actions { grid-column: 1 / -1; }
+.flex-table-scroll:has(.flex-table-more[open]) { padding-block-end: 7rem; }
+.flex-table-grid .flex-table-actions:has(.flex-table-more[open]) {
+    position: relative;
+    z-index: 3;
+}
+.flex-clipboard-actions {
+    display: grid;
+    min-width: max-content;
+    color: var(--pw-text-color, #333);
+    background: var(--pw-blocks-background, #fff);
+}
+.flex-rows .flex-row > .flex-row-header:has(.flex-row-clipboard[open]) {
+    overflow: visible;
+    z-index: 3;
+}
+.flex-row-clipboard > .flex-clipboard-actions {
+    position: absolute;
+    z-index: 3;
+    inset-block-start: 100%;
+    inset-inline-end: 0;
+    box-shadow: 0 0 0 1px var(--pw-border-color, rgba(0, 0, 0, .15));
+}
+.flex-row-controls .flex-clipboard-actions > button.flex-row-action {
+    justify-content: flex-start;
+    padding-inline: .65rem;
+}
+.flex-clipboard-actions > button:not(:disabled):hover { text-decoration: underline; }
+.flex-row-remove-pending > .flex-row-header .flex-row-clipboard,
+.flex-row-type-control[hidden] { display: none; }
 .flex-table-grid > tbody > .flex-row { display: table-row; float: none; }
 .flex-table-grid > tbody > .flex-row-hidden > .flex-table-cell { opacity: .6; }
 .flex-table-grid > tbody > .flex-row-remove-pending { background: var(--pw-error-background-color, #fff0ef); }
@@ -193,7 +224,7 @@
 }
 .flex-row-bar > button,
 .flex-row-controls .flex-row-action,
-.flex-table-more > summary,
+:is(.flex-table-more, .flex-row-clipboard) > summary,
 .flex-table-sort > button {
     appearance: none;
     display: inline-flex;
@@ -215,12 +246,12 @@
 }
 .flex-row-bar > .flex-row-sort,
 .flex-row-controls .flex-row-action,
-.flex-table-more > summary,
+:is(.flex-table-more, .flex-row-clipboard) > summary,
 .flex-table-sort > button {
     min-width: 1.625rem;
     padding-inline: .125rem;
 }
-.flex-table-grid :is(.flex-table-actions .flex-row-action, .flex-table-more > summary, .flex-table-sort > button) {
+.flex-table-grid :is(.flex-table-actions .flex-row-action, :is(.flex-table-more, .flex-row-clipboard) > summary, .flex-table-sort > button) {
     min-height: 2rem;
 }
 .flex-row-bar > .flex-row-toggle {
@@ -287,7 +318,7 @@
     cursor: grab;
     touch-action: none;
 }
-:is(.flex-row-action, .flex-row-sort, .flex-table-more > summary):hover:not(:disabled) > .fa {
+:is(.flex-row-action, .flex-row-sort, .flex-table-more > summary, .flex-row-clipboard > summary):hover:not(:disabled) > .fa {
     opacity: .65;
 }
 :is(.flex-row-header, .flex-table-sort) button:disabled {

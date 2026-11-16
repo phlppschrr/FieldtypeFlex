@@ -132,6 +132,22 @@ $matches = $pages->find('content.blocks.text.heading*=Architecture');
 $withGalleries = $pages->find('content.blocks.gallery.count>1');
 ```
 
+## Copy and paste rows
+
+Use the clipboard menu in a row header or the **More row actions** menu in a table.
+**Copy Row to Clipboard** includes the current editor values. **Paste Row Above**
+and **Paste Row Below** insert a new row. To append a row, select **Paste from
+Clipboard** in the Add item type picker and click **Add item**. Paste uses the
+target collection's row types, settings and defaults. Save the page to commit
+the inserted rows and media.
+
+Clipboard access needs HTTPS and browser permission. When copying across
+installations, language values match by language name, Page references are
+skipped, and relative rich-text links retain their source URL. Media uses owned
+local originals when available. Remote media requires cURL and PHP's global IP
+range filter. Downloads use public IPv4 HTTPS URLs without redirects, with file
+type, size and time limits. Any skipped contents are reported in the editor.
+
 ## Examples and documentation
 
 The [examples](examples/README.md) cover PHP, JSON and native Inputfield definitions, from basic properties to nested Rows, conditional inputs and custom media fields.

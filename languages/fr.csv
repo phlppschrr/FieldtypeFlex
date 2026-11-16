@@ -353,3 +353,16 @@ Table,Tableau,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,51c45b79
 Resize column %s,Redimensionner la colonne %s,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,21d53025776dcafda3783d5d72b15433
 More row actions,Autres actions de ligne,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,e2a4efbc8b757af6e753f6a12bb575c7
 Reorder rows,Réordonner les lignes,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,314e8f6c00327e6455394d06ba2478bb
+The clipboard is unavailable. Open the editor in a browser that supports clipboard access over HTTPS.,Le presse-papiers est indisponible. Ouvrez l’éditeur via HTTPS dans un navigateur qui permet d’y accéder.,,site/modules/FieldtypeFlex/InputfieldFlex.module.php,9e69435c804923bffdbc5b0daf8a80f1
+Clipboard access was denied. Allow access in your browser and try again.,L’accès au presse-papiers a été refusé. Autorisez-le dans votre navigateur et réessayez.,,site/modules/FieldtypeFlex/InputfieldFlex.module.php,4ffe1c333a6b533a5e8142ac135b903c
+Row copied to the clipboard.,Ligne copiée dans le presse-papiers.,,site/modules/FieldtypeFlex/InputfieldFlex.module.php,9d53447514a2f0ea465e3bfbbcc81a80
+Row pasted.,Ligne collée.,,site/modules/FieldtypeFlex/InputfieldFlex.module.php,e93ac8f1bb2efaf99a6f27c0b4864a61
+Copy Row to Clipboard,Copier la ligne dans le presse-papiers,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,a9c1d0ca31b1f067f9d0e79a9ff8137e
+Paste Row Above,Coller la ligne au-dessus,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,d7fae6727002a74d2002448f1dd06391
+Paste Row Below,Coller la ligne en dessous,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,1076b86358ae6db684f18bd16ce97b28
+Row clipboard,Presse-papiers de la ligne,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,3b0ba94efe9af61b551a0a84756fd2cc
+Paste from Clipboard,Coller depuis le presse-papiers,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,9de3891a7bdf6b298406fe85b6c41a65
+The row is too large for the clipboard.,La ligne est trop grande pour le presse-papiers.,,site/modules/FieldtypeFlex/src/FlexClipboard.php,09f3120b0035e897bcffc759f0ba8a67
+Row type %s is unavailable in this collection.,Le type de ligne %s est indisponible dans cette collection.,,site/modules/FieldtypeFlex/src/FlexClipboard.php,023e9f90a4419b8114c6bcce95eea23e
+Skipped or adjusted %1$d values or files: %2$s,%1$d valeurs ou fichiers ignorés ou ajustés : %2$s,,site/modules/FieldtypeFlex/src/FlexClipboard.php,c73ce5080f6c9deaedb4323af1402767
+The clipboard does not contain a supported FieldtypeFlex row.,Le presse-papiers ne contient pas de ligne FieldtypeFlex prise en charge.,,site/modules/FieldtypeFlex/src/FlexClipboard.php,767ccc7da8e9de5260a6dc109fd79126

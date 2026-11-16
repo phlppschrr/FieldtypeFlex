@@ -1,5 +1,6 @@
 namespace FieldtypeFlex {
-    interface RowResponse {html: string; error?: boolean; message?: string;}
+    interface RowResponse {html: string; error?: boolean; message?: string; warning?: string;}
+    interface ClipboardResponse {clipboard: string; error?: boolean; message?: string;}
     interface UploadItem {markup: string; error?: boolean; message?: string;}
     interface RowState { title?: TitleData; removalReady?: boolean; load?: Promise<boolean>; }
     const state = new WeakMap<HTMLElement, RowState>();
@@ -88,6 +89,11 @@ namespace FieldtypeFlex {
     }
     function updateActions(set: HTMLElement): void {
         const count = activeRows(set).length, min = Number(attr(set, 'data-flex-min')) || 0, max = Number(attr(set, 'data-flex-max')) || 0, busy = treeBusy(set);
+        const typeControl = set.querySelector<HTMLElement>(':scope > .flex-row-type-control');
+        if(typeControl && set.hasAttribute('data-flex-type')) {
+            typeControl.hidden = count > 0;
+            if(typeControl.hidden) one<HTMLSelectElement>(typeControl, 'select').selectedIndex = 0;
+        }
         all<HTMLButtonElement>(set, ':scope > .flex-row-add').forEach(button => button.disabled = busy || (max > 0 && count >= max));
         rows(set).forEach(row => {
             const header = one(row, ':scope > .flex-row-header');
@@ -95,6 +101,9 @@ namespace FieldtypeFlex {
             const removed = row.matches('.flex-row-remove-pending');
             if(toggle) toggle.disabled = busy;
             one<HTMLButtonElement>(header, '[data-flex-row-action="duplicate"]').disabled = busy || (max > 0 && count >= max);
+            all<HTMLButtonElement>(header, '.flex-clipboard-actions > button').forEach(button => {
+                button.disabled = busy || removed || attr(button, 'data-flex-row-action') !== 'clipboard-copy' && max > 0 && count >= max;
+            });
             one<HTMLButtonElement>(header, '[data-flex-row-action="remove"]').disabled = busy || (!removed && count <= min);
             one<HTMLButtonElement>(row, ':scope > .flex-row-header .flex-row-sort, :scope > .flex-table-sort > .flex-row-sort').disabled = busy || removed || count < 2;
         });
@@ -200,7 +209,9 @@ namespace FieldtypeFlex {
         }, 240);
     }
     function moved(set: HTMLElement, row: HTMLElement): void {
-        one(set, ':scope > .flex-rows-status').textContent = message('itemMoved', 'Item moved to position {position} of {count}').replace('{position}', String(rows(set).indexOf(row) + 1)).replace('{count}', String(rows(set).length));
+        const status = one(set, ':scope > .flex-rows-status');
+        status.classList.add('uk-hidden-visually');
+        status.textContent = message('itemMoved', 'Item moved to position {position} of {count}').replace('{position}', String(rows(set).indexOf(row) + 1)).replace('{count}', String(rows(set).length));
     }
     function updateImagePreview(button: HTMLButtonElement, editor: HTMLElement): void {
         const images = all(editor, '.InputfieldImageList > li.gridImage, .InputfieldImageEditSingle')
@@ -447,11 +458,11 @@ namespace FieldtypeFlex {
     for(const name of ['click', 'focusin']) document.addEventListener(name, event => {
         const target = event.target;
         if(!(target instanceof Node)) return;
-        all<HTMLDetailsElement>(document, '.flex-table-more[open]').forEach(details => {
+        all<HTMLDetailsElement>(document, ':is(.flex-table-more, .flex-row-clipboard)[open]').forEach(details => {
             if(!details.contains(target)) details.open = false;
         });
     }, true);
-    delegate('keydown', '.flex-table-more[open]', (event, details) => {
+    delegate('keydown', ':is(.flex-table-more, .flex-row-clipboard)[open]', (event, details) => {
         if(event.key !== 'Escape') return;
         event.preventDefault(); event.stopPropagation();
         (details as HTMLDetailsElement).open = false;
@@ -519,13 +530,42 @@ namespace FieldtypeFlex {
         event.preventDefault(); event.stopPropagation();
         const set = closest(button, '.flex-rows'), row = button.closest<HTMLElement>('.flex-row');
         if(button.disabled || treeBusy(set)) return;
-        const more = button.closest<HTMLDetailsElement>('.flex-table-more');
+        const more = button.closest<HTMLDetailsElement>('.flex-table-more, .flex-row-clipboard');
         if(more) {
             more.open = false;
             one(more, 'summary').focus();
         }
-        const action = button.matches('.flex-row-add') ? 'add' : attr(button, 'data-flex-row-action');
-        const error = one(set, ':scope > .flex-rows-error'); error.textContent = '';
+        const type = set.querySelector<HTMLSelectElement>(':scope > .flex-row-type-control .flex-row-type')?.value;
+        let action = attr(button, 'data-flex-row-action');
+        if(button.matches('.flex-row-add')) action = type === '@clipboard' ? 'paste-end' : 'add';
+        const pasting = action.startsWith('paste-');
+        const error = one(set, ':scope > .flex-rows-error');
+        const status = one(set, ':scope > .flex-rows-status');
+        error.textContent = '';
+        status.textContent = '';
+        status.classList.toggle('uk-hidden-visually', action !== 'clipboard-copy' && !pasting);
+        if(action === 'clipboard-copy' && row) {
+            setTreeBusy(set, true);
+            try {
+                const clipboard = navigator.clipboard;
+                if(!clipboard?.writeText) throw new Error(message('clipboardUnavailable', 'The clipboard is unavailable. Open the editor over HTTPS.'));
+                const text = Promise.resolve().then(() => copyRow(set, row));
+                // WebKit needs the write to start in the click handler, before the AJAX result.
+                if(window.ClipboardItem && clipboard.write) {
+                    const blob = text.then(value => new Blob([value], {type: 'text/plain'}));
+                    const writing = clipboard.write([new ClipboardItem({'text/plain': blob})]);
+                    await Promise.all([text, writing.catch(async problem => {
+                        await text;
+                        throw problem;
+                    })]);
+                } else {
+                    await clipboard.writeText(await text);
+                }
+                status.textContent = message('rowCopied', 'Row copied to the clipboard.');
+            } catch(problem) { error.textContent = clipboardError(problem); }
+            finally { setTreeBusy(set, false); }
+            return;
+        }
         if(action === 'visibility' && row) {
             const hidden = !row.matches('.flex-row-hidden'); row.classList.toggle('flex-row-hidden', hidden);
             change(one<HTMLInputElement>(row, ':scope > .flex-row-hidden-value, :scope > .flex-table-actions .flex-row-hidden-value'), hidden ? '1' : '0');
@@ -542,6 +582,7 @@ namespace FieldtypeFlex {
         setTreeBusy(set, true);
         let focus: HTMLElement | undefined;
         try {
+            const clipboard = pasting ? await readClipboard() : '';
             window.tinymce?.triggerSave();
             const data = new URLSearchParams({flex_action: action, flex_set: attr(set, 'data-flex-set'), flex_order: activeRows(set).map(row => attr(row, 'data-flex-row')).join(',')});
             const orders: Record<string, string[]> = {};
@@ -549,11 +590,11 @@ namespace FieldtypeFlex {
                 if(!current.closest('.flex-row-remove-pending')) orders[attr(current, 'data-flex-set')] = activeRows(current).map(row => attr(row, 'data-flex-row'));
             });
             data.set('flex_orders', JSON.stringify(orders));
-            if(action === 'add') data.set('flex_type', attr(set, 'data-flex-type') || one<HTMLSelectElement>(set, ':scope > .flex-row-type-control .flex-row-type').value);
-            else if(action === 'duplicate' && row) {
-                data.set('flex_source', attr(row, 'data-flex-row'));
-                // A Repeater's owner URL must not be overridden by the main PageEdit id.
-                serialize(closest(row, 'form')).forEach(([name, value]) => { if(name !== 'id') data.append(name, value); });
+            if(action === 'add') data.set('flex_type', type || attr(set, 'data-flex-type'));
+            else if(action === 'duplicate' && row) appendSource(data, row);
+            if(pasting) {
+                data.set('flex_clipboard', clipboard);
+                if(action !== 'paste-end' && row) data.set('flex_source', attr(row, 'data-flex-row'));
             }
             const token = csrf(); if(token) data.set(token.name, token.value); data.set('flex_complete', attr(set, 'data-flex-draft'));
             const response = await fetch(attr(set, 'data-flex-page-url'), {method: 'POST', credentials: 'same-origin', headers: requestHeaders(set), body: data});
@@ -561,15 +602,48 @@ namespace FieldtypeFlex {
             if(!response.ok || result.error) throw new Error(result.message || message('unableToAdd', 'Unable to add item'));
             if(!set.isConnected) return;
             const fresh = parseHTML(result.html);
-            if(action === 'duplicate' && row) row.after(fresh); else rowList(set).append(fresh);
+            if(action === 'paste-above' && row) row.before(fresh);
+            else if((action === 'duplicate' || action === 'paste-below') && row) row.after(fresh);
+            else rowList(set).append(fresh);
             await activateScripts(fresh, response); order(set); await classic.setup(fresh); initRows(set);
             [fresh, ...all(fresh, '.flex-row[data-flex-title]')].forEach(row => syncTitleSources(row));
             queueTitleRefresh(closest(set, '.InputfieldFlex'));
             focus = fresh.querySelector<HTMLElement>(':scope > .flex-row-header .flex-row-toggle, :scope > .flex-table-actions summary') || undefined;
             classic.added(fresh);
-        } catch(problem) { error.textContent = errorMessage(problem); }
+            if(pasting) {
+                status.textContent = [message('rowPasted', 'Row pasted.'), result.warning].filter(Boolean).join(' ');
+                const selection = set.querySelector<HTMLSelectElement>(':scope > .flex-row-type-control .flex-row-type');
+                if(selection?.value === '@clipboard') selection.selectedIndex = 0;
+            }
+        } catch(problem) { error.textContent = pasting ? clipboardError(problem) : errorMessage(problem); }
         finally { setTreeBusy(set, false); }
         focus?.focus();
+    }
+    function appendSource(data: URLSearchParams, row: HTMLElement): void {
+        data.set('flex_source', attr(row, 'data-flex-row'));
+        // A Repeater owner URL must not be overridden by the main PageEdit id.
+        serialize(closest(row, 'form')).forEach(([name, value]) => { if(name !== 'id') data.append(name, value); });
+    }
+    async function copyRow(set: HTMLElement, row: HTMLElement): Promise<string> {
+        window.tinymce?.triggerSave();
+        classic.saveReady(closest(set, '.InputfieldFlex'));
+        const data = new URLSearchParams({flex_action: 'clipboard-copy', flex_set: attr(set, 'data-flex-set')});
+        appendSource(data, row);
+        const token = csrf(); if(token) data.set(token.name, token.value);
+        data.set('flex_complete', attr(set, 'data-flex-draft'));
+        const response = await fetch(attr(set, 'data-flex-page-url'), {method: 'POST', credentials: 'same-origin', headers: requestHeaders(set), body: data});
+        const result: ClipboardResponse = await response.json();
+        if(!response.ok || result.error || typeof result.clipboard !== 'string') throw new Error(result.message || message('unableToLoad', 'Unable to load item'));
+        return result.clipboard;
+    }
+    function readClipboard(): Promise<string> {
+        if(!navigator.clipboard?.readText) throw new Error(message('clipboardUnavailable', 'The clipboard is unavailable. Open the editor over HTTPS.'));
+        return navigator.clipboard.readText();
+    }
+    function clipboardError(problem: unknown): string {
+        return problem instanceof DOMException && (problem.name === 'NotAllowedError' || problem.name === 'SecurityError')
+            ? message('clipboardDenied', 'Clipboard access was denied. Allow access in your browser and try again.')
+            : errorMessage(problem);
     }
     interface MetadataSnapshot {
         controls: {name: string; value: string | string[]; type: string; checked: boolean; property: string; suffix: string; native: string}[];

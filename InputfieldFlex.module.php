@@ -136,6 +136,10 @@ class InputfieldFlex extends Inputfield implements BridgeComponent {
 		$this->wire()->config->scripts->add($base . 'FieldtypeFlex.js');
 		$this->wire()->config->styles->add($base . 'FieldtypeFlex.css');
 		$this->wire()->config->js('FieldtypeFlex', [
+			'clipboardUnavailable' => $this->_('The clipboard is unavailable. Open the editor in a browser that supports clipboard access over HTTPS.'),
+			'clipboardDenied'      => $this->_('Clipboard access was denied. Allow access in your browser and try again.'),
+			'rowCopied'            => $this->_('Row copied to the clipboard.'),
+			'rowPasted'            => $this->_('Row pasted.'),
 			'unableToAdd'           => $this->_('Unable to add item'),
 			'unableToLoad'          => $this->_('Unable to load item'),
 			'loading'               => $this->_('Loading…'),

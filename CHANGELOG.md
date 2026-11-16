@@ -2,6 +2,10 @@
 
 ## WIP
 
+### Added
+
+- Copy rows through the browser clipboard and paste them into compatible collections, with warnings for values or files that could not be imported.
+
 ## 1.0.0-beta.1 - 2026-11-16
 
 ### Added

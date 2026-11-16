@@ -17,6 +17,7 @@ require_once __DIR__ . '/src/FlexRowTitle.php';
 require_once __DIR__ . '/src/FlexMaintenanceAdmin.php';
 require_once __DIR__ . '/src/FlexQuery.php';
 require_once __DIR__ . '/src/FlexAdmin.php';
+require_once __DIR__ . '/src/FlexClipboard.php';
 require_once __DIR__ . '/InputfieldFlexRows.module.php';
 require_once __DIR__ . '/src/FlexMedia.php';
 

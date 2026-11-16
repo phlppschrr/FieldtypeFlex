@@ -163,9 +163,10 @@ class FlexAdmin extends Wire {
 	 * @param string $token
 	 * @param string $set Repeatable property name.
 	 * @param FlexRow $row
+	 * @param FlexValue|null $root Root bound to the evaluated editor definitions, when available.
 	 * @return void
 	 */
-	public function registerRow(string $token, string $set, FlexRow $row): void {
+	public function registerRow(string $token, string $set, FlexRow $row, ?FlexValue $root = null): void {
 		$draft = $this->draft($token);
 		if($draft['page'] !== (int) $row->ownerPage()->id || $draft['field'] !== (int) $row->ownerField()->id || $row->address() !== "$set.{$row->rowId()}") {
 			throw new WirePermissionException($this->_('Invalid Flex editor context'));
@@ -177,19 +178,19 @@ class FlexAdmin extends Wire {
 		$draft['rows'][$set][$row->rowId()] = $row->envelope();
 		$this->put($token, $draft);
 		try {
-			$root = $row->ownerPage()->getUnformatted($row->ownerField()->name);
+			$root ??= $row->ownerPage()->getUnformatted($row->ownerField()->name);
 			FlexPath::validate($this->discovery($token, $root)->rawArray(), $row->ownerField());
 			$this->type->media()->setDraft($row, $token);
 			$this->type->media()->prepare($row);
 			$draft = $this->draft($token);
 			$draft['rows'][$set][$row->rowId()]['values'] = $row->rawArray();
 			$this->put($token, $draft);
-			$children = function(FlexValue $owner) use (&$children, $token): void {
+			$children = function(FlexValue $owner) use (&$children, $token, $root): void {
 				foreach($owner as $item) {
 					if($item instanceof FlexValue) $children($item);
 					if($item instanceof FlexRows) {
 						foreach($item as $child) {
-							$this->registerRow($token, FlexPath::rowSet($child), $child);
+							$this->registerRow($token, FlexPath::rowSet($child), $child, $root);
 						}
 					}
 				}
@@ -355,7 +356,8 @@ class FlexAdmin extends Wire {
 		}
 	}
 
-	private function editableInput(Inputfield $input): void {
+	/** Require edit access to the native input and its containing fieldsets. @internal */
+	public function editableInput(Inputfield $input): void {
 		for($item = $input; $item instanceof Inputfield; $item = $item->parent) {
 			if(!$item->editable() || $this->hiddenOrLocked((int) $item->collapsed) || $item->disabled) {
 				throw new WirePermissionException($this->_('This Flex property is not editable'));
@@ -618,6 +620,29 @@ class FlexAdmin extends Wire {
 		}
 	}
 
+	/** Process current form values through the same scoped inputs for copy and duplicate. */
+	private function submittedRow(string $token, array $draft, string $set, FlexValue $value, bool $clipboard = false): FlexRow {
+		$input = $this->wire()->input;
+		$source = $this->row($token, $set, (string) $input->post('flex_source'), $value);
+		$postedType = $input->post('flex_type');
+		if($postedType !== null && $postedType !== $source->rowType()) {
+			throw new WirePermissionException($this->_('An existing Flex row cannot change type'));
+		}
+		InputfieldFlexRows::applyVisibility($source, $input->post, $draft['input']);
+		$prefix = FlexPath::inputPrefix($draft['input'], $source->address());
+		$inputs = $source->definitions()->getInputfields($source, $prefix, $token, $value);
+		$post = FlexLazy::prepare($value, $token, $input->post);
+		if($clipboard) {
+			// Copying a row must not create Page references from the native add-items control.
+			$data = array_filter($post->getArray(), static fn($key) => !preg_match('/^_.*_add_items$/D', $key), ARRAY_FILTER_USE_KEY);
+			$post = $this->wire(new WireInputData($data));
+		}
+		$form = FlexDependencies::processInput($inputs, $value->ownerPage(), $post);
+		if(!FlexLazy::unloaded($value, $token, $source->address())) InputfieldFlex::applyInputs($source, $form, $prefix);
+		if($form->getErrors()) throw new WireException(implode('; ', $form->getErrors()));
+		return $source;
+	}
+
 	/**
 	 * Validate and dispatch row and media editor AJAX requests.
 	 *
@@ -661,6 +686,11 @@ class FlexAdmin extends Wire {
 			$page->of(false);
 			$value = $page->getUnformatted($field->name);
 			$action = (string) $this->wire()->input->post('flex_action');
+			$pasting = in_array($action, ['paste-above', 'paste-below', 'paste-end'], true);
+			if($pasting || $action === 'clipboard-copy') {
+				if($value instanceof FlexInvalidValue) throw $value->definitionError();
+				$value = new FlexValue($page, $field, $this->type->getDefinitions($field, $page), $value->rawArray());
+			}
 			FlexLazy::assertSchema($value, $token);
 			if($action === 'row-titles') {
 				$response = ['error' => false, 'titles' => (object) $this->rowTitles($token, $draft, $value)];
@@ -678,7 +708,14 @@ class FlexAdmin extends Wire {
 				$input->setName = $set;
 				$input->flexInputName = $draft['input'];
 				$response = ['error' => false, 'html' => $input->renderRow($row, 1, false, true)];
-			} else if(in_array($action, ['add', 'duplicate'], true)) {
+			} else if($action === 'clipboard-copy') {
+				if($this->wire()->input->post('flex_complete') !== $token) throw new WireException($this->_('Incomplete Flex row request; check the PHP input limits'));
+				$set = (string) $this->wire()->input->post('flex_set');
+				$this->collection($token, $set, $value, true);
+				$source = $this->submittedRow($token, $draft, $set, $value, true);
+				$clipboard = $this->wire(new FlexClipboard());
+				$response = ['error' => false, 'clipboard' => $clipboard->export($source)];
+			} else if(in_array($action, ['add', 'duplicate', 'paste-above', 'paste-below', 'paste-end'], true)) {
 				if($this->wire()->input->post('flex_complete') !== $token) {
 					throw new WireException($this->_('Incomplete Flex row request; check the PHP input limits'));
 				}
@@ -713,31 +750,35 @@ class FlexAdmin extends Wire {
 						$this->row($token, $address, $rowId, $value, false);
 					}
 				}
+				$position = count($ids);
+				if($action === 'paste-above' || $action === 'paste-below') {
+					$position = array_search($this->wire()->input->post('flex_source'), $ids, true);
+					if($position === false) throw new WirePermissionException($this->_('Invalid Flex editor context'));
+					if($action === 'paste-below') $position++;
+				}
+				if($pasting) $beforePaste = $draft;
 				$orders[$set] = $ids;
 				$draft['orders'] = $orders;
 				$this->put($token, $draft);
 				$rows = new FlexRows($page, $field, $set, $definition);
 				if($action === 'duplicate') {
-					$source = $this->row($token, $set, (string) $this->wire()->input->post('flex_source'), $value);
-					$postedType = $this->wire()->input->post('flex_type');
-					if($postedType !== null && $postedType !== $source->rowType()) {
-						throw new WirePermissionException($this->_('An existing Flex row cannot change type'));
-					}
-					InputfieldFlexRows::applyVisibility($source, $this->wire()->input->post, $draft['input']);
-					$prefix = FlexPath::inputPrefix($draft['input'], $source->address());
-					$inputs = $source->definitions()->getInputfields($source, $prefix, $token, $value);
-					$post = FlexLazy::prepare($value, $token, $this->wire()->input->post);
-					$form = FlexDependencies::processInput($inputs, $page, $post);
-					if(!FlexLazy::unloaded($value, $token, $source->address())) InputfieldFlex::applyInputs($source, $form, $prefix);
-					if($form->getErrors()) {
-						throw new WireException(implode('; ', $form->getErrors()));
-					}
+					$source = $this->submittedRow($token, $draft, $set, $value);
 					$rows->add($source);
 					$row = $rows->duplicateRow($source->rowId());
+				} else if($pasting) {
+					$clipboard = $this->wire(new FlexClipboard());
+					$row = $clipboard->paste($rows, $definition, $this->wire()->input->post('flex_clipboard'), $token);
+					$this->assertFresh($token, $page, $field);
 				} else {
 					$row = $rows->addRow((string) $this->wire()->input->post('flex_type'));
 				}
-				$this->registerRow($token, $set, $row);
+				$this->registerRow($token, $set, $row, $pasting ? $value : null);
+				if($pasting) {
+					$updated = $this->draft($token);
+					array_splice($ids, $position, 0, [$row->rowId()]);
+					$updated['orders'][$set] = $ids;
+					$this->put($token, $updated);
+				}
 				$input = $this->wire(new InputfieldFlexRows());
 				$input->name = FlexPath::inputPrefix($draft['input'], $parent->address()) . $setName;
 				$input->definition = $definition;
@@ -749,8 +790,9 @@ class FlexAdmin extends Wire {
 				$response = [
 					'error' => false,
 					'id'    => $row->rowId(),
-					'html'  => $input->renderRow($row, count($ids) + 1, true),
+					'html'  => $input->renderRow($row, $position + 1, true),
 				];
+				if($pasting) $response['warning'] = $clipboard->warningSummary();
 			} else if($action === 'media-render') {
 				$address = (string) $this->wire()->input->post('flex_path');
 				[, , $input] = $this->target($token, $address, $value);
@@ -800,6 +842,10 @@ class FlexAdmin extends Wire {
 			$event->return = '';
 			echo json_encode($response, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
 		} catch(\Throwable $error) {
+			if(isset($beforePaste)) {
+				$this->put($token, $beforePaste);
+				if(isset($clipboard)) $clipboard->abandon($page, $field, $token);
+			}
 			if(isset($assetId)) {
 				$this->type->media()->abandon($assetId, $page, $field, $token);
 			}

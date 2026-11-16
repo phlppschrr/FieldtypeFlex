@@ -559,3 +559,115 @@ test('maintenance rebinds a replaced native form once after in-place save', asyn
     dom.window.document.dispatchEvent(new dom.window.CustomEvent('pw-form-saved'));dom.window.document.dispatchEvent(new dom.window.CustomEvent('pw-form-saved'));
     dom.window.document.querySelector('[data-flex-maintenance="rename"]').click();await tick();assert.equal(calls,2);dom.window.close();
 });
+
+function clipboardMenu() {
+    return `<details class="flex-row-clipboard"><summary title="Row clipboard">Clipboard</summary><div class="flex-clipboard-actions">${[
+        ['clipboard-copy', 'Copy Row to Clipboard'], ['paste-above', 'Paste Row Above'], ['paste-below', 'Paste Row Below']
+    ].map(([action, text]) => `<button type="button" class="flex-row-action" data-flex-row-action="${action}">${text}</button>`).join('')}</div></details>`;
+}
+function clipboardSet(content, attributes = '') {
+    return set(content, attributes).replace('<button type="button" class="flex-row-add">',
+        '<label class="flex-row-type-control"><select class="flex-row-type"><option value="text">Text</option><option value="@clipboard">Paste from Clipboard</option></select></label><button type="button" class="flex-row-add">');
+}
+test('clipboard write begins in the click before collecting live form values via AJAX', async () => {
+    const events = [];
+    const clipboard = '{"format":"fieldtype-flex-row","version":1}';
+    const h = await harness(clipboardSet(row('a').replace('</span>', '</span>' + clipboardMenu())), {
+        before(w) {
+            w.ClipboardItem = class { constructor(data) { this.data = data; } };
+            Object.defineProperty(w.navigator, 'clipboard', {value: {
+                async write([item]) {
+                    events.push('write');
+                    const blob = await item.data['text/plain'];
+                    assert.equal(blob.type, 'text/plain');
+                    const reader = new w.FileReader();
+                    await new Promise((resolve, reject) => {
+                        reader.onload = resolve; reader.onerror = reject; reader.readAsText(blob);
+                    });
+                    assert.equal(reader.result, clipboard);
+                },
+                writeText() { throw new Error('unexpected fallback'); },
+            }});
+        },
+        response: async () => {
+            events.push('fetch');
+            return {ok: true, json: async () => ({clipboard})};
+        },
+    });
+    const d = h.document;
+    d.querySelector('[name="heading_a"]').value = 'Pending source edit';
+    const summary = d.querySelector('.flex-row-clipboard summary');
+    summary.click();
+    d.querySelector('[data-flex-row-action="clipboard-copy"]').click();
+    assert.deepEqual(events, ['write']);
+    await new Promise(resolve => setTimeout(resolve, 20));
+    assert.deepEqual(events, ['write', 'fetch']);
+    const request = h.calls[0].body;
+    assert.equal(request.get('heading_a'), 'Pending source edit');
+    assert.equal(request.get('flex_source'), 'a');
+    assert.equal(request.get('id'), null);
+    assert.match(d.querySelector('.flex-rows-status').textContent, /Row copied/);
+    assert.equal(d.activeElement, summary);
+    assert.equal(d.querySelector('.flex-row-clipboard').open, false);
+    assert.equal(d.querySelectorAll('.flex-row').length, 1);
+    h.close();
+});
+test('clipboard read places a fresh row above or below an anchor and preserves unsaved target inputs', async () => {
+    const events = [];
+    const clipboard = '{"format":"fieldtype-flex-row","version":1}';
+    const h = await harness(clipboardSet(row('a') + row('b').replace('</span>', '</span>' + clipboardMenu())), {
+        before(w) {
+            Object.defineProperty(w.navigator, 'clipboard', {value: {readText() { events.push('read'); return Promise.resolve(clipboard); }}});
+        },
+        response: async (_url, {body}) => {
+            const action = body.get('flex_action');
+            events.push(action);
+            return {ok: true, json: async () => ({html: row(action), warning: action === 'paste-below' ? 'Skipped image.png' : ''})};
+        },
+    });
+    const d = h.document;
+    const target = d.querySelector('[name="heading_b"]');
+    target.value = 'Pending target edit';
+    d.querySelector('[data-flex-row-action="paste-above"]').click();
+    assert.deepEqual(events, ['read']);
+    await tick();
+    d.querySelector('[data-flex-row-action="paste-below"]').click();
+    await tick();
+    assert.deepEqual(events, ['read', 'paste-above', 'read', 'paste-below']);
+    assert.equal(d.querySelector('.flex-rows-order').value, 'a,paste-above,b,paste-below');
+    assert.equal(h.calls[0].body.get('flex_source'), 'b');
+    assert.equal(h.calls[0].body.get('flex_clipboard'), clipboard);
+    assert.equal(target.value, 'Pending target edit');
+    assert.match(d.querySelector('.flex-rows-status').textContent, /Row pasted.*image\.png/);
+    h.close();
+});
+test('the empty nested type picker pastes to its own set and reports clipboard permission failures', async () => {
+    const nested = clipboardSet('').replace('data-flex-set="blocks"', 'data-flex-set="blocks.a.children"');
+    let deny = true;
+    const h = await harness(set(row('a', 'Parent', nested)), {
+        before(w) {
+            Object.defineProperty(w.navigator, 'clipboard', {value: {readText() {
+                return deny ? Promise.reject(new w.DOMException('Permission denied', 'NotAllowedError')) : Promise.resolve('JSON');
+            }}});
+        },
+        response: async () => ({ok: true, json: async () => ({html: row('child')})}),
+    });
+    const d = h.document, childSet = d.querySelector('[data-flex-set="blocks.a.children"]');
+    const picker = childSet.querySelector('select'), add = childSet.querySelector('.flex-row-add');
+    assert.equal(picker.parentElement.hidden, false);
+    picker.value = '@clipboard';
+    add.click();
+    await tick();
+    assert.match(childSet.querySelector('.flex-rows-error').textContent, /Clipboard access was denied/);
+    assert.equal(h.calls.length, 0);
+    deny = false;
+    add.click();
+    await tick();
+    assert.equal(h.calls[0].body.get('flex_set'), 'blocks.a.children');
+    assert.equal(h.calls[0].body.get('flex_action'), 'paste-end');
+    assert.equal(h.calls[0].body.get('flex_source'), null);
+    assert.equal(childSet.querySelector('.flex-rows-order').value, 'child');
+    assert.equal(childSet.querySelector('.flex-rows-error').textContent, '');
+    assert.equal(picker.parentElement.hidden, true);
+    h.close();
+});
