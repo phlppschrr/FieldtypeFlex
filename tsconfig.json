@@ -8,5 +8,5 @@
     "outFile": "FieldtypeFlex.js",
     "newLine": "lf"
   },
-  "files": ["scripts/typescript/dom.ts", "scripts/typescript/classic.ts", "scripts/typescript/sortable.ts", "scripts/typescript/FieldtypeFlex.ts"]
+  "files": ["scripts/typescript/dom.ts", "scripts/typescript/classic.ts", "scripts/typescript/sortable.ts", "scripts/typescript/row-title.ts", "scripts/typescript/FieldtypeFlex.ts"]
 }

@@ -2,14 +2,18 @@
 
 ## WIP
 
+## 1.0.0-beta.1 - 2026-11-16
+
 ### Added
 
 - Edit iframe and inline TinyMCE fields in a full-width table detail row.
 - Open File and PageList editors in a full-width table detail row.
 - Support Checkboxes, Radios and TextTags for Page references in table cells.
+- Add the `rowTitleValues` and `rowTitleParts` hooks for custom tokens and structured title overrides, with live updates from unsaved editor values.
 
 ### Changed
 
+- **Breaking:** Migrate `rowTitle` from `heading` to `{heading}`, `#n` to `#{@index}`, `_{heading}_` to `{heading}{.flex-badge}`, and `[{heading}]` to `{heading}{.flex-muted}`. Bracketed groups now represent optional segments and accept adjacent `{.class}` attributes.
 - Keep the card sort handle visible and reveal the compact row actions and chevron on hover or keyboard focus. Dim individual action icons on hover.
 - Move the table sort handle to the first column and group Duplicate and Hide/Show in a disclosure next to Remove.
 - Show image thumbnails in table cells and open the native editor in a full-width detail row that closes when focus moves to another cell.

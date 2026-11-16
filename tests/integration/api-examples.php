@@ -8,7 +8,9 @@ if(PHP_SAPI !== 'cli' || !isset($same, $createField)) {
 // Execute the actual reference snippets in the existing disposable suite fixture.
 $api = file_get_contents(dirname(__DIR__, 2) . '/API.md');
 preg_match_all('/```php\n(.*?)```/s', $api, $matches);
-$same(33, count($matches[1]), 'all API PHP examples have an execution context');
+$same(35, count($matches[1]), 'all API PHP examples have an execution context');
+$titleHooks = array_values(array_filter($matches[1], static fn($code) => str_contains($code, 'InputfieldFlexRows::rowTitle')));
+$matches[1] = array_values(array_diff($matches[1], $titleHooks));
 $tableExamples = array_values(array_filter($matches[1], static fn($code) => str_starts_with($code, '// Table definition.')));
 $matches[1] = array_values(array_filter($matches[1], static fn($code) => !in_array($code, $tableExamples, true)));
 $objectExamples = array_values(array_filter($matches[1], static fn($code) => str_starts_with($code, '// Fixed object definition.')));
@@ -54,7 +56,24 @@ $tableValue->rows->addRow('row', ['service' => 'Advice']);
 $same('Advice', $tableValue->rows->first()->service, 'API table definition and public Rows access execute');
 $same(null, $tableValue->headers, 'API table example uses fixed column labels');
 $rowTitleSettings = $snippet($fragment($rowTitleFragment))['result'];
-$same('[{@path} › {@type}] #n: _{heading|title}_', $rowTitleSettings['rowTitle'], 'API rowTitle fragment executes as native Rows settings');
+$same('[{@type}]{.flex-badge} [#{@index}]{.flex-muted} {heading|title|"Untitled"}[ · {category}]{.flex-muted}', $rowTitleSettings['rowTitle'], 'API rowTitle fragment executes as native Rows settings');
+$titleExampleField = $createField('flex_api_title_hooks', ['items' => ['type' => 'rows', 'types' => [
+	'gallery' => ['label' => 'Gallery', 'rowTitle' => '{heading}[ · {@details}]{.flex-muted}', 'children' => [
+		'heading' => ['type' => 'text'], 'images' => ['type' => 'image'],
+	]],
+]]]);
+$titleValue = $type->getBlankValue($page, $titleExampleField);
+$titleValue->items->addRow('gallery', ['heading' => 'Holiday images']);
+foreach($titleHooks as $code) {
+	$hookId = $snippet(str_replace('$wire->addHookAfter', '$hook = $wire->addHookAfter', $code), ['wire' => $wire])['hook'];
+	try {
+		$titleEditor = $titleExampleField->getInputfield($page);
+		$titleEditor->value = $titleValue;
+		$titleMarkup = $titleEditor->render();
+		$expected = str_contains($code, 'rowTitleParts') ? '<span class="flex-strong"> Holiday images</span>' : '>Holiday images</span>';
+		$assert(str_contains($titleMarkup, $expected), 'documented row title hook executes and renders');
+	} finally { $wire->removeHook($hookId); }
+}
 $dependencySettings = $snippet($fragment($dependencyFragment))['result'];
 $same('parent.show_details=1, forpage.feature_enabled=1', $dependencySettings['details']['showIf'], 'API dependency fragment declares containing and main Page contexts');
 $same('root.details_required=1', $dependencySettings['details']['requiredIf'], 'API dependency fragment declares root requiredIf');

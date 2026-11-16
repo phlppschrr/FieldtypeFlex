@@ -149,7 +149,7 @@ var FieldtypeFlex;
                 row.dispatchEvent(new Event(open ? 'opened' : 'closed', { bubbles: true }));
             }
         },
-        events(reloaded, toggled, tinyChanged, mediaRefresh) {
+        events(reloaded, toggled, changed, mediaRefresh) {
             document.addEventListener('reloaded', event => {
                 if (event.target instanceof HTMLElement && event.target.matches('.Inputfield'))
                     reloaded(event.target);
@@ -159,8 +159,8 @@ var FieldtypeFlex;
                     toggled(event.target, name === 'opened');
             }));
             document.addEventListener('change', event => {
-                if (event.target instanceof HTMLElement && event.target.matches('.InputfieldTinyMCE[data-flex-label-property]'))
-                    tinyChanged(event.target);
+                if (event.target instanceof HTMLElement && event.target.matches('.Inputfield'))
+                    changed(event.target);
             });
             // Upstream custom events are jQuery-only. Bind when a legacy child loads the stack.
             let bound = false;
@@ -177,9 +177,9 @@ var FieldtypeFlex;
                     if (!event.originalEvent && event.target === this)
                         toggled(event.target, event.type === 'opened');
                 });
-                $(document).on('change.flexRows', '.InputfieldTinyMCE[data-flex-label-property]', function (event) {
-                    if (!event.originalEvent && event.target === this)
-                        tinyChanged(event.target);
+                $(document).on('change.flexRows', '.Inputfield', function (event) {
+                    if (!event.originalEvent && event.target instanceof HTMLElement && event.target.closest('.Inputfield') === this)
+                        changed(event.target);
                 });
                 $(document).on('flexMediaRefresh.flexRows', (_event, draft, path) => {
                     if (typeof draft === 'string' && typeof path === 'string')
@@ -342,7 +342,205 @@ var FieldtypeFlex;
 })(FieldtypeFlex || (FieldtypeFlex = {}));
 var FieldtypeFlex;
 (function (FieldtypeFlex) {
+    function evaluateTitle(nodes, values, group = false) {
+        const parts = [];
+        let omittedGroup = false;
+        for (const node of nodes) {
+            const attributes = node.classes ? { classes: node.classes } : {};
+            if (node.children) {
+                const children = evaluateTitle(node.children, values, true);
+                omittedGroup = !children.length;
+                if (children.length)
+                    parts.push(...(node.classes ? [{ children, ...attributes }] : children));
+                continue;
+            }
+            let text = node.text ?? '';
+            if (omittedGroup && /\s$/.test(parts[parts.length - 1]?.text ?? ''))
+                text = text.trimStart();
+            let position = {};
+            for (const choice of node.choices ?? []) {
+                const candidate = 'text' in choice ? choice.text : Object.prototype.hasOwnProperty.call(values, choice.ref) ? values[choice.ref] : '';
+                if (candidate.trim() === '')
+                    continue;
+                text = candidate;
+                if ('ref' in choice && choice.ref === '@index')
+                    position = { index: true };
+                break;
+            }
+            if (text !== '') {
+                parts.push({ text, ...attributes, ...position });
+                omittedGroup = false;
+            }
+            else if (group && node.choices)
+                return [];
+        }
+        return parts;
+    }
+    function trimTitleEdge(parts, end) {
+        while (parts.length) {
+            const index = end ? parts.length - 1 : 0;
+            const part = parts[index];
+            if (part.children) {
+                trimTitleEdge(part.children, end);
+                if (part.children.length)
+                    return;
+            }
+            else {
+                part.text = end ? part.text.trimEnd() : part.text.trimStart();
+                if (part.text !== '')
+                    return;
+            }
+            parts.splice(index, 1);
+        }
+    }
+    function titleParts(title, index) {
+        function indexed(parts) {
+            return parts.map(part => part.children ? { ...part, children: indexed(part.children) } : (part.index ? { ...part, text: String(index) } : part));
+        }
+        if (title.override?.length)
+            return indexed(title.override);
+        const parts = title.override ?? evaluateTitle(title.nodes, { ...title.values, ...title.custom, '@index': String(index) });
+        trimTitleEdge(parts, false);
+        trimTitleEdge(parts, true);
+        return parts.length ? parts : [{ text: '#' }, { text: String(index), index: true }];
+    }
+    FieldtypeFlex.titleParts = titleParts;
+    function titleFragment(parts) {
+        const result = document.createDocumentFragment();
+        for (const part of parts) {
+            const content = part.children ? titleFragment(part.children) : document.createTextNode(part.text ?? '');
+            if (part.classes?.length) {
+                const span = document.createElement('span');
+                span.classList.add(...part.classes);
+                span.append(content);
+                result.append(span);
+            }
+            else
+                result.append(content);
+        }
+        return result;
+    }
+    FieldtypeFlex.titleFragment = titleFragment;
+    function plainTitleValue(value) {
+        const decoder = document.createElement('textarea');
+        FieldtypeFlex.setHTML(decoder, value.replace(/<[^>]*>/g, '').replace(/</g, '&lt;'));
+        return Array.from(decoder.value.replace(/\s+/g, ' ').trim()).slice(0, 160).join('');
+    }
+    function sourceMatches(source, target) {
+        const name = FieldtypeFlex.attr(target, 'name').replace(/\[\]$/, '');
+        if (source.kind === 'media')
+            return target.closest('.InputfieldFile')?.id === 'wrap_Inputfield_' + source.base;
+        return source.names.some(base => name === base || (source.kind === 'date' && name.startsWith(base + '__')) ||
+            target.id === 'wrap_Inputfield_' + base || target.id === 'wrap_Inputfield_' + base.replace(/__\d+$/, ''));
+    }
+    FieldtypeFlex.sourceMatches = sourceMatches;
+    function mediaTitleValue(tree, source) {
+        const wrapper = FieldtypeFlex.all(tree, '.InputfieldFile').find(input => input.id === 'wrap_Inputfield_' + source.base);
+        if (!wrapper)
+            return;
+        const prefix = 'sort_' + source.base + '_';
+        const items = FieldtypeFlex.all(wrapper, 'input[name^="sort_"]').filter(input => input.name.startsWith(prefix))
+            .map(input => {
+            const suffix = input.name.slice(5);
+            const item = input.closest('li') || wrapper;
+            const find = (name) => FieldtypeFlex.all(item, '[name]').find(control => control.name === name + '_' + suffix);
+            return { find, item };
+        }).filter(({ find }) => !find('delete')?.checked);
+        const first = items[0];
+        if (!first)
+            return '';
+        if (source.leaf === 'description' || source.leaf === 'tags') {
+            const leaf = source.leaf;
+            const metadata = FieldtypeFlex.all(first.item, '[data-flex-metadata-property]').find(field => FieldtypeFlex.attr(field, 'data-flex-metadata-property') === leaf);
+            if (metadata) {
+                const controls = FieldtypeFlex.all(metadata, 'input:not([type="hidden"]), textarea');
+                const localized = source.language ? controls.find(control => control.name.endsWith('__' + source.language)) : undefined;
+                return localized?.value.trim() ? localized.value : controls[0]?.value;
+            }
+            const localized = leaf === 'description' && source.language ? first.find('description' + source.language) : undefined;
+            return localized?.value.trim() ? localized.value : first.find(leaf)?.value;
+        }
+        const basename = (item) => {
+            const original = item.querySelector('.gridImage__overflow img[data-original]');
+            const link = item.querySelector('a.InputfieldFileName, a.InputfieldFileLink');
+            const image = item.querySelector('.InputfieldImageEdit__image[src]');
+            const url = original?.getAttribute('data-original') || link?.href || image?.src;
+            if (!url)
+                return '';
+            try {
+                return decodeURIComponent(new URL(url, document.baseURI).pathname.split('/').pop() || '');
+            }
+            catch {
+                return '';
+            }
+        };
+        const names = (source.leaf === 'basename' ? [first] : items).map(({ item }) => basename(item)).filter(Boolean);
+        return names.length ? names.join(', ') : undefined;
+    }
+    function titleSourceValue(tree, source) {
+        if (source.kind === 'media') {
+            const value = mediaTitleValue(tree, source);
+            return value === undefined ? value : plainTitleValue(value);
+        }
+        let current;
+        for (const name of source.names) {
+            // ProcessWire generates these names from the authenticated field and schema identifiers.
+            const controls = FieldtypeFlex.all(tree, `[name="${name}"], [name="${name}[]"]`);
+            if (!controls.length)
+                continue;
+            const control = controls[0];
+            const label = (key) => source.options && Object.prototype.hasOwnProperty.call(source.options, key) ? source.options[key] : key;
+            if (control.matches('.InputfieldTinyMCEInline')) {
+                current = control.innerHTML;
+            }
+            else if (control instanceof HTMLSelectElement) {
+                current = Array.from(control.selectedOptions).filter(option => source.kind !== 'page' || Boolean(+option.value))
+                    .map(option => source.options ? label(option.value) : option.textContent ?? '').join(', ');
+            }
+            else if (control instanceof HTMLInputElement && control.matches('[type="checkbox"], [type="radio"]')) {
+                current = controls.filter((option) => option instanceof HTMLInputElement && option.checked)
+                    .map(option => source.kind === 'page' ? option.labels?.[0]?.textContent?.trim() ?? '' : label(option.value)).join(', ');
+                if (!current && source.unchecked !== undefined)
+                    current = label(source.unchecked);
+            }
+            else if (control instanceof HTMLInputElement || control instanceof HTMLTextAreaElement) {
+                if (source.kind === 'page') {
+                    if (!control.value || control.value === '0')
+                        current = '';
+                    else {
+                        const widget = control.closest('.Inputfield');
+                        const selected = widget && FieldtypeFlex.all(widget, 'li:not(.itemTemplate, .itemDeleted, .delete) > .itemLabel');
+                        if (selected?.length)
+                            current = selected.map(item => item.textContent ?? '').join(', ');
+                        else
+                            current = widget?.querySelector('.PageListSelectName')?.textContent ??
+                                (control.id ? tree.ownerDocument.getElementById(control.id + '_input')?.value : undefined);
+                    }
+                }
+                else {
+                    current = label(control.value);
+                    if (control.matches('.InputfieldDatetimeValue')) {
+                        const dates = ['y', 'm', 'd'].map(part => tree.querySelector(`[name="${name}__${part}"]`)?.value ?? '');
+                        current = dates.every(value => /^\d+$/.test(value)) ? dates.map((value, part) => value.padStart(part ? 2 : 4, '0')).join('-') : '';
+                    }
+                    else if (source.kind === 'date') {
+                        const time = tree.querySelector(`[name="${name}__time"]`);
+                        if (time?.value)
+                            current += ' ' + time.value;
+                    }
+                }
+            }
+            if (current && current.trim())
+                break;
+        }
+        return current === undefined ? current : plainTitleValue(current);
+    }
+    FieldtypeFlex.titleSourceValue = titleSourceValue;
+})(FieldtypeFlex || (FieldtypeFlex = {}));
+var FieldtypeFlex;
+(function (FieldtypeFlex) {
     const state = new WeakMap();
+    const titleRequests = new WeakMap();
     const disabledBeforeRemoval = new WeakMap();
     const busyTrees = new WeakSet();
     const tableEditors = new WeakMap();
@@ -396,101 +594,43 @@ var FieldtypeFlex;
         button.setAttribute('aria-label', label);
         button.title = label;
     }
-    function titleParts(format, values, number, type, path, cleanup = true) {
-        const parts = [];
-        format.split(/(\[[^\[\]]*\]|_\{[^{}]+\}_|\{[^{}]+\}|#n)/gi).filter(Boolean).forEach(function (part) {
-            if (part[0] === '[' && part.slice(-1) === ']') {
-                var details = titleParts(part.slice(1, -1), values, number, type, path, false);
-                if (!details.length)
-                    details.push({ text: '', badge: false, literal: false });
-                details.forEach(function (detail) {
-                    detail.muted = true;
-                    parts.push(detail);
-                });
-                return;
-            }
-            var badge = part.slice(0, 2) === '_{' && part.slice(-2) === '}_';
-            var token = badge ? part.slice(1, -1) : part, value = part, literal = false;
-            if (token.toLowerCase() === '#n')
-                value = '#' + number;
-            else if (token[0] === '{' && token.slice(-1) === '}') {
-                value = '';
-                token.slice(1, -1).split('|').some(function (name) {
-                    var candidate = name === '@type' ? type : (name === '@path' ? path : (Object.prototype.hasOwnProperty.call(values, name) ? values[name] : ''));
-                    if (String(candidate).trim() === '')
-                        return false;
-                    value = String(candidate);
-                    return true;
-                });
-            }
-            else
-                literal = true;
-            parts.push({ text: value, badge: badge, literal: literal });
-        });
-        if (cleanup === false)
-            return parts;
-        parts.forEach(function (part, i) {
-            if (!part.literal || !/^[\s›|/:;,–—-]+$/.test(part.text))
-                return;
-            var before = parts.some(function (other, j) { return j < i && other.text.trim() !== '' && (!other.literal || !/^[\s›|/:;,–—-]+$/.test(other.text)); });
-            var after = parts.some(function (other, j) { return j > i && other.text.trim() !== '' && (!other.literal || !/^[\s›|/:;,–—-]+$/.test(other.text)); });
-            if (!before || !after)
-                part.text = '';
-        });
-        let separator = null, omitted = false;
-        parts.forEach(function (part, i) {
-            if (part.text === '') {
-                if (!part.literal)
-                    omitted = true;
-                return;
-            }
-            if (part.literal && /^[\s›|/:;,–—-]+$/.test(part.text)) {
-                if (separator !== null && omitted)
-                    parts[separator].text = '';
-                separator = i;
-            }
-            else
-                separator = null;
-            omitted = false;
-        });
-        return parts;
+    function rowTitleData(row) {
+        var _a;
+        const data = FieldtypeFlex.attr(row, 'data-flex-title');
+        if (data)
+            return (_a = rowState(row)).title ?? (_a.title = JSON.parse(data));
     }
-    function rowTitle(row, index, path) {
-        const format = FieldtypeFlex.attr(row, 'data-flex-label-format'), type = FieldtypeFlex.attr(row, 'data-flex-type-label');
-        const values = rowState(row).labels ?? JSON.parse(FieldtypeFlex.attr(row, 'data-flex-label-values') || '{}');
-        let parts = titleParts(format, values, index + 1, type, path);
-        if (!parts.some(part => part.text.trim() !== ''))
-            parts = [{ text: (format ? '' : type + ' ') + '#' + (index + 1), badge: false }];
-        if (!format)
-            parts.unshift({ text: type, badge: true }, { text: ' ', badge: false });
-        return parts;
+    function renderTitle(row, title, index) {
+        row.querySelector(':scope > .flex-row-header .flex-row-title')?.replaceChildren(FieldtypeFlex.titleFragment(FieldtypeFlex.titleParts(title, index)));
     }
-    function contextPath(row) {
-        const path = [];
-        for (let parent = row.parentElement?.closest('.flex-row'); parent; parent = parent.parentElement?.closest('.flex-row'))
-            path.unshift(FieldtypeFlex.attr(parent, 'data-flex-type-label'));
-        return path.join(' › ');
+    function syncTitleSources(row, target, afterWidgetUpdate = false) {
+        const title = rowTitleData(row);
+        const tree = row.closest('.InputfieldFlex');
+        if (!title || !tree)
+            return;
+        let changed = false;
+        for (const [reference, source] of Object.entries(title.sources)) {
+            if (target && !FieldtypeFlex.sourceMatches(source, target))
+                continue;
+            if (target && source.kind === 'page' && !afterWidgetUpdate) {
+                // Core dispatches change just before replacing the visible selected label.
+                queueMicrotask(() => syncTitleSources(row, target, true));
+                continue;
+            }
+            const value = FieldtypeFlex.titleSourceValue(tree, source);
+            if (value === undefined || value === title.values[reference])
+                continue;
+            title.values[reference] = value;
+            changed = true;
+        }
+        if (changed)
+            renderTitle(row, title, rows(FieldtypeFlex.closest(row, '.flex-rows')).indexOf(row) + 1);
     }
     function updateLabels(set) {
         rows(set).forEach((row, index) => {
-            const title = row.querySelector(':scope > .flex-row-header .flex-row-title');
-            if (!title)
-                return;
-            title.replaceChildren();
-            rowTitle(row, index, contextPath(row)).forEach(part => {
-                if (!part.text)
-                    return;
-                if (part.badge || part.muted) {
-                    const span = document.createElement('span');
-                    span.classList.toggle('flex-row-type-badge', !!part.badge);
-                    span.classList.toggle('flex-row-deemphasized', !!part.muted);
-                    span.textContent = part.text;
-                    title.append(span);
-                }
-                else
-                    title.append(document.createTextNode(part.text));
-            });
-            FieldtypeFlex.all(row, ':scope > .flex-row-content .flex-rows').filter(set => set.closest('.flex-row') === row).forEach(updateLabels);
+            const title = rowTitleData(row);
+            if (title)
+                renderTitle(row, title, index + 1);
         });
     }
     function treeBusy(scope) { return busyTrees.has(FieldtypeFlex.closest(scope, '.InputfieldFlex')); }
@@ -503,6 +643,8 @@ var FieldtypeFlex;
         tree.setAttribute('aria-busy', String(busy));
         FieldtypeFlex.all(tree, '.flex-rows').forEach(updateActions);
         const form = FieldtypeFlex.closest(tree, 'form');
+        if (!busy && titleRequests.get(tree)?.queued)
+            queueTitleRefresh(tree);
         if (!busy && !form.querySelector('.InputfieldFlex[aria-busy="true"], .flex-row[data-flex-load-failed="1"]'))
             FieldtypeFlex.all(form, ':scope > .flex-form-request-error').forEach(error => error.remove());
     }
@@ -601,6 +743,63 @@ var FieldtypeFlex;
     }
     function requestHeaders(set) {
         return { 'X-Requested-With': 'XMLHttpRequest', 'X-FIELDNAME': FieldtypeFlex.attr(set, 'data-flex-field'), 'X-FLEX-DRAFT': FieldtypeFlex.attr(set, 'data-flex-draft') };
+    }
+    function externalTitleDependencies(tree) {
+        return new Set(FieldtypeFlex.all(tree, '[data-flex-external-dependencies]').flatMap(input => FieldtypeFlex.attr(input, 'data-flex-external-dependencies').split(' ')));
+    }
+    function dependencyName(name) { return name.replace(/\[\]$|^_|_$/g, '').replace(/__\d+$/, ''); }
+    function queueTitleRefresh(tree) {
+        if (!tree.querySelector('.flex-row[data-flex-title-refresh]'))
+            return;
+        const request = titleRequests.get(tree) ?? { revision: 0, queued: false };
+        titleRequests.set(tree, request);
+        const revision = ++request.revision;
+        clearTimeout(request.timer);
+        request.queued = true;
+        if (treeBusy(tree))
+            return;
+        request.timer = window.setTimeout(async () => {
+            if (!tree.isConnected || treeBusy(tree))
+                return;
+            request.queued = false;
+            const targets = FieldtypeFlex.all(tree, '.flex-row[data-flex-title-refresh]').filter(row => row.closest('.InputfieldFlex') === tree && !row.closest('.flex-row-remove-pending'));
+            if (!targets.length)
+                return;
+            const set = FieldtypeFlex.closest(targets[0], '.flex-rows');
+            const addresses = targets.map(row => [FieldtypeFlex.attr(FieldtypeFlex.closest(row, '.flex-rows'), 'data-flex-set'), FieldtypeFlex.attr(row, 'data-flex-row')]);
+            const token = csrf(), draft = FieldtypeFlex.attr(set, 'data-flex-draft');
+            if (!token || !draft)
+                return;
+            FieldtypeFlex.classic.saveReady(tree);
+            const data = new URLSearchParams(FieldtypeFlex.serialize(tree));
+            const dependencies = externalTitleDependencies(tree);
+            if (dependencies.size) {
+                FieldtypeFlex.serialize(FieldtypeFlex.closest(tree, 'form')).forEach(([name, value]) => {
+                    if (name !== 'id' && (dependencies.has(name) || dependencies.has(dependencyName(name))))
+                        data.append(name, value);
+                });
+            }
+            data.set(token.name, token.value);
+            data.set('flex_action', 'row-titles');
+            data.set('flex_title_rows', JSON.stringify(addresses));
+            data.set('flex_complete', draft);
+            try {
+                const response = await fetch(FieldtypeFlex.attr(set, 'data-flex-page-url'), { method: 'POST', credentials: 'same-origin', headers: requestHeaders(set), body: data });
+                const result = await response.json();
+                if (!response.ok || result.error || request.revision !== revision || !tree.isConnected)
+                    return;
+                targets.forEach((row, index) => {
+                    const title = rowTitleData(row), update = result.titles[addresses[index].join('.')];
+                    if (!title || !update || !row.isConnected)
+                        return;
+                    Object.assign(title, update);
+                    renderTitle(row, title, rows(FieldtypeFlex.closest(row, '.flex-rows')).indexOf(row) + 1);
+                });
+            }
+            catch {
+                // Retain the last title if the draft or network is unavailable.
+            }
+        }, 240);
     }
     function moved(set, row) {
         FieldtypeFlex.one(set, ':scope > .flex-rows-status').textContent = message('itemMoved', 'Item moved to position {position} of {count}').replace('{position}', String(rows(set).indexOf(row) + 1)).replace('{count}', String(rows(set).length));
@@ -807,11 +1006,10 @@ var FieldtypeFlex;
         void loadRow(row); }, scope => {
         FieldtypeFlex.all(scope, 'textarea').forEach(input => {
             const editor = window.tinymce?.get(input.id);
-            if (editor) {
+            if (editor)
                 editor.save();
-                input.dispatchEvent(new Event('input', { bubbles: true }));
-            }
         });
+        titlesChanged(scope);
     }, (draft, path) => { void refreshMedia(draft, path); });
     function tableColumnResizer(handle) {
         const table = handle.closest('.flex-table-grid');
@@ -964,32 +1162,30 @@ var FieldtypeFlex;
         button.focus();
         moved(set, row);
     });
-    function labelChanged(input) {
-        const property = input.closest('[data-flex-label-property]'), row = property?.closest('.flex-row');
-        if (!property || !row)
+    function titlesChanged(target) {
+        const tree = target.closest('.InputfieldFlex');
+        if (tree) {
+            FieldtypeFlex.all(tree, '.flex-row[data-flex-title]').forEach(row => syncTitleSources(row, target));
+            queueTitleRefresh(tree);
             return;
-        const kind = FieldtypeFlex.attr(property, 'data-flex-label-kind');
-        if (kind === 'file' || kind === 'image' || (kind === 'page' && !(input instanceof HTMLSelectElement)))
-            return;
-        let label = FieldtypeFlex.value(input);
-        if (input instanceof HTMLSelectElement)
-            label = Array.from(input.selectedOptions, option => option.textContent).join(', ');
-        else if (input.matches('[type="checkbox"], [type="radio"]')) {
-            const options = JSON.parse(FieldtypeFlex.attr(property, 'data-flex-label-options') || '{}');
-            label = FieldtypeFlex.all(property, ':checked').map(option => Object.prototype.hasOwnProperty.call(options, option.value) ? options[option.value] : option.value).join(', ');
         }
-        else if (input.matches('[type="file"], [type="hidden"], button'))
+        const form = target.closest('form');
+        if (!form)
             return;
-        const text = document.createElement('textarea');
-        FieldtypeFlex.setHTML(text, String(label || '').replace(/<[^>]*>/g, '').replace(/</g, '&lt;').replace(/>/g, '&gt;'));
-        const current = rowState(row);
-        current.labels ?? (current.labels = JSON.parse(FieldtypeFlex.attr(row, 'data-flex-label-values') || '{}'));
-        current.labels[FieldtypeFlex.attr(property, 'data-flex-label-property')] = text.value.replace(/\s+/g, ' ').trim().slice(0, 160);
-        updateLabels(FieldtypeFlex.closest(row, '.flex-rows'));
+        const name = FieldtypeFlex.attr(target, 'name');
+        if (!name)
+            return;
+        FieldtypeFlex.all(form, '.InputfieldFlex').forEach(field => {
+            if (!field.querySelector('[data-flex-title-refresh]'))
+                return;
+            const dependencies = externalTitleDependencies(field);
+            if (dependencies.has(name) || dependencies.has(dependencyName(name)))
+                queueTitleRefresh(field);
+        });
     }
     ['input', 'change'].forEach(name => document.addEventListener(name, event => {
-        if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLButtonElement)
-            labelChanged(event.target);
+        if (event.target instanceof HTMLElement && event.target.matches('input:not(.flex-rows-order), select, textarea, .InputfieldTinyMCEEditor[contenteditable]'))
+            titlesChanged(event.target);
     }));
     let openingInvalidDetail = false;
     document.addEventListener('invalid', event => {
@@ -1056,6 +1252,7 @@ var FieldtypeFlex;
             removalState(row, removed);
             rowState(row).removalReady = true;
             order(set);
+            queueTitleRefresh(FieldtypeFlex.closest(set, '.InputfieldFlex'));
             button.focus();
             return;
         }
@@ -1099,10 +1296,12 @@ var FieldtypeFlex;
                 rowList(set).append(fresh);
             await FieldtypeFlex.activateScripts(fresh, response);
             order(set);
-            initRows(set);
             await FieldtypeFlex.classic.setup(fresh);
-            FieldtypeFlex.classic.added(fresh);
+            initRows(set);
+            [fresh, ...FieldtypeFlex.all(fresh, '.flex-row[data-flex-title]')].forEach(row => syncTitleSources(row));
+            queueTitleRefresh(FieldtypeFlex.closest(set, '.InputfieldFlex'));
             focus = fresh.querySelector(':scope > .flex-row-header .flex-row-toggle, :scope > .flex-table-actions summary') || undefined;
+            FieldtypeFlex.classic.added(fresh);
         }
         catch (problem) {
             error.textContent = errorMessage(problem);
@@ -1208,6 +1407,7 @@ var FieldtypeFlex;
                 field.classList.remove('InputfieldFileEmpty');
                 field.classList.add('InputfieldStateChanged');
                 await FieldtypeFlex.classic.setup(field);
+                titlesChanged(field);
             }
             status.remove();
         }
@@ -1270,6 +1470,7 @@ var FieldtypeFlex;
             restoreMediaMetadata(field, metadata, false);
             await FieldtypeFlex.classic.setup(field);
             field.classList.add('InputfieldStateChanged');
+            titlesChanged(field);
             FieldtypeFlex.classic.closeDialog();
         }
         catch (error) {

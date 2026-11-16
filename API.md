@@ -225,7 +225,7 @@ File, Image, PageListSelect, PageListSelectMultiple and TinyMCE (iframe or inlin
     'type' => 'rows', 'minItems' => 0, 'maxItems' => 30,
     'types' => [
         'text' => [
-            'rowTitle' => '#n: {heading}',
+            'rowTitle' => '#{@index}: {heading}',
             'children' => [
                 'heading' => ['type' => 'text'],
                 'body' => ['type' => 'TinyMCE'],
@@ -245,15 +245,46 @@ Type keys start with a lowercase ASCII letter, contain lowercase letters/digits/
 
 ### Presentation and visibility
 
-`rowTitle` is a string (no Closures); a bare property name means `{property}`. Values use escaped plain display labels in the editor's language.
+`rowTitle` is a single-line string on a row type. `{heading}` reads a property in the current row. `{heading|title|"Untitled"}` uses the first nonblank value. Whitespace-only values are blank and `0` is a value. Use dots for declared Object properties such as `{details.caption}`. `{image.description}`, `{image.tags}` and `{image.basename}` read the first item of a media field. `{parent.heading}` reads the scope containing the collection and `{root.heading}` reads the top-level Flex value. Titles use plain text and localized option labels.
 
-Titles support `{heading}`, fallback `{heading|title}`, type/ancestor labels `{@type}`/`{@path}`, position `#n`, token badges `_{heading}_` and de-emphasized groups `[…]`. Zero counts as a value.
+`{@type}` is the row type label, `{@index}` is the one-based position, and `{@path}` contains ancestor row type labels joined by ` › `. At the root, `{@path}` is blank.
 
 ```php
-'rowTitle' => '[{@path} › {@type}] #n: _{heading|title}_',
+'rowTitle' => '[{@type}]{.flex-badge} [#{@index}]{.flex-muted} {heading|title|"Untitled"}[ · {category}]{.flex-muted}',
 ```
 
-Absent/blank titles use the default badge/label/number; an empty custom title falls back to `#n`.
+Append `{.class}` or `{.class .another}` directly to a token or group. A class name starts with an ASCII letter or underscore, optionally preceded by a hyphen, or starts with two hyphens. It continues with ASCII letters, digits, underscores or hyphens. Use your own admin stylesheet or the built-in `flex-badge`, `flex-muted`, `flex-strong`, `flex-small` and `flex-mono` classes. `[NEW]{.flex-badge}` styles a literal. In `{heading}[ ({start}–{end})]`, the parenthesized segment appears only when both tokens have values after fallback. Literal groups always appear and groups cannot nest. Put optional punctuation and spaces inside the group. The editor trims the ends of the complete title and avoids doubled literal spaces around an omitted group.
+
+Prefix `{`, `}`, `[`, `]`, `|`, a quote or a backslash with `\` to show it literally. Either quote style works for fallback literals. Inside a quoted fallback, delimiters are ordinary text and the matching quote and backslash can be escaped. A malformed template displays as literal text. An absent or blank template uses a type badge and row number. An empty custom result displays the row number.
+
+#### Row title hooks
+
+`InputfieldFlexRows::rowTitleValues($row, $root, $parent)` returns a map of custom `@name` values for the template. The built-in context names are reserved. `$root` and `$parent` are Flex values for the current editor, with `$parent` scoped to the collection owner.
+
+```php
+// Template: {heading}[ · {@details}]{.flex-muted}
+$wire->addHookAfter('InputfieldFlexRows::rowTitleValues', function(HookEvent $event) {
+    $row = $event->arguments(0);
+    if($row->rowType() !== 'gallery') return;
+    $count = count($row->getUnformatted('images'));
+    $event->return = array_merge($event->return, ['@details' => $count ? "$count images" : '']);
+});
+```
+
+`InputfieldFlexRows::rowTitleParts($row, $parts, $root, $parent)` receives the computed parts. Return an array of parts with `text` and optional `classes` to replace the complete title. Text is escaped and class names are validated. You can retain computed parts, including their live position. Returning `null` uses the template. For an override that only applies after an edit, return the computed `$parts` in its initial state to enable refresh. Returning an empty array uses the position fallback.
+
+```php
+$wire->addHookAfter('InputfieldFlexRows::rowTitleParts', function(HookEvent $event) {
+    $row = $event->arguments(0);
+    if($row->rowType() !== 'gallery') return;
+    $event->return = [
+        ['text' => $row->rowTypeLabel(), 'classes' => ['flex-badge']],
+        ['text' => ' ' . $row->getUnformatted('heading'), 'classes' => ['flex-strong']],
+    ];
+});
+```
+
+Standard tokens update locally as you type or reorder. Titles referencing custom tokens with a registered hook, or returning an override on initial render, also refresh in a debounced editor request using unsaved Flex values. Read `$row`, `$root` and `$parent` from the hook arguments for those edits. Title hooks should compute display values without saving pages or changing files.
 
 `rowCollapse` uses `FieldtypeFlex::ROW_COLLAPSE_EXISTING` (0, default: existing closed/new open), `ROW_COLLAPSE_ALL` (1), or `ROW_EXPAND_ALL` (3). Use `addRowLabel` for the add-button text. See [Rows examples](examples/07-rows.php).
 
@@ -679,7 +710,7 @@ php index.php flex cleanup content --path=old_summary --apply
 - Native Repeater may contain Flex; Flex/Repeater/RepeaterMatrix/PageTable/Password cannot be Flex properties. Inputs needing their own Fieldtype persistence require explicit integration. TinyMCE is supported; CKEditor is not established as fully compatible.
 - HTML URL/link transformations do not include native image markup QA. Automatic `$target->links()` discovery excludes Flex. Explicit-field `Page::links()` is core-version-dependent; `MarkupQA::findLinks()` can miss hidden-Row/custom media HTML. Neither provides complete Flex backlink discovery. See [compatibility regression coverage](docs/development.md#html-link-compatibility).
 - File cleanup is conservative and eventual. Relevant writes and process completion attempt bounded work; later PHP executions retry pending/expired staging (six hours). No execution means no progress. Referenced/unknown files remain protected; outer transactions postpone cleanup without implicit commits. Whole-Page permanent deletion and native variation deletion retain immediate native filesystem behavior. See [automatic media work](docs/architecture.md#automatic-media-work).
-- Use the APIs documented here and referenced native collections. Schema metadata, transformers, view factories, `storage()`/`media()`, owner/address helpers and editor hooks are internal despite public PHP visibility.
+- Use the APIs documented here and referenced native collections. Schema metadata, transformers, view factories, `storage()`/`media()`, owner/address helpers and undocumented editor hooks are internal despite public PHP visibility.
 
 Retrieve this reference through native `php index.php docs get FieldtypeFlex` or WireApiDocs where supported; `[[ClassName]]` references intentionally link native documentation.
 

@@ -1045,6 +1045,7 @@ class FlexFieldDefs extends Wire {
 				}
 				$input->name = $prefix . $name;
 				$input->id = 'Inputfield_' . $prefix . $name;
+				$externalDependencies = [];
 				foreach(['showIf', 'requiredIf'] as $key) {
 					$expression = (string) $input->get($key);
 					if($prefix && $expression) {
@@ -1053,7 +1054,9 @@ class FlexFieldDefs extends Wire {
 							$fields = [];
 							$not = $selector->not;
 							foreach($selector->fields() as $fieldName) {
-								$fields[] = FlexDependencies::fieldName($fieldName, $value, $inputName, $prefix, $this->names, $this->flexPage, $this->flexField, $parentAddress);
+								$resolved = FlexDependencies::fieldName($fieldName, $value, $inputName, $prefix, $this->names, $this->flexPage, $this->flexField, $parentAddress);
+								$fields[] = $resolved;
+								if(preg_match('/^(?:page|forpage)\./', $fieldName)) $externalDependencies[explode('.', $resolved, 2)[0]] = true;
 							}
 							$selector->setField($fields);
 							$selector->not = $not;
@@ -1061,6 +1064,8 @@ class FlexFieldDefs extends Wire {
 						$input->set($key, (string) $selectors);
 					}
 				}
+				if($externalDependencies) $input->wrapAttr('data-flex-external-dependencies', implode(' ', array_keys($externalDependencies)));
+				if(($input->disabled || $input->attr('disabled')) && $this->flexField->type instanceof FieldtypeFlex && $this->flexField->type->admin()->previewingRowTitles()) $input->editable(false);
 				if($value && isset($this->properties[$name]) && $definition['kind'] !== 'object') {
 					$v = $value->getUnformatted($name);
 					if($v instanceof LanguagesPageFieldValue) {

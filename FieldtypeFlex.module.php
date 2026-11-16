@@ -13,6 +13,7 @@ require_once __DIR__ . '/src/FlexStorage.php';
 require_once __DIR__ . '/src/FlexMaintenance.php';
 require_once __DIR__ . '/src/FlexMaintenanceCli.php';
 require_once __DIR__ . '/src/FlexInspection.php';
+require_once __DIR__ . '/src/FlexRowTitle.php';
 require_once __DIR__ . '/src/FlexMaintenanceAdmin.php';
 require_once __DIR__ . '/src/FlexQuery.php';
 require_once __DIR__ . '/src/FlexAdmin.php';
@@ -116,7 +117,7 @@ class FieldtypeFlex extends Fieldtype implements ConfigurableModule, FieldtypeHa
 	public static function getModuleInfo() {
 		return [
 			'title'    => __('Flex'),
-			'version'  => '0.7.0',
+			'version'  => '1.0.0-beta.1',
 			'summary'  => __('PHP/JSON-defined compound fields with native inputs and selectors'),
 			'author'   => __('FieldtypeFlex contributors'),
 			'href'     => 'https://github.com/phlppschrr/FieldtypeFlex',

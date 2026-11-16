@@ -57,6 +57,7 @@ trait FlexMediaInput {
 	 * @return $this
 	 */
 	public function ___processInput(WireInputData $input) {
+		if($this->flexRoot->ownerField()->type->admin()->previewingRowTitles()) return $this->previewTitleMedia($input);
 		if(!$this->isAjax && isset($_FILES[$this->name])) {
 			foreach((array) ($_FILES[$this->name]['error'] ?? []) as $error) {
 				if((int) $error !== UPLOAD_ERR_NO_FILE) {
@@ -78,6 +79,41 @@ trait FlexMediaInput {
 			$this->trackChange('value');
 		}
 		return $result;
+	}
+
+	/** Apply only detached metadata and ordering, without native upload/rename operations. */
+	private function previewTitleMedia(WireInputData $input) {
+		$files = $this->value;
+		if(!$input->{FlexPath::controlName($this->flexInputName ?: $this->name, $files->address(), 'present')}) return $this;
+		$languages = $this->wire()->languages;
+		foreach($files->getArray() as $file) {
+			$id = $this->name . '_' . $file->hash;
+			if((string) $input->{'delete_' . $id} === '1') {
+				$files->remove($file);
+				continue;
+			}
+			if(!$files->metadataSchema()->property('description')) {
+				foreach($languages ?: [null] as $language) {
+					if($language && (!$languages->editable($language) || ($this->noLang && !$language->isDefault()))) continue;
+					$suffix = $language && !$language->isDefault() ? $language->id : '';
+					$description = $input->{'description' . $suffix . '_' . $id};
+					if(is_string($description)) $file->description($language, trim($description));
+				}
+			}
+			$tags = $input->{'tags_' . $id};
+			if(!$files->metadataSchema()->property('tags') && is_string($tags)) $file->tags = trim($tags);
+			$sort = $input->{'sort_' . $id};
+			if(is_string($sort) && ctype_digit($sort)) $file->set('sort', (int) $sort);
+			$focus = $input->{'focus_' . $id};
+			if($file instanceof Pageimage && is_string($focus)) $file->focus($focus ?: '50 50 0');
+			$metadata = $this->getItemInputfields($file);
+			if($metadata && $input->{FlexPath::controlName($this->flexInputName ?: $this->name, $file->metadataInputValue()->address(), 'metadata')}) {
+				$this->___processItemInputfields($file, $metadata, $id, $input);
+			}
+		}
+		$files->sort('sort');
+		$this->trackChange('value');
+		return $this;
 	}
 
 	/** Native per-item rendering with stable asset scope, also for AJAX uploads. */

@@ -40,7 +40,7 @@ $rowsSchema = [
 		'type' => 'rows', 'addRowLabel' => 'Add block', 'rowCollapse' => 3,
 		'minItems' => 1, 'maxItems' => 2,
 		'types' => ['text' => [
-			'rowTitle' => '#n: {heading}',
+			'rowTitle' => '#{@index}: {heading}',
 			'children' => [
 				'heading' => ['type' => 'text'],
 				'notes' => ['type' => 'rows', 'types' => ['note' => ['children' => ['text' => ['type' => 'text']]]]],
@@ -69,7 +69,7 @@ $notes = $wire->modules->get('InputfieldFlexRows');
 $notes->name = 'notes';
 $notes->types = $rowsSchema['blocks']['types']['text']['children']['notes']['types'];
 $nativeChildren->add($notes);
-$nativeRows->types = ['text' => ['rowTitle' => '#n: {heading}', 'children' => $nativeChildren]];
+$nativeRows->types = ['text' => ['rowTitle' => '#{@index}: {heading}', 'children' => $nativeChildren]];
 $nativeRowsTree->add($nativeRows);
 $rowsField = clone $field;
 $rowsField->flexDefinition = json_encode($rowsSchema, JSON_THROW_ON_ERROR);
@@ -81,7 +81,7 @@ foreach(['PHP' => $rowsSchema, 'JSON' => null, 'native' => $nativeRowsTree] as $
 	$assert($metadata instanceof InputfieldFlexRows, "$format rows metadata uses the rows Inputfield");
 	$settings = $defs->property('blocks')['settings'];
 	$same([1, 2, 3, 'Add block'], [$settings['minItems'], $settings['maxItems'], $settings['rowCollapse'], $settings['addRowLabel']], "$format preserves collection settings");
-	$same('#n: {heading}', $defs->rowType('blocks', 'text')['settings']['rowTitle'], "$format preserves type-specific rowTitle");
+	$same('#{@index}: {heading}', $defs->rowType('blocks', 'text')['settings']['rowTitle'], "$format preserves type-specific rowTitle");
 	$same('rows', $defs->structure()[1]['kind'], "$format configuration summary exposes rows");
 	$value = new FlexValue($page, $rowsField, $defs, ['city' => 'Berlin']);
 	$row = $value->blocks->addRow('text', ['heading' => 'Intro']);

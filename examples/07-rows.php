@@ -2,8 +2,8 @@
 
 /**
  * Slides, facts, mixed content blocks and three levels of nested Rows.
- * rowTitle supports {heading|title}, {@type}, ancestor {@path} and _{heading}_
- * badges; […] de-emphasizes text/tokens, and #n inserts the row number.
+ * rowTitle supports {heading|title|"Untitled"}, {@type}, {@path}, and {@index}.
+ * Brackets group optional content and {.flex-badge} styles the preceding expression.
  * Dependencies use local names or parent./root. for containing/root Flex scopes.
  * page.field targets an owning Page input; forpage.field targets the main editor
  * Page, including outside native Repeaters. See API.md#dependency-contexts.
@@ -39,7 +39,7 @@ return [
 		'types'       => [
 			'item' => [
 				'label'    => 'Slide',
-				'rowTitle' => '#n: {heading}', // Row number and live heading.
+				'rowTitle' => '#{@index}: {heading}', // Row number and live heading.
 				'children' => [
 					'heading' => [
 						'type'     => 'text',
@@ -84,7 +84,7 @@ return [
 		'types'       => [
 			'item' => [
 				'label'    => 'Fact',
-				'rowTitle' => '_{@type}_ {heading}',
+				'rowTitle' => '{@type}{.flex-badge} {heading}',
 				'children' => [
 					'heading' => [
 						'type'  => 'text',
@@ -107,7 +107,7 @@ return [
 		'types'       => [
 			'text'  => [
 				'label'    => 'Text',
-				'rowTitle' => '#n: {heading}',
+				'rowTitle' => '#{@index}: {heading}',
 				'children' => [
 					'heading' => [
 						'type'     => 'text',
@@ -123,7 +123,7 @@ return [
 			],
 			'image' => [
 				'label'    => 'Image',
-				'rowTitle' => '#n: {caption}',
+				'rowTitle' => '#{@index}: {caption}',
 				'children' => [
 					'image'   => [
 						'type'     => 'image',
@@ -139,7 +139,7 @@ return [
 			],
 			'quote' => [
 				'label'    => 'Quote',
-				'rowTitle' => '#n: {quote}',
+				'rowTitle' => '#{@index}: {quote}',
 				'children' => [
 					'quote'  => [
 						'type'  => 'textarea',
@@ -162,7 +162,7 @@ return [
 		'types'       => [
 			'section' => [
 				'label'    => 'Section',
-				'rowTitle' => '[{@path}] / _{heading}_', // Muted ancestor types and a heading badge.
+				'rowTitle' => '[{@path} / ]{.flex-muted}{heading}{.flex-badge}', // Muted ancestor types and a heading badge.
 				'children' => [
 					'heading' => [
 						'type'     => 'text',
@@ -182,7 +182,7 @@ return [
 						'types'       => [
 							'text'  => [
 								'label'    => 'Text',
-								'rowTitle' => '[{@path}] / _{heading}_',
+								'rowTitle' => '[{@path} / ]{.flex-muted}{heading}{.flex-badge}',
 								'children' => [
 									'heading' => [
 										'type'  => 'text',

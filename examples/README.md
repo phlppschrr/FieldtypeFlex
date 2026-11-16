@@ -92,7 +92,7 @@ Use the settings supported by the selected ProcessWire Inputfield, including:
 | `type => 'table'` | Table with a fixed set of columns and repeatable rows |
 | `children` | Properties inside Objects or Row types |
 | `types` | Available Row types |
-| `rowTitle` | Dynamic titles using `{heading}`, `{@type}`, `#n`, etc. |
+| `rowTitle` | Dynamic titles using `{heading}`, `{@type}`, `{@index}` and optional styled spans. |
 | `rowCollapse` | Initial collapsed/expanded state |
 | `rowLazyLoad` | Lazy-load eligible collapsed Rows |
 | `columns` | Named table columns in display order, each with its own Inputfield definition |
