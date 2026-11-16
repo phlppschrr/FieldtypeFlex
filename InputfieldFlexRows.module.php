@@ -339,7 +339,12 @@ class InputfieldFlexRows extends Inputfield implements BridgeComponent {
 		$wrapper = $this->wire(new InputfieldWrapper());
 		$detail = !$readOnly && $input instanceof InputfieldFlexImage && $input->editable()
 			&& !$input->disabled && !in_array((int) $input->collapsed, [Inputfield::collapsedHidden, Inputfield::collapsedNoLocked], true);
-		if(!$detail) $input->addClass('flex-table-input', 'wrapClass');
+		if($detail) {
+			$input->themeBorder = 'none';
+			$input->themeOffset = 'none';
+		} else {
+			$input->addClass('flex-table-input', 'wrapClass');
+		}
 		if(!$readOnly && ($input instanceof InputfieldText || $input instanceof InputfieldInteger)) {
 			$input->addClass('flex-table-text', 'wrapClass');
 		}

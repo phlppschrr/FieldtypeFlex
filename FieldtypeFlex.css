@@ -141,6 +141,8 @@
 .flex-table-preview > img { flex: none; width: 1.4rem; height: 1.4rem; object-fit: cover; }
 .flex-table-grid > tbody > .flex-table-detail > td { padding: .75rem; }
 .flex-table-detail > td > .flex-table-editor { contain: inline-size; }
+.flex-table-detail .flex-table-editor > .Inputfields > .InputfieldImage > .InputfieldHeader { padding-block: 0 .5rem; }
+.flex-table-detail .flex-table-editor > .Inputfields > .InputfieldImage > .InputfieldContent { padding-block-end: 0; }
 .flex-table-detail .flex-table-editor-close { margin-top: .5rem; }
 
 .flex-rows > .flex-rows-items {

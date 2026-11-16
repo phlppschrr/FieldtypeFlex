@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Show image thumbnails in table cells and open the native editor in a full-width detail row that closes when focus moves to another cell.
+- Remove the extra Inputfield frame and padding from the table image editor.
 
 ## 0.7.0 — 2026-11-11
 
