@@ -337,16 +337,25 @@ class InputfieldFlexRows extends Inputfield implements BridgeComponent {
 	private function tableCell(Inputfield $input, bool $readOnly = false): string {
 		$parent = $input->parent;
 		$wrapper = $this->wire(new InputfieldWrapper());
-		$input->addClass('flex-table-input', 'wrapClass');
+		$detail = !$readOnly && $input instanceof InputfieldFlexImage && $input->editable()
+			&& !$input->disabled && !in_array((int) $input->collapsed, [Inputfield::collapsedHidden, Inputfield::collapsedNoLocked], true);
+		if(!$detail) $input->addClass('flex-table-input', 'wrapClass');
 		if(!$readOnly && ($input instanceof InputfieldText || $input instanceof InputfieldInteger)) {
 			$input->addClass('flex-table-text', 'wrapClass');
 		}
 		$wrapper->add($input);
 		try {
-			return $readOnly ? $wrapper->renderValue() : $wrapper->render();
+			$html = $readOnly ? $wrapper->renderValue() : $wrapper->render();
 		} finally {
 			$input->setParent($parent);
 		}
+		if(!$detail || $html === '') return $html;
+		$entities = fn($value) => $this->wire()->sanitizer->entities((string) $value);
+		$id = $entities($input->id . '_detail');
+		$label = $entities($input->label);
+		return '<button type="button" class="flex-table-preview" aria-expanded="false" aria-controls="' . $id . '" aria-label="' . $label . '" hidden><span>' . $label . '</span></button>'
+			. '<div id="' . $id . '" class="flex-table-editor">' . $html
+			. '<button type="button" class="ui-button flex-table-editor-close" hidden>' . $entities($this->_('Done')) . '</button></div>';
 	}
 
 	/** Only presentation differs; row processing and draft identities stay shared. */

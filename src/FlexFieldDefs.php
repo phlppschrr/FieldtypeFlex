@@ -656,10 +656,10 @@ class FlexFieldDefs extends Wire {
 			}
 			$schema = new self($this->flexField, $this->flexPage, $children, $this->depth + 1);
 			if(isset($settings['_flexTable'])) {
-				$allowed = ['InputfieldText', 'InputfieldEmail', 'InputfieldURL', 'InputfieldInteger', 'InputfieldFloat', 'InputfieldTextarea', 'InputfieldCheckbox', 'InputfieldToggle', 'InputfieldSelect', 'InputfieldRadios', 'InputfieldCheckboxes', 'InputfieldSelectMultiple', 'InputfieldAsmSelect', 'InputfieldTextTags', 'InputfieldDatetime', 'InputfieldPage'];
+				$allowed = ['InputfieldText', 'InputfieldEmail', 'InputfieldURL', 'InputfieldInteger', 'InputfieldFloat', 'InputfieldTextarea', 'InputfieldCheckbox', 'InputfieldToggle', 'InputfieldSelect', 'InputfieldRadios', 'InputfieldCheckboxes', 'InputfieldSelectMultiple', 'InputfieldAsmSelect', 'InputfieldTextTags', 'InputfieldDatetime', 'InputfieldPage', 'InputfieldImage'];
 				foreach($schema->properties() as $column => $definition) {
 					$cell = $definition['input'];
-					if(!in_array($cell->className(), $allowed, true) || in_array($definition['kind'], ['object', 'rows', 'file', 'image'], true)) throw new WireException(sprintf($this->_('Unsupported table column input: %s'), $cell->className()));
+					if(!in_array($cell->className(), $allowed, true) || in_array($definition['kind'], ['object', 'rows'], true)) throw new WireException(sprintf($this->_('Unsupported table column input: %s'), $cell->className()));
 					if($cell instanceof InputfieldPage && !$cell->labelFieldName) $cell->labelFieldName = 'title';
 					if($cell instanceof InputfieldPage && !in_array(ltrim((string) $cell->inputfield, '_'), ['InputfieldSelect', 'InputfieldSelectMultiple', 'InputfieldAsmSelect', 'InputfieldPageAutocomplete'], true)) throw new WireException($this->_('Table Page columns require Select, SelectMultiple, AsmSelect or PageAutocomplete'));
 					if(in_array((int) $cell->collapsed, [Inputfield::collapsedYesAjax, Inputfield::collapsedBlankAjax, Inputfield::collapsedTab, Inputfield::collapsedTabAjax, Inputfield::collapsedTabLocked], true)) throw new WireException($this->_('Table cells cannot use AJAX collapse or tabs'));

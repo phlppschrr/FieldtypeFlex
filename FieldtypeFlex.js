@@ -345,6 +345,8 @@ var FieldtypeFlex;
     const state = new WeakMap();
     const disabledBeforeRemoval = new WeakMap();
     const busyTrees = new WeakSet();
+    const tableEditors = new WeakMap();
+    const initializedDetailEditors = new WeakSet();
     function rowState(row) {
         let current = state.get(row);
         if (!current) {
@@ -360,6 +362,7 @@ var FieldtypeFlex;
     function rowBodies(row) { return FieldtypeFlex.all(row, ':scope > .flex-row-content, :scope > .flex-table-cell'); }
     function activeRows(set) { return rows(set).filter(row => !row.matches('.flex-row-remove-pending')); }
     function removalState(row, removed) {
+        closeRowEditors(row);
         const bodies = rowBodies(row);
         const transport = row.querySelector(':scope > .flex-table-actions .flex-row-transport') || row;
         row.classList.toggle('flex-row-remove-pending', removed);
@@ -525,6 +528,10 @@ var FieldtypeFlex;
     }
     function csrf() { return document.querySelector('#ProcessPageEdit input._post_token'); }
     function teardown(row) {
+        const table = row.closest('.flex-table');
+        if (table && row.tagName === 'TR')
+            closeTableEditor(table);
+        closeRowEditors(row);
         if (!window.tinymce)
             return;
         FieldtypeFlex.all(row, 'textarea.InputfieldTinyMCEEditor').forEach(input => {
@@ -594,12 +601,95 @@ var FieldtypeFlex;
     function moved(set, row) {
         FieldtypeFlex.one(set, ':scope > .flex-rows-status').textContent = message('itemMoved', 'Item moved to position {position} of {count}').replace('{position}', String(rows(set).indexOf(row) + 1)).replace('{count}', String(rows(set).length));
     }
+    function updateImagePreview(button, editor) {
+        const images = FieldtypeFlex.all(editor, '.InputfieldImageList > li.gridImage, .InputfieldImageEditSingle')
+            .filter(item => !item.querySelector('.gridImage__deletebox:checked'));
+        const label = FieldtypeFlex.attr(button, 'aria-label');
+        const text = document.createElement('span');
+        text.textContent = label;
+        button.replaceChildren(text);
+        const source = images[0]?.querySelector('img');
+        if (source?.getAttribute('src')) {
+            const thumb = document.createElement('img');
+            thumb.src = source.src;
+            thumb.alt = '';
+            button.prepend(thumb);
+        }
+        if (images.length > 1)
+            text.textContent += ` +${images.length - 1}`;
+        button.classList.toggle('ui-state-error', !!editor.querySelector('.InputfieldStateError, .InputfieldError'));
+    }
+    function closeTableEditor(set, focus = false) {
+        const active = tableEditors.get(set);
+        if (!active)
+            return;
+        const { button, editor, detail } = active;
+        updateImagePreview(button, editor);
+        editor.hidden = true;
+        FieldtypeFlex.one(editor, '.flex-table-editor-close').hidden = true;
+        button.after(editor);
+        button.setAttribute('aria-expanded', 'false');
+        detail.remove();
+        tableEditors.delete(set);
+        if (focus)
+            button.focus({ preventScroll: true });
+    }
+    function closeRowEditors(row) {
+        const set = row.closest('.flex-table');
+        if (set && tableEditors.get(set)?.button.closest('.flex-row') === row)
+            closeTableEditor(set);
+        FieldtypeFlex.all(row, '.flex-table').forEach(set => closeTableEditor(set));
+    }
+    function openTableEditor(button, focus = true) {
+        const row = button.closest('.flex-row');
+        if (!(row instanceof HTMLTableRowElement))
+            return;
+        const set = FieldtypeFlex.closest(button, '.flex-table');
+        if (treeBusy(set) || row.matches('.flex-row-remove-pending'))
+            return;
+        if (tableEditors.get(set)?.button === button) {
+            closeTableEditor(set, focus);
+            return;
+        }
+        closeTableEditor(set);
+        const editor = button.nextElementSibling;
+        if (!(editor instanceof HTMLElement) || !editor.matches('.flex-table-editor'))
+            return;
+        const detail = document.createElement('tr');
+        detail.className = 'flex-table-detail';
+        const cell = detail.insertCell();
+        cell.colSpan = row.cells.length;
+        row.after(detail);
+        cell.append(editor);
+        editor.hidden = false;
+        const close = FieldtypeFlex.one(editor, '.flex-table-editor-close');
+        close.hidden = false;
+        button.setAttribute('aria-expanded', 'true');
+        tableEditors.set(set, { button, editor, detail });
+        if (focus) {
+            editor.tabIndex = -1;
+            editor.focus();
+        }
+        if (!initializedDetailEditors.has(editor)) {
+            initializedDetailEditors.add(editor);
+            void FieldtypeFlex.classic.setup(editor);
+        }
+    }
     function initRows(context) {
         const sets = FieldtypeFlex.all(context, '.flex-rows');
         if (context instanceof HTMLElement && context.matches('.flex-rows'))
             sets.unshift(context);
         sets.forEach(set => {
+            let errorPreview;
             rows(set).forEach(row => {
+                FieldtypeFlex.all(row, ':scope > .flex-table-cell > .flex-table-preview[hidden]').forEach(button => {
+                    const editor = FieldtypeFlex.one(button.parentElement, ':scope > .flex-table-editor');
+                    updateImagePreview(button, editor);
+                    editor.hidden = true;
+                    button.hidden = false;
+                    if (!row.matches('.flex-row-remove-pending') && button.matches('.ui-state-error'))
+                        errorPreview ?? (errorPreview = button);
+                });
                 if (row.matches('.flex-row-remove-pending') && !rowState(row).removalReady) {
                     removalState(row, true);
                     rowState(row).removalReady = true;
@@ -608,6 +698,8 @@ var FieldtypeFlex;
                     openRow(row, true);
                 syncToggle(row);
             });
+            if (errorPreview && !tableEditors.has(set))
+                openTableEditor(errorPreview, false);
             FieldtypeFlex.sortable.init(rowList(set), teardown, async (row) => { order(set); await FieldtypeFlex.classic.setup(row); moved(set, row); });
             updateLabels(set);
             updateActions(set);
@@ -725,6 +817,11 @@ var FieldtypeFlex;
         control?.focus({ preventScroll: true });
     });
     FieldtypeFlex.delegate('click', '.flex-row-retry', (event, button) => { event.preventDefault(); void loadRow(FieldtypeFlex.closest(button, '.flex-row')); });
+    FieldtypeFlex.delegate('click', '.flex-table-preview', (_event, button) => openTableEditor(button));
+    FieldtypeFlex.delegate('click', '.flex-table-editor-close', (_event, button) => {
+        if (!treeBusy(button))
+            closeTableEditor(FieldtypeFlex.closest(button, '.flex-table'), true);
+    });
     FieldtypeFlex.delegate('click', '.flex-row-toggle', (event, button) => {
         event.preventDefault();
         event.stopPropagation();
@@ -739,11 +836,15 @@ var FieldtypeFlex;
         const row = FieldtypeFlex.closest(button, '.flex-row'), set = FieldtypeFlex.closest(row, '.flex-rows');
         if (treeBusy(set))
             return;
-        let target = event.key === 'ArrowUp' ? row.previousElementSibling : row.nextElementSibling;
+        if (set.matches('.flex-table'))
+            closeTableEditor(set);
+        const siblings = rows(set);
+        const index = siblings.indexOf(row);
+        let target = event.key === 'ArrowUp' ? siblings[index - 1] : siblings[index + 1];
         if (event.key === 'Home')
-            target = rows(set)[0];
+            target = siblings[0];
         if (event.key === 'End')
-            target = rows(set).slice(-1)[0];
+            target = siblings[siblings.length - 1];
         if (!target?.matches('.flex-row') || target === row)
             return;
         teardown(row);
@@ -783,11 +884,20 @@ var FieldtypeFlex;
         if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLButtonElement)
             labelChanged(event.target);
     }));
+    let openingInvalidDetail = false;
     document.addEventListener('invalid', event => {
         if (!(event.target instanceof Element))
             return;
         for (let row = event.target.closest('.flex-row'); row; row = row.parentElement?.closest('.flex-row') || null)
             openRow(row, true);
+        const editor = event.target.closest('.flex-table-editor[hidden]');
+        const button = editor?.previousElementSibling;
+        if (button instanceof HTMLButtonElement && !openingInvalidDetail) {
+            // Keep the first invalid detail open until the browser focuses the control.
+            openingInvalidDetail = true;
+            queueMicrotask(() => { openingInvalidDetail = false; });
+            openTableEditor(button, false);
+        }
     }, true);
     FieldtypeFlex.delegate('dblclick', '[data-flex-row-action="remove"]', (event, element) => {
         event.preventDefault();
@@ -837,6 +947,8 @@ var FieldtypeFlex;
             button.focus();
             return;
         }
+        if (row)
+            closeRowEditors(row);
         if (action === 'duplicate' && row && FieldtypeFlex.attr(row, 'data-flex-loaded') === '0' && !(await loadRow(row)))
             return;
         setTreeBusy(set, true);

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add a compact Image cell editor that opens in a full-width detail row.
+
 ## 0.7.0 — 2026-11-11
 
 - Add tables with native editable cells, optional headers and row labels, column widths, and shared Rows actions.

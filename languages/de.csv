@@ -348,5 +348,6 @@ Table columns must be a non-empty property map,Tabellenspalten müssen als nicht
 Unsupported table column input: %s,Nicht unterstütztes Tabellenspalten-Inputfield: %s,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,8fca3ce7056f9b2fbe7b9414471ac93d
 row_label is reserved for table row labels,row_label ist für Tabellenzeilenbeschriftungen reserviert,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,e1803c4f0e3023f137ed796819e60c72
 Row actions,Zeilenaktionen,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,09debd9a654a51d3320d117f7f6c9f10
+Done,Fertig,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,f92965e2c8a7afb3c1b9a5c09a263636
 Table,Tabelle,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,51c45b795d5d18a3e4e0c37e8b20a141
 Resize column %s,Breite der Spalte %s ändern,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,21d53025776dcafda3783d5d72b15433

@@ -76,7 +76,7 @@ $badTables = [
  ['columns' => ['row_label' => ['type' => 'text']]],
 ];
 foreach(['100%', 'auto', '-2rem', '0px', '1em', '1rem;display:none', 12] as $width) $badTables[] = ['columns' => ['value' => ['width' => $width]]];
-foreach(['file', 'image', 'TinyMCE', 'fieldset', 'Markup', 'Hidden', 'Icon', 'Selector'] as $inputType) $badTables[] = ['columns' => ['value' => ['type' => $inputType]]];
+foreach(['file', 'TinyMCE', 'fieldset', 'Markup', 'Hidden', 'Icon', 'Selector'] as $inputType) $badTables[] = ['columns' => ['value' => ['type' => $inputType]]];
 foreach([10, 11, 20, 21, 22] as $collapsed) $badTables[] = ['columns' => ['value' => ['type' => 'text', 'collapsed' => $collapsed]]];
 $badTables[] = ['columns' => ['value' => ['type' => 'object', 'children' => []]]];
 $badTables[] = ['columns' => ['value' => ['type' => 'rows', 'types' => ['item' => ['children' => []]]]]];
@@ -88,6 +88,16 @@ foreach($badTables as $index => $override) {
 $bad = clone $tf;
 $bad->flexDefinition = json_encode(['prices' => ['type' => 'table', 'columns' => ['body' => ['type' => 'TinyMCE', 'inheritField' => $sourceField->name]]]]);
 $throws(fn() => $type->getDefinitions($bad, $page), 'inherited rich text is rejected', FlexDefinitionException::class, 'Unsupported table');
+
+$imageTable = $createField('flex_table_images', ['grid' => ['type' => 'table', 'columns' => [
+	'photo' => ['type' => 'image', 'maxFiles' => 3],
+]]]);
+$imageTableValue = $type->getBlankValue($page, $imageTable);
+$imageTableValue->grid->rows->addRow('row');
+$imageTableEditor = $imageTable->getInputfield($page);
+$imageTableEditor->value = $imageTableValue;
+$imageTableHtml = $imageTableEditor->render();
+$assert(str_contains($imageTableHtml, 'class="flex-table-preview"') && str_contains($imageTableHtml, 'data-flex-upload'), 'table Image preview owns the existing native upload field');
 
 // Every released cell widget renders under the table's native wrappers.
 $cellTypes = ['Text', 'Email', 'URL', 'Integer', 'Float', 'Textarea', 'Checkbox', 'Toggle', 'Select', 'Radios', 'Checkboxes', 'SelectMultiple', 'AsmSelect', 'TextTags', 'Datetime'];
