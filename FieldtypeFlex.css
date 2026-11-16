@@ -78,11 +78,6 @@
     display: block;
     font-weight: bold;
 }
-.flex-table-grid > thead .flex-table-input:not(.InputfieldStateError, .ui-state-error)
-    :is(.InputfieldContent, .LanguageSupport) > input[type="text"]:focus:not([aria-invalid="true"]) {
-    /* Konkat's optional focus style sets an !important background. */
-    background-color: transparent !important;
-}
 .flex-table-grid .flex-table-input :is(.InputfieldContent, .LanguageSupport)
     > :is(input:not([type="checkbox"], [type="radio"], [type="hidden"]), textarea) { padding-inline: .4rem; }
 .flex-table-grid .flex-table-input :is(.InputfieldContent, .LanguageSupport)
@@ -168,8 +163,15 @@
     margin: 0 0 .5rem;
     border: 1px solid var(--pw-border-color, rgba(0, 0, 0, .15));
 }
-.AdminThemeUikitOriginal .flex-rows .flex-row {
+.AdminThemeUikitOriginal .flex-rows .flex-row,
+.AdminThemeUikitDefault .flex-rows li.flex-row {
     border: 0;
+}
+.AdminThemeUikitDefault .flex-rows li.flex-row {
+    outline: none;
+}
+.AdminThemeUikitDefault .flex-rows li.flex-row:has(> .flex-row-header-bold) {
+    margin-block-end: 2px;
 }
 .flex-rows .flex-row > .flex-row-header:where(:not(.flex-table-actions)) {
     margin: 0;
@@ -188,10 +190,6 @@
 }
 .AdminThemeUikitOriginal .flex-row-bar {
     color: #fff;
-}
-.AdminThemeUikit:not(.AdminThemeUikitOriginal) .flex-row-bar {
-    background: var(--pw-inputs-background);
-    color: var(--pw-text-color);
 }
 .flex-row-bar > button,
 .flex-row-controls .flex-row-action,
@@ -314,6 +312,30 @@
 .flex-row > .flex-row-content > .Inputfields {
     margin: 0;
 }
+.AdminThemeUikitDefault .flex-rows li.flex-row > .flex-row-header {
+    /* Match Konkat's native header, including its collapsed hover specificity. */
+    background-color: var(--pw-inputs-background) !important;
+    border: 1px solid var(--pw-border-color);
+    color: var(--pw-text-color);
+}
+.AdminThemeUikitDefault .flex-row-header > .flex-row-bar { min-height: 2.2rem; }
+.AdminThemeUikitDefault .flex-rows li.flex-row > .flex-row-header-bold {
+    --pw-inputs-background: var(--pw-main-color);
+    --pw-border-color: var(--pw-main-color);
+    --pw-text-color: rgba(255, 255, 255, .9);
+    --pw-muted-color: rgba(255, 255, 255, .8);
+}
+@media (hover: hover) and (pointer: fine) {
+    .AdminThemeUikitDefault .flex-row-header-bold:hover { filter: brightness(1.05); }
+}
+.AdminThemeUikitDefault .flex-rows li.flex-row:not(.InputfieldStateCollapsed) > .flex-row-header {
+    border-block-end-color: transparent;
+}
+.AdminThemeUikitDefault .flex-rows li.flex-row > .flex-row-content {
+    border: 1px solid var(--pw-border-color);
+    border-block-start: 0;
+    outline: none;
+}
 .flex-row.ui-sortable-helper {
     opacity: .9;
 }
@@ -359,7 +381,7 @@
     opacity: .5;
 }
 /* Default/Konkat preserves the header surface and fades its contents instead. */
-.AdminThemeUikit:not(.AdminThemeUikitOriginal) .flex-row-hidden > .flex-row-header {
+.AdminThemeUikitDefault .flex-rows li.flex-row > .flex-row-header {
     opacity: 1;
 }
 .AdminThemeUikit:not(.AdminThemeUikitOriginal) .flex-row-hidden > .flex-row-header .flex-row-bar > * {
@@ -373,8 +395,8 @@
 .flex-row > .flex-row-header:focus-within {
     opacity: 1;
 }
-.AdminThemeUikitOriginal .flex-row-bar > button,
-.AdminThemeUikitOriginal .flex-row-bar .flex-row-action {
+.AdminThemeUikit .flex-row-bar > button,
+.AdminThemeUikit .flex-row-bar .flex-row-action {
     min-height: 2rem;
 }
 .flex-row-hidden > .flex-row-header .flex-row-title {
@@ -404,10 +426,13 @@
 .flex-rows .flex-row-remove-pending {
     border-color: var(--pw-error-inline-text-color, #bc283d);
 }
-.AdminThemeUikit:not(.AdminThemeUikitOriginal) .flex-row-remove-pending > .flex-row-header .flex-row-bar {
-    /* Override UIKit's !important background utility, as native error headers do. */
-    background-color: var(--pw-alert-danger) !important;
-    color: var(--pw-error-inline-text-color);
+.AdminThemeUikitDefault .flex-rows li.flex-row-remove-pending > .flex-row-header {
+    --pw-inputs-background: var(--pw-alert-danger);
+    --pw-border-color: var(--pw-error-inline-text-color);
+    --pw-text-color: var(--pw-error-inline-text-color);
+}
+.AdminThemeUikitDefault .flex-row-remove-pending > .flex-row-header-bold:hover {
+    filter: none;
 }
 .AdminThemeUikit:not(.AdminThemeUikitOriginal) .flex-row-remove-pending > .flex-row-header .flex-row-bar > * {
     opacity: 1;

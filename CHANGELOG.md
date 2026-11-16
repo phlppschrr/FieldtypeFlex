@@ -1,61 +1,90 @@
 # Changelog
 
-## Unreleased
+## WIP
 
-- Keep the card sort handle visible and reveal the compact row actions and chevron on hover or keyboard focus. Dim individual action icons on hover.
-- Move the table sort handle to the first column and group Duplicate and Hide/Show in a disclosure next to Remove.
+### Added
+
 - Edit iframe and inline TinyMCE fields in a full-width table detail row.
 - Open File and PageList editors in a full-width table detail row.
 - Support Checkboxes, Radios and TextTags for Page references in table cells.
-- Show image thumbnails in table cells and open the native editor in a full-width detail row that closes when focus moves to another cell.
-- Remove the extra Inputfield frame and padding from the table image editor.
 
-## 0.7.0 — 2026-11-11
+### Changed
+
+- Keep the card sort handle visible and reveal the compact row actions and chevron on hover or keyboard focus. Dim individual action icons on hover.
+- Move the table sort handle to the first column and group Duplicate and Hide/Show in a disclosure next to Remove.
+- Show image thumbnails in table cells and open the native editor in a full-width detail row that closes when focus moves to another cell.
+- Match native Repeater headers in Konkat, including the bold header option.
+
+### Fixed
+
+- Remove the extra Inputfield frame and padding from the table image editor.
+- Remove the doubled border around card rows in Konkat.
+- Honor the focused-input background option on editable table headings.
+- Preserve configured unchecked values when saving and reopening native Checkbox inputs.
+
+## 0.7.0 - 2026-11-11
+
+### Added
 
 - Add tables with native editable cells, optional headers and row labels, column widths, and shared Rows actions.
 - Allow editors to drag column dividers to resize table columns until the page is reloaded.
+
+### Changed
+
 - Show editable header values as column titles and keep multilingual cells compact with language tabs.
 - Reduce nested field borders and spacing in the table editor, including the row actions.
 - Give Uikit and Konkat tables bold gray headings, white data cells and a transparent header above the row actions.
 - Focus native inputs when clicking their table cells, stretch text fields to the row height and tighten language tabs.
+
+### Fixed
+
 - Distinguish classic Uikit's admin global from Bridge when initializing inputs and inserting AJAX rows.
 
-## 0.6.1 — 2026-11-09
+## 0.6.1 - 2026-11-09
+
+### Changed
 
 - Move rename and cleanup tools to individual native sections in the field Actions tab.
+
+### Fixed
+
 - Restore execution of documented CLI examples in integration tests and configure the DDEV Composer root version.
 
-## 0.6.0 — 2026-11-08
+## 0.6.0 - 2026-11-08
+
+### Added
 
 - Add PHPDoc class stubs and usage examples to field settings, with a hookable `getPhpDoc()` API for custom exports.
 
-## 0.5.1 — 2026-11-02
+## 0.5.1 - 2026-11-02
+
+### Fixed
 
 - Fix double application of textformatters to formatted Language Alternate values.
 
-## 0.5.0 — 2026-11-02
+## 0.5.0 - 2026-11-02
 
-- Migrate admin JavaScript to vanilla TypeScript; retain support for classic admin themes.
+### Added
+
 - Add native AdminThemeBridge 0.24.0+ support for nested Rows and media.
 - Support Language Alternate Fields such as `image` / `image_de` with native fallback.
 - Add fixed Objects, configurable Row titles, visibility, lazy loading and removal with undo.
+
+### Changed
+
+- Migrate admin JavaScript to vanilla TypeScript and retain support for classic admin themes.
 - Improve nested editing, duplication, dependencies and File/Image metadata handling.
 - Simplify field configuration, examples and maintenance tools.
 - Improve selectors, data preservation, media cleanup and integration coverage.
 
 ## 0.3.0 (pre-release)
 
-- Expanded native field comparison coverage and added a separate CI baseline for 13 Core Fieldtypes. Fixed blank date values incorrectly matching less-than date ranges, including in rows.
+### Added
 
-- Added root Page-reference selector traversal through supported native target Fields, with native PageFinder matching, single/multiple references and selector discovery. Documented query costs and explicit unsupported paths/operators.
-- Aligned Page reference loading, formatting, assignment and selection validation with native FieldtypePage; editor submissions replace selections, including in rows.
-- Aligned unformatted Datetime reads with native Unix timestamps, formatted multilingual reads with strings, Float precision and default Checkbox/Toggle values. Added native Email/URL normalization; canonical JSON formats remain unchanged.
-- Added direct native-field comparison tests and documented the explicit boundaries of Fieldtype compatibility.
-
-- Added the explicit `rows` structure type with `addRowLabel`, `rowCollapse` and per-type `rowTitle`; native wrapper definitions use `InputfieldFlexRows`.
-
-- Simplified editor error handling and shared technical messages; invalid repeatable presentation settings now use safe defaults. Updated bundled translations to remove obsolete phrases.
-
+- Expand native field comparison coverage and add a separate CI baseline for 13 Core Fieldtypes.
+- Add root Page-reference selector traversal through supported native target Fields, with native PageFinder matching, single/multiple references and selector discovery. Document query costs and explicit unsupported paths/operators.
+- Add direct native-field comparison tests and document the explicit boundaries of Fieldtype compatibility.
+- Add the explicit `rows` structure type with `addRowLabel`, `rowCollapse` and per-type `rowTitle`. Native wrapper definitions use `InputfieldFlexRows`.
 - Bundled German, French and Spanish admin translations, including editor messages and the example catalog. Install or update them through Module Information → Languages → install translations.
 - Added typed rows collections with stable row IDs and per-type schemas.
 - Added recursive nested rows collections, parent-aware selectors and subtree duplication.
@@ -64,3 +93,13 @@
 - Added typed row selectors, collection counts and same-row expressions.
 - Added definition source diagnostics, property-label helpers and configurable resource budgets.
 - Established the versioned rows:1 envelope for typed repeatable data.
+
+### Changed
+
+- Align Page reference loading, formatting, assignment and selection validation with native FieldtypePage. Editor submissions replace selections, including in rows.
+- Align unformatted Datetime reads with native Unix timestamps, formatted multilingual reads with strings, Float precision and default Checkbox/Toggle values. Add native Email/URL normalization and preserve canonical JSON formats.
+- Simplify editor error handling and shared technical messages. Invalid repeatable presentation settings use safe defaults. Update bundled translations to remove obsolete phrases.
+
+### Fixed
+
+- Fix blank date values incorrectly matching less-than date ranges, including in rows.

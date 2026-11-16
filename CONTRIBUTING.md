@@ -10,7 +10,7 @@ Use the disposable DDEV fixture described in [docs/development.md](docs/developm
 
 ## Changes and review
 
-Start features on `feature/<short-name>` branches from current `main`. Record every enhancement and fix in [CHANGELOG.md](CHANGELOG.md). When merging into `main`, increase the version using SemVer (major for breaking changes, minor for compatible features, patch for compatible fixes), keeping module metadata, the documented version and dated changelog entries consistent. Use SemVer prerelease identifiers where applicable.
+Start features on `feature/<short-name>` branches from current `main`. Use [Conventional Commits](https://www.conventionalcommits.org/) for commit messages. Record each enhancement and fix under the appropriate [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) category in the `WIP` section of [CHANGELOG.md](CHANGELOG.md). When merging into `main`, increase the version using SemVer (major for breaking changes, minor for compatible features, patch for compatible fixes), keeping module metadata, the documented version and dated changelog entries consistent. Use SemVer prerelease identifiers where applicable.
 
 Keep changes focused and use the existing PHP and JavaScript conventions. Add or update integration coverage for behavior changes, including failure paths where data integrity is involved. For admin input changes, verify a real ProcessPageEdit save and inspect browser errors.
 

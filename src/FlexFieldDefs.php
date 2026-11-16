@@ -1073,7 +1073,7 @@ class FlexFieldDefs extends Wire {
 						$input->value = clone $v;
 					}
 					if($input instanceof InputfieldCheckbox) {
-						$input->checked($v !== '' && $v !== null && $v !== 0);
+						$input->checked($value->hasValue($name));
 					}
 				}
 				$input->resetTrackChanges();

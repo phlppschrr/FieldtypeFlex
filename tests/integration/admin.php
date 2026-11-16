@@ -39,4 +39,26 @@ $page->flex_test = $input->value;
 $page->save('flex_test');
 $same('New name', $page->flex_test->name, 'processed value saves');
 
+$customCheckbox = $createField('flex_checkbox_off', ['checked' => [
+	'type' => 'checkbox', 'checkedValue' => 'on', 'uncheckedValue' => 'off',
+]]);
+$name = $customCheckbox->name;
+$page = $wire->pages->getFresh($id);
+$page->of(false);
+$page->getUnformatted($name)->checked = 'on';
+$page->save($name);
+$editor = $customCheckbox->getInputfield($page);
+$editor->value = $page->getUnformatted($name);
+$same(true, $editor->inputs()->getChildByName($name . '__checked')->checked(), 'custom native checkbox renders checked with its configured on value');
+$uncheckedPost = [];
+$editor->processInput($wire->wire(new WireInputData($uncheckedPost)));
+$page->set($name, $editor->value);
+$page->save($name);
+$page = $wire->pages->getFresh($id);
+$page->of(false);
+$same('off', $page->getUnformatted($name)->checked, 'unchecking persists the configured off value through hydration');
+$editor = $customCheckbox->getInputfield($page);
+$editor->value = $page->getUnformatted($name);
+$same(false, $editor->inputs()->getChildByName($name . '__checked')->checked(), 'custom native checkbox stays unchecked after reload');
+
 require __DIR__ . '/dependencies.php';

@@ -934,7 +934,9 @@ class FlexValue extends WireData implements \JsonSerializable {
 			return date($time ? 'Y-m-d H:i:s' : 'Y-m-d', $timestamp);
 		}
 		if($def['kind'] === 'checkbox') {
-			return $value === '' || $value === null || $value === false || $value === 0 || $value === '0' ? ($input->uncheckedValue === '' ? 0 : $input->uncheckedValue) : $input->checkedValue;
+			$unchecked = $input->uncheckedValue === '' ? 0 : $input->uncheckedValue;
+			$value = (string) $value;
+			return $value === '' || $value === '0' || $value === (string) $unchecked ? $unchecked : $input->checkedValue;
 		}
 		if($value === '' || $value === null) {
 			return '';

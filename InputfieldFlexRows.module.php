@@ -293,6 +293,9 @@ class InputfieldFlexRows extends Inputfield implements BridgeComponent {
 		$bodyId = 'flex_row_' . $this->name . '__' . $id;
 		$buttons = $this->rowActions($row, $removed);
 		$sortLabel = $entities($this->_('Drag to reorder; use Up and Down arrow keys when focused'));
+		$theme = $this->wire()->adminTheme;
+		$konkat = $theme instanceof AdminThemeUikit && $theme->themeName === 'default';
+		$boldHeader = $konkat && in_array('useBoldItemHeaders', (array) $theme->defaultToggles, true);
 		if($loaded) {
 			$body = $inputs->render();
 			if($entry) $body = FlexLazy::marker($this->flexInputName ?: $this->name, $row->address(), 'body', $entry['grant']) . $body . FlexLazy::marker($this->flexInputName ?: $this->name, $row->address(), 'complete', $entry['grant']);
@@ -305,7 +308,7 @@ class InputfieldFlexRows extends Inputfield implements BridgeComponent {
 		return '<li class="Inputfield InputfieldFieldset InputfieldNoFocus flex-row' . ($collapsed ? ' InputfieldStateCollapsed' : '') . ($row->isHidden() ? ' flex-row-hidden' : '') . ($removed ? ' flex-row-remove-pending' : '') . '" id="wrap_' . $entities($bodyId) . '" data-flex-row="' . $entities($id) . '"' . ($entry ? ' data-flex-loaded="' . ($loaded ? '1' : '0') . '"' : '') . ' data-flex-type="' . $entities($type) . '" data-flex-type-label="' . $entities($typeLabel) . '" data-flex-label-format="' . $entities($format) . '" data-flex-label-values="' . $entities(json_encode((object) $values, JSON_THROW_ON_ERROR)) . '">' .
 			'<input type="hidden" class="flex-row-remove-value" name="' . $entities(FlexPath::controlName($this->flexInputName ?: $this->name, $row->address(), 'remove')) . '" value="' . ($removed ? '1' : '0') . '">' .
 			'<input type="hidden" class="flex-row-hidden-value" name="' . $entities(FlexPath::controlName($this->flexInputName ?: $this->name, $row->address(), 'hidden')) . '" value="' . ($row->isHidden() ? '1' : '0') . '">' .
-			'<div class="InputfieldHeader flex-row-header' . ($removed ? ' ui-state-error' : '') . '"><div class="flex-row-bar uk-background-primary uk-light">' .
+			'<div class="InputfieldHeader flex-row-header' . ($boldHeader ? ' flex-row-header-bold' : '') . ($removed ? ' ui-state-error' : '') . '"><div class="flex-row-bar' . ($konkat ? '' : ' uk-background-primary uk-light') . '">' .
 			'<button type="button" class="flex-row-sort" title="' . $sortLabel . '" aria-label="' . $sortLabel . '"><i class="fa fa-fw fa-arrows" aria-hidden="true"></i></button>' .
 			'<button type="button" class="flex-row-toggle" aria-controls="' . $entities($bodyId) . '" aria-expanded="' . ($collapsed ? 'false' : 'true') . '"><span class="flex-row-label"><span class="flex-row-title">' . $label . '</span></span><i class="fa fa-fw fa-angle-down flex-row-chevron" aria-hidden="true"></i></button>' .
 			'<span class="flex-row-controls">' . $buttons . '</span></div></div>' .
