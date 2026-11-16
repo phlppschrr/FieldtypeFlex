@@ -106,15 +106,19 @@ final class FlexInspection {
 					foreach($definition['types'] as $type => $typeDefinition) {
 						$rowPath = $path . '.' . $type;
 						$format = (string) ($typeDefinition['settings']['rowTitle'] ?? '');
-						if($format !== '' && preg_match_all('/_?\\{([^{}]+)\\}_?/', $format, $matches)) {
-							$children = $typeDefinition['schema'];
-							foreach($matches[1] as $token) {
-								$known = false;
-								foreach(explode('|', $token) as $candidate) {
-									if(in_array($candidate, ['@type', '@path'], true) || $children->property($candidate)) { $known = true; break; }
-								}
-								if(!$known) $add('row_title_unresolved', $rowPath, $token, 'rowTitle', 'rowTitle token does not resolve to a property or built-in token.');
+						foreach(FlexRowTitle::references(FlexRowTitle::compile($format)) as $reference) {
+							if($reference[0] === '@') continue;
+							$parts = explode('.', $reference);
+							$scope = $typeDefinition['schema'];
+							if(count($parts) > 1 && in_array($parts[0], ['parent', 'root'], true)) $scope = array_shift($parts) === 'parent' ? $schema : $root;
+							while(($part = array_shift($parts)) !== null) {
+								$property = $scope->property($part);
+								if(!$property || !$parts) break;
+								if(in_array($property['kind'], ['file', 'image'], true) && count($parts) === 1 && in_array($parts[0], ['description', 'tags', 'basename'], true)) break;
+								if($property['kind'] !== 'object') { $property = null; break; }
+								$scope = $property['schema'];
 							}
+							if(!$property) $add('row_title_unresolved', $rowPath, $reference, 'rowTitle', 'rowTitle token does not resolve to a declared property.');
 						}
 						$walk($typeDefinition['schema'], $schema, $rowPath . '.');
 					}

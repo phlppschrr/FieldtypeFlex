@@ -13,6 +13,7 @@ require_once __DIR__ . '/src/FlexStorage.php';
 require_once __DIR__ . '/src/FlexMaintenance.php';
 require_once __DIR__ . '/src/FlexMaintenanceCli.php';
 require_once __DIR__ . '/src/FlexInspection.php';
+require_once __DIR__ . '/src/FlexRowTitle.php';
 require_once __DIR__ . '/src/FlexMaintenanceAdmin.php';
 require_once __DIR__ . '/src/FlexQuery.php';
 require_once __DIR__ . '/src/FlexAdmin.php';

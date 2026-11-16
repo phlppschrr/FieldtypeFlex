@@ -1,9 +1,9 @@
 namespace FieldtypeFlex {
     interface RowResponse {html: string; error?: boolean; message?: string;}
     interface UploadItem {markup: string; error?: boolean; message?: string;}
-    interface RowState { labels?: Record<string, string>; removalReady?: boolean; load?: Promise<boolean>; }
-    interface TitlePart { text: string; badge: boolean; literal?: boolean; muted?: boolean; }
+    interface RowState { title?: TitleData; removalReady?: boolean; load?: Promise<boolean>; }
     const state = new WeakMap<HTMLElement, RowState>();
+    const titleRequests = new WeakMap<HTMLElement, {revision: number; timer?: number; queued: boolean}>();
     const disabledBeforeRemoval = new WeakMap<Control, boolean>();
     const busyTrees = new WeakSet<HTMLElement>();
     function rowState(row: HTMLElement): RowState {
@@ -42,80 +42,36 @@ namespace FieldtypeFlex {
         const label = attr(button, removed ? 'data-flex-undo-label' : 'data-flex-remove-label');
         button.setAttribute('aria-pressed', String(removed)); button.setAttribute('aria-label', label); button.title = label;
     }
-    function titleParts(format: string, values: Record<string, string>, number: number, type: string, path: string, cleanup = true): TitlePart[] {
-        const parts: TitlePart[] = [];
-        format.split(/(\[[^\[\]]*\]|_\{[^{}]+\}_|\{[^{}]+\}|#n)/gi).filter(Boolean).forEach(function(part) {
-            if(part[0] === '[' && part.slice(-1) === ']') {
-                var details = titleParts(part.slice(1, -1), values, number, type, path, false);
-                if(!details.length) details.push({text: '', badge: false, literal: false});
-                details.forEach(function(detail) {
-                    detail.muted = true;
-                    parts.push(detail);
-                });
-                return;
-            }
-            var badge = part.slice(0, 2) === '_{' && part.slice(-2) === '}_';
-            var token = badge ? part.slice(1, -1) : part, value = part, literal = false;
-            if(token.toLowerCase() === '#n') value = '#' + number;
-            else if(token[0] === '{' && token.slice(-1) === '}') {
-                value = '';
-                token.slice(1, -1).split('|').some(function(name) {
-                    var candidate = name === '@type' ? type : (name === '@path' ? path : (Object.prototype.hasOwnProperty.call(values, name) ? values[name] : ''));
-                    if(String(candidate).trim() === '') return false;
-                    value = String(candidate);
-                    return true;
-                });
-            } else literal = true;
-            parts.push({text: value, badge: badge, literal: literal});
-        });
-        if(cleanup === false) return parts;
-        parts.forEach(function(part, i) {
-            if(!part.literal || !/^[\s›|/:;,–—-]+$/.test(part.text)) return;
-            var before = parts.some(function(other, j) { return j < i && other.text.trim() !== '' && (!other.literal || !/^[\s›|/:;,–—-]+$/.test(other.text)); });
-            var after = parts.some(function(other, j) { return j > i && other.text.trim() !== '' && (!other.literal || !/^[\s›|/:;,–—-]+$/.test(other.text)); });
-            if(!before || !after) part.text = '';
-        });
-        let separator: number | null = null, omitted = false;
-        parts.forEach(function(part, i) {
-            if(part.text === '') {
-                if(!part.literal) omitted = true;
-                return;
-            }
-            if(part.literal && /^[\s›|/:;,–—-]+$/.test(part.text)) {
-                if(separator !== null && omitted) parts[separator].text = '';
-                separator = i;
-            } else separator = null;
-            omitted = false;
-        });
-        return parts;
+    function rowTitleData(row: HTMLElement): TitleData | undefined {
+        const data = attr(row, 'data-flex-title');
+        if(data) return rowState(row).title ??= JSON.parse(data) as TitleData;
     }
-    function rowTitle(row: HTMLElement, index: number, path: string): TitlePart[] {
-        const format = attr(row, 'data-flex-label-format'), type = attr(row, 'data-flex-type-label');
-        const values = rowState(row).labels ?? JSON.parse(attr(row, 'data-flex-label-values') || '{}');
-        let parts = titleParts(format, values, index + 1, type, path);
-        if(!parts.some(part => part.text.trim() !== '')) parts = [{text: (format ? '' : type + ' ') + '#' + (index + 1), badge: false}];
-        if(!format) parts.unshift({text: type, badge: true}, {text: ' ', badge: false});
-        return parts;
+    function renderTitle(row: HTMLElement, title: TitleData, index: number): void {
+        row.querySelector(':scope > .flex-row-header .flex-row-title')?.replaceChildren(titleFragment(titleParts(title, index)));
     }
-    function contextPath(row: HTMLElement): string {
-        const path: string[] = [];
-        for(let parent = row.parentElement?.closest<HTMLElement>('.flex-row'); parent; parent = parent.parentElement?.closest<HTMLElement>('.flex-row')) path.unshift(attr(parent, 'data-flex-type-label'));
-        return path.join(' › ');
+    function syncTitleSources(row: HTMLElement, target?: HTMLElement, afterWidgetUpdate = false): void {
+        const title = rowTitleData(row);
+        const tree = row.closest<HTMLElement>('.InputfieldFlex');
+        if(!title || !tree) return;
+        let changed = false;
+        for(const [reference, source] of Object.entries(title.sources)) {
+            if(target && !sourceMatches(source, target)) continue;
+            if(target && source.kind === 'page' && !afterWidgetUpdate) {
+                // Core dispatches change just before replacing the visible selected label.
+                queueMicrotask(() => syncTitleSources(row, target, true));
+                continue;
+            }
+            const value = titleSourceValue(tree, source);
+            if(value === undefined || value === title.values[reference]) continue;
+            title.values[reference] = value;
+            changed = true;
+        }
+        if(changed) renderTitle(row, title, rows(closest(row, '.flex-rows')).indexOf(row) + 1);
     }
     function updateLabels(set: HTMLElement): void {
         rows(set).forEach((row, index) => {
-            const title = row.querySelector<HTMLElement>(':scope > .flex-row-header .flex-row-title');
-            if(!title) return;
-            title.replaceChildren();
-            rowTitle(row, index, contextPath(row)).forEach(part => {
-                if(!part.text) return;
-                if(part.badge || part.muted) {
-                    const span = document.createElement('span');
-                    span.classList.toggle('flex-row-type-badge', !!part.badge); span.classList.toggle('flex-row-deemphasized', !!part.muted);
-                    span.textContent = part.text; title.append(span);
-                } else title.append(document.createTextNode(part.text));
-            });
-            all(row, ':scope > .flex-row-content .flex-rows').filter(set => set.closest('.flex-row') === row).forEach(updateLabels);
+            const title = rowTitleData(row);
+            if(title) renderTitle(row, title, index + 1);
         });
     }
     function treeBusy(scope: HTMLElement): boolean { return busyTrees.has(closest(scope, '.InputfieldFlex')); }
@@ -124,6 +80,7 @@ namespace FieldtypeFlex {
         if(busy) busyTrees.add(tree); else busyTrees.delete(tree);
         tree.setAttribute('aria-busy', String(busy)); all(tree, '.flex-rows').forEach(updateActions);
         const form = closest(tree, 'form');
+        if(!busy && titleRequests.get(tree)?.queued) queueTitleRefresh(tree);
         if(!busy && !form.querySelector('.InputfieldFlex[aria-busy="true"], .flex-row[data-flex-load-failed="1"]')) all(form, ':scope > .flex-form-request-error').forEach(error => error.remove());
     }
     function updateActions(set: HTMLElement): void {
@@ -185,6 +142,55 @@ namespace FieldtypeFlex {
     function requestHeaders(set: HTMLElement): Record<string, string> {
         return {'X-Requested-With': 'XMLHttpRequest', 'X-FIELDNAME': attr(set, 'data-flex-field'), 'X-FLEX-DRAFT': attr(set, 'data-flex-draft')};
     }
+    function externalTitleDependencies(tree: HTMLElement): Set<string> {
+        return new Set(all(tree, '[data-flex-external-dependencies]').flatMap(input => attr(input, 'data-flex-external-dependencies').split(' ')));
+    }
+    function dependencyName(name: string): string { return name.replace(/\[\]$|^_|_$/g, '').replace(/__\d+$/, ''); }
+    function queueTitleRefresh(tree: HTMLElement): void {
+        if(!tree.querySelector('.flex-row[data-flex-title-refresh]')) return;
+        const request = titleRequests.get(tree) ?? {revision: 0, queued: false};
+        titleRequests.set(tree, request);
+        const revision = ++request.revision;
+        clearTimeout(request.timer);
+        request.queued = true;
+        if(treeBusy(tree)) return;
+        request.timer = window.setTimeout(async () => {
+            if(!tree.isConnected || treeBusy(tree)) return;
+            request.queued = false;
+            const targets = all(tree, '.flex-row[data-flex-title-refresh]').filter(row =>
+                row.closest('.InputfieldFlex') === tree && !row.closest('.flex-row-remove-pending'));
+            if(!targets.length) return;
+            const set = closest(targets[0], '.flex-rows');
+            const addresses = targets.map(row => [attr(closest(row, '.flex-rows'), 'data-flex-set'), attr(row, 'data-flex-row')]);
+            const token = csrf(), draft = attr(set, 'data-flex-draft');
+            if(!token || !draft) return;
+            classic.saveReady(tree);
+            const data = new URLSearchParams(serialize(tree));
+            const dependencies = externalTitleDependencies(tree);
+            if(dependencies.size) {
+                serialize(closest(tree, 'form')).forEach(([name, value]) => {
+                    if(name !== 'id' && (dependencies.has(name) || dependencies.has(dependencyName(name)))) data.append(name, value);
+                });
+            }
+            data.set(token.name, token.value);
+            data.set('flex_action', 'row-titles');
+            data.set('flex_title_rows', JSON.stringify(addresses));
+            data.set('flex_complete', draft);
+            try {
+                const response = await fetch(attr(set, 'data-flex-page-url'), {method: 'POST', credentials: 'same-origin', headers: requestHeaders(set), body: data});
+                const result: {error: boolean; titles: Record<string, Pick<TitleData, 'custom' | 'override'>>} = await response.json();
+                if(!response.ok || result.error || request.revision !== revision || !tree.isConnected) return;
+                targets.forEach((row, index) => {
+                    const title = rowTitleData(row), update = result.titles[addresses[index].join('.')];
+                    if(!title || !update || !row.isConnected) return;
+                    Object.assign(title, update);
+                    renderTitle(row, title, rows(closest(row, '.flex-rows')).indexOf(row) + 1);
+                });
+            } catch {
+                // Retain the last title if the draft or network is unavailable.
+            }
+        }, 240);
+    }
     function moved(set: HTMLElement, row: HTMLElement): void {
         one(set, ':scope > .flex-rows-status').textContent = message('itemMoved', 'Item moved to position {position} of {count}').replace('{position}', String(rows(set).indexOf(row) + 1)).replace('{count}', String(rows(set).length));
     }
@@ -227,8 +233,9 @@ namespace FieldtypeFlex {
     classic.events(scope => { initRows(scope); }, (row, open) => { syncToggle(row); if(open) void loadRow(row); }, scope => {
         all<HTMLTextAreaElement>(scope, 'textarea').forEach(input => {
             const editor = window.tinymce?.get(input.id);
-            if(editor) { editor.save(); input.dispatchEvent(new Event('input', {bubbles: true})); }
+            if(editor) editor.save();
         });
+        titlesChanged(scope);
     }, (draft, path) => { void refreshMedia(draft, path); });
     function tableColumnResizer(handle: HTMLElement): ((distance: number) => void) | undefined {
         const table = handle.closest<HTMLTableElement>('.flex-table-grid');
@@ -294,24 +301,25 @@ namespace FieldtypeFlex {
         if(event.key === 'ArrowUp' || event.key === 'Home') target.before(row); else target.after(row);
         order(set); await classic.setup(row); one(row, ':scope > .flex-row-header .flex-row-sort').focus(); moved(set, row);
     });
-    function labelChanged(input: Control): void {
-        const property = input.closest<HTMLElement>('[data-flex-label-property]'), row = property?.closest<HTMLElement>('.flex-row');
-        if(!property || !row) return;
-        const kind = attr(property, 'data-flex-label-kind');
-        if(kind === 'file' || kind === 'image' || (kind === 'page' && !(input instanceof HTMLSelectElement))) return;
-        let label: string | string[] = value(input);
-        if(input instanceof HTMLSelectElement) label = Array.from(input.selectedOptions, option => option.textContent).join(', ');
-        else if(input.matches('[type="checkbox"], [type="radio"]')) {
-            const options: Record<string, string> = JSON.parse(attr(property, 'data-flex-label-options') || '{}');
-            label = all<HTMLInputElement>(property, ':checked').map(option => Object.prototype.hasOwnProperty.call(options, option.value) ? options[option.value] : option.value).join(', ');
-        } else if(input.matches('[type="file"], [type="hidden"], button')) return;
-        const text = document.createElement('textarea'); setHTML(text, String(label || '').replace(/<[^>]*>/g, '').replace(/</g, '&lt;').replace(/>/g, '&gt;'));
-        const current = rowState(row); current.labels ??= JSON.parse(attr(row, 'data-flex-label-values') || '{}');
-        current.labels![attr(property, 'data-flex-label-property')] = text.value.replace(/\s+/g, ' ').trim().slice(0, 160);
-        updateLabels(closest(row, '.flex-rows'));
+    function titlesChanged(target: HTMLElement): void {
+        const tree = target.closest<HTMLElement>('.InputfieldFlex');
+        if(tree) {
+            all(tree, '.flex-row[data-flex-title]').forEach(row => syncTitleSources(row, target));
+            queueTitleRefresh(tree);
+            return;
+        }
+        const form = target.closest('form');
+        if(!form) return;
+        const name = attr(target, 'name');
+        if(!name) return;
+        all(form, '.InputfieldFlex').forEach(field => {
+            if(!field.querySelector('[data-flex-title-refresh]')) return;
+            const dependencies = externalTitleDependencies(field);
+            if(dependencies.has(name) || dependencies.has(dependencyName(name))) queueTitleRefresh(field);
+        });
     }
     ['input', 'change'].forEach(name => document.addEventListener(name, event => {
-        if(event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLButtonElement) labelChanged(event.target);
+        if(event.target instanceof HTMLElement && event.target.matches('input:not(.flex-rows-order), select, textarea, .InputfieldTinyMCEEditor[contenteditable]')) titlesChanged(event.target);
     }));
     document.addEventListener('invalid', event => {
         if(!(event.target instanceof Element)) return;
@@ -340,7 +348,7 @@ namespace FieldtypeFlex {
         }
         if(action === 'remove' && row) {
             const removed = !row.matches('.flex-row-remove-pending'); window.tinymce?.triggerSave(); if(removed) openRow(row, false);
-            removalState(row, removed); rowState(row).removalReady = true; order(set); button.focus(); return;
+            removalState(row, removed); rowState(row).removalReady = true; order(set); queueTitleRefresh(closest(set, '.InputfieldFlex')); button.focus(); return;
         }
         if(action === 'duplicate' && row && attr(row, 'data-flex-loaded') === '0' && !(await loadRow(row))) return;
         setTreeBusy(set, true);
@@ -365,7 +373,9 @@ namespace FieldtypeFlex {
             if(!set.isConnected) return;
             const fresh = parseHTML(result.html);
             if(action === 'duplicate' && row) row.after(fresh); else rowList(set).append(fresh);
-            await activateScripts(fresh, response); order(set); await classic.setup(fresh); initRows(set); (fresh.querySelector<HTMLElement>(':scope > .flex-row-header .flex-row-toggle') || one<HTMLElement>(fresh, ':scope > .flex-row-header .flex-row-sort')).focus(); classic.added(fresh);
+            await activateScripts(fresh, response); order(set); await classic.setup(fresh); initRows(set);
+            [fresh, ...all(fresh, '.flex-row[data-flex-title]')].forEach(row => syncTitleSources(row));
+            queueTitleRefresh(closest(set, '.InputfieldFlex')); (fresh.querySelector<HTMLElement>(':scope > .flex-row-header .flex-row-toggle') || one<HTMLElement>(fresh, ':scope > .flex-row-header .flex-row-sort')).focus(); classic.added(fresh);
         } catch(problem) { error.textContent = errorMessage(problem); }
         finally { setTreeBusy(set, false); }
     }
@@ -441,7 +451,7 @@ namespace FieldtypeFlex {
                     const fresh = parseHTML(item.markup); list.append(fresh); await activateScripts(fresh, response);
                     if(metadata) restoreMediaMetadata(fresh, metadata, true);
                 }
-                field.classList.remove('InputfieldFileEmpty'); field.classList.add('InputfieldStateChanged'); await classic.setup(field);
+                field.classList.remove('InputfieldFileEmpty'); field.classList.add('InputfieldStateChanged'); await classic.setup(field); titlesChanged(field);
             }
             status.remove();
         } catch(error) { status.setAttribute('role', 'alert'); status.textContent = errorMessage(error); }
@@ -477,7 +487,7 @@ namespace FieldtypeFlex {
             if(!response.ok || result.error) throw new Error(result.message || message('unableToRefreshImage', 'Unable to refresh image'));
             const metadata = mediaMetadata(field); classic.destroyEditors(field);
             const content = one(field, ':scope > .InputfieldContent'); setHTML(content, result.html); await activateScripts(content, response);
-            restoreMediaMetadata(field, metadata, false); await classic.setup(field); field.classList.add('InputfieldStateChanged'); classic.closeDialog();
+            restoreMediaMetadata(field, metadata, false); await classic.setup(field); field.classList.add('InputfieldStateChanged'); titlesChanged(field); classic.closeDialog();
         } catch(error) {
             const status = document.createElement('p'); status.setAttribute('role', 'alert'); status.className = 'flex-upload-status'; status.textContent = errorMessage(error); field.append(status);
         }

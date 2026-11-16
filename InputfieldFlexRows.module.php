@@ -105,134 +105,53 @@ class InputfieldFlexRows extends Inputfield implements BridgeComponent {
 		return $this->definition['types'][$row->rowType()];
 	}
 
-	/** Resolve a bare property name or the core-style label format for one row type. */
-	private function labelFormat(FlexRow $row): string {
-		$format = trim($this->typeDefinition($row)['settings']['rowTitle'] ?? '');
-		if($row->definitions()->property($format)) {
-			$format = '{' . $format . '}';
-		}
-		return $format;
+	/** Supply plain values for custom @tokens. #pw-hooker */
+	public function ___rowTitleValues(FlexRow $row, FlexValue $root, FlexValue $parent): array {
+		return [];
 	}
 
-	/** Return plain display values for the known, flat properties used by the label. */
-	private function labelValues(FlexRow $row): array {
-		preg_match_all('/\{([a-zA-Z_][a-zA-Z0-9_]*(?:\|[a-zA-Z_][a-zA-Z0-9_]*)*)\}/', $this->labelFormat($row), $matches);
-		$matches[1] = explode('|', implode('|', $matches[1]));
-		$values = [];
-		foreach(array_unique($matches[1]) as $name) {
-			$property = $row->definitions()->property($name);
-			if(!$property) {
-				continue;
-			}
-			$value = $row->getUnformatted($name);
-			$options = $row->getOptions($name);
-			if($options) {
-				$labels = [];
-				foreach(is_array($value) ? $value : [$value] as $key) {
-					$labels[] = $options[$key] ?? (string) $key;
-				}
-				$value = implode(', ', $labels);
-			} else if($value instanceof Page) {
-				$value = $value->id ? $value->get('title|name') : '';
-			} else if($value instanceof PageArray) {
-				$value = implode(', ', array_map(fn($page) => $page->get('title|name'), $value->getArray()));
-			} else if($value instanceof Pagefiles) {
-				$value = implode(', ', array_map(fn($file) => $file->basename(), $value->getArray()));
-			} else if(is_array($value)) {
-				$value = implode(', ', array_filter($value, 'is_scalar'));
-			}
-			$values[$name] = $this->wire()->sanitizer->text((string) $value, ['maxLength' => 160]);
-		}
-		return $values;
+	/** Replace the title with text and optional CSS classes. Return null to use the template. #pw-hooker */
+	public function ___rowTitleParts(FlexRow $row, array $parts, FlexValue $root, FlexValue $parent): ?array {
+		return null;
 	}
 
-	/** Render a text-only format, with optional badges and no dangling edge separators. */
-	private function titleParts(string $format, array $values, int $number, string $type, string $path, bool $cleanup = true): array {
-		$parts = preg_split('/(\[[^\[\]]*\]|_\{[^{}]+\}_|\{[^{}]+\}|#n)/i', $format, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY);
-		$result = [];
-		foreach($parts as $part) {
-			if(str_starts_with($part, '[') && str_ends_with($part, ']')) {
-				$details = $this->titleParts(substr($part, 1, -1), $values, $number, $type, $path, false);
-				if(!$details) $details[] = ['text' => '', 'badge' => false, 'literal' => false];
-				foreach($details as $detail) {
-					$detail['muted'] = true;
-					$result[] = $detail;
-				}
-				continue;
+	/** Prepare one title for initial rendering or a detached AJAX preview. @internal */
+	public function titleData(FlexRow $row, int $index): array {
+		$root = $this->flexRoot;
+		$path = [];
+		[$parent] = FlexPath::resolve($root, FlexPath::rowSet($row), function($set, $id, $owner) use ($root, &$path) {
+			$ancestor = $owner->getUnformatted(substr($set, strrpos('.' . $set, '.')))->getById($id);
+			$ancestor ??= $this->admin()->row($this->flexDraft, $set, $id, $root);
+			$path[] = $ancestor->rowTypeLabel();
+			return $ancestor;
+		});
+		$nodes = FlexRowTitle::compile($this->typeDefinition($row)['settings']['rowTitle'] ?? '');
+		$values = ['@type' => $row->rowTypeLabel(), '@index' => (string) $index, '@path' => implode(' › ', $path)];
+		$sources = $custom = [];
+		$references = array_unique(iterator_to_array(FlexRowTitle::references($nodes), false));
+		$customRefs = array_filter($references, static fn($ref) => $ref[0] === '@' && !in_array($ref, FlexRowTitle::BUILT_INS, true));
+		$usesValues = $customRefs && $this->hasHook('rowTitleValues()');
+		if($usesValues) {
+			$provided = $this->rowTitleValues($row, $root, $parent);
+			foreach($customRefs as $reference) {
+				$value = $provided[$reference] ?? '';
+				if(is_scalar($value)) $custom[$reference] = (string) $value;
 			}
-			$badge = str_starts_with($part, '_{') && str_ends_with($part, '}_');
-			$token = $badge ? substr($part, 1, -1) : $part;
-			$value = $part;
-			$literal = false;
-			if(strcasecmp($token, '#n') === 0) {
-				$value = '#' . $number;
-			} else if(str_starts_with($token, '{') && str_ends_with($token, '}')) {
-				$value = '';
-				foreach(explode('|', substr($token, 1, -1)) as $name) {
-					$candidate = $name === '@type' ? $type : ($name === '@path' ? $path : ($values[$name] ?? ''));
-					if(trim($candidate) !== '') {
-						$value = $candidate;
-						break;
-					}
-				}
-			} else {
-				$literal = true;
-			}
-			$result[] = ['text' => $value, 'badge' => $badge, 'literal' => $literal];
 		}
-		if(!$cleanup) return $result;
-		// Separator-only literals need visible content on both sides. Field values
-		// themselves are never cleaned as punctuation or interpreted as new tokens.
-		foreach($result as $i => &$part) {
-			if(!$part['literal'] || !preg_match('/^[\s›|\/:;,–—-]+$/u', $part['text'])) continue;
-			$before = $after = false;
-			foreach($result as $j => $other) {
-				if(trim($other['text']) !== '' && (!$other['literal'] || !preg_match('/^[\s›|\/:;,–—-]+$/u', $other['text']))) {
-					if($j < $i) $before = true;
-					if($j > $i) $after = true;
-				}
-			}
-			if(!$before || !$after) $part['text'] = '';
+		foreach($references as $reference) {
+			if($reference[0] === '@') continue;
+			$property = FlexRowTitle::property($reference, $row, $root, $parent, $this->flexInputName ?: $this->name);
+			if($property) [$values[$reference], $sources[$reference]] = $property;
 		}
-		unset($part);
-		$separator = null;
-		$omitted = false;
-		foreach($result as $i => $part) {
-			if($part['text'] === '') {
-				if(!$part['literal']) $omitted = true;
-				continue;
-			}
-			if($part['literal'] && preg_match('/^[\s›|\/:;,–—-]+$/u', $part['text'])) {
-				if($separator !== null && $omitted) $result[$separator]['text'] = '';
-				$separator = $i;
-			} else {
-				$separator = null;
-			}
-			$omitted = false;
-		}
-		return $result;
-	}
-
-	/** Use only ancestor type labels, independent of their titles and values. */
-	private function contextPath(): string {
-		$parts = explode('.', $this->setName);
-		$owner = $this->flexRoot;
-		$labels = [];
-		while(count($parts) > 1) {
-			$set = array_shift($parts);
-			if($owner->definitions()->property($set)['kind'] === 'object') {
-				$owner = $owner->getUnformatted($set);
-				continue;
-			}
-			$id = array_shift($parts);
-			$rows = $owner->getUnformatted($set);
-			if(!$rows instanceof FlexRows) break;
-			$ancestor = $rows->getById($id);
-			if(!$ancestor) break;
-			$labels[] = $ancestor->rowTypeLabel();
-			$owner = $ancestor;
-		}
-		return implode(' › ', $labels);
+		$parts = FlexRowTitle::parts($nodes, $values + $custom);
+		$override = $this->rowTitleParts($row, $parts, $root, $parent);
+		if(is_array($override)) $override = FlexRowTitle::override($override, $index);
+		else $override = null;
+		// The index remains local even when a template contains server-provided values.
+		unset($values['@index']);
+		return ['nodes' => $nodes, 'values' => (object) $values, 'sources' => (object) $sources, 'custom' => (object) $custom,
+			'override' => $override, 'refresh' => $usesValues || $override !== null,
+			'parts' => $override === null ? $parts : ($override ?: [['text' => '#' . $index]])];
 	}
 
 	/**
@@ -259,37 +178,12 @@ class InputfieldFlexRows extends Inputfield implements BridgeComponent {
 		$loaded = !$entry || $entry['loaded'];
 		if($loaded) $inputs = $this->inputsFor($row);
 		$type = $row->rowType();
-		$typeDefinition = $this->typeDefinition($row);
-		$typeLabel = (string) ($typeDefinition['label'] ?? $type);
-		$values = $this->labelValues($row);
-		$format = $this->labelFormat($row);
-		$parts = $this->titleParts($format, $values, $number, $typeLabel, str_contains($format, '@path') ? $this->contextPath() : '');
-		if(trim(implode('', array_column($parts, 'text'))) === '') {
-			$parts = [['text' => ($format === '' ? $typeLabel . ' ' : '') . '#' . $number, 'badge' => false]];
-		}
+		$typeLabel = $row->rowTypeLabel();
+		$title = $this->titleData($row, $number);
+		$label = FlexRowTitle::markup($title['parts']);
+		$refreshTitle = $title['refresh'];
+		unset($title['parts'], $title['refresh']);
 		$entities = fn($value) => $this->wire()->sanitizer->entities((string) $value);
-		$label = '';
-		foreach($parts as $part) {
-			if($part['text'] === '') continue;
-			$classes = [];
-			if($part['badge']) $classes[] = 'flex-row-type-badge';
-			if(!empty($part['muted'])) $classes[] = 'flex-row-deemphasized';
-			$text = $entities($part['text']);
-			$label .= $classes ? '<span class="' . implode(' ', $classes) . '">' . $text . '</span>' : $text;
-		}
-		// Preserve the established default header, including its type badge.
-		if($format === '') $label = '<span class="flex-row-type-badge">' . $entities($typeLabel) . '</span> ' . $label;
-		foreach($loaded ? $inputs->getAll() : [] as $input) {
-			$name = (string) $input->_flex_property;
-			if(array_key_exists($name, $values)) {
-				$input->wrapAttr('data-flex-label-property', $name);
-				$input->wrapAttr('data-flex-label-kind', $row->definitions()->property($name)['kind']);
-				$options = $row->getOptions($name);
-				if($options) {
-					$input->wrapAttr('data-flex-label-options', json_encode((object) $options, JSON_THROW_ON_ERROR));
-				}
-			}
-		}
 		$bodyId = 'flex_row_' . $this->name . '__' . $id;
 		$buttons = $this->rowActions($row, $removed);
 		$sortLabel = $entities($this->_('Drag to reorder; use Up and Down arrow keys when focused'));
@@ -302,7 +196,7 @@ class InputfieldFlexRows extends Inputfield implements BridgeComponent {
 			$fallbackLabel = $entities($this->_('Load all items'));
 			$body = '<p class="flex-row-load-status" role="status"></p><button type="button" class="ui-button flex-row-retry" hidden>' . $retryLabel . '</button><noscript><a href="' . $entities($url) . '">' . $fallbackLabel . '</a></noscript>';
 		}
-		return '<li class="Inputfield InputfieldFieldset InputfieldNoFocus flex-row' . ($collapsed ? ' InputfieldStateCollapsed' : '') . ($row->isHidden() ? ' flex-row-hidden' : '') . ($removed ? ' flex-row-remove-pending' : '') . '" id="wrap_' . $entities($bodyId) . '" data-flex-row="' . $entities($id) . '"' . ($entry ? ' data-flex-loaded="' . ($loaded ? '1' : '0') . '"' : '') . ' data-flex-type="' . $entities($type) . '" data-flex-type-label="' . $entities($typeLabel) . '" data-flex-label-format="' . $entities($format) . '" data-flex-label-values="' . $entities(json_encode((object) $values, JSON_THROW_ON_ERROR)) . '">' .
+		return '<li class="Inputfield InputfieldFieldset InputfieldNoFocus flex-row' . ($collapsed ? ' InputfieldStateCollapsed' : '') . ($row->isHidden() ? ' flex-row-hidden' : '') . ($removed ? ' flex-row-remove-pending' : '') . '" id="wrap_' . $entities($bodyId) . '" data-flex-row="' . $entities($id) . '"' . ($entry ? ' data-flex-loaded="' . ($loaded ? '1' : '0') . '"' : '') . ' data-flex-type="' . $entities($type) . '" data-flex-type-label="' . $entities($typeLabel) . '" data-flex-title="' . $entities(json_encode($title, JSON_THROW_ON_ERROR)) . '"' . ($refreshTitle ? ' data-flex-title-refresh' : '') . '>' .
 			'<input type="hidden" class="flex-row-remove-value" name="' . $entities(FlexPath::controlName($this->flexInputName ?: $this->name, $row->address(), 'remove')) . '" value="' . ($removed ? '1' : '0') . '">' .
 			'<input type="hidden" class="flex-row-hidden-value" name="' . $entities(FlexPath::controlName($this->flexInputName ?: $this->name, $row->address(), 'hidden')) . '" value="' . ($row->isHidden() ? '1' : '0') . '">' .
 			'<div class="InputfieldHeader flex-row-header' . ($removed ? ' ui-state-error' : '') . '"><div class="flex-row-bar uk-background-primary uk-light">' .
@@ -468,6 +362,7 @@ class InputfieldFlexRows extends Inputfield implements BridgeComponent {
 		if($input->{FlexPath::controlName($this->flexInputName ?: $this->name, $this->setName, 'present')} !== '1' && $input->{FlexPath::controlName($this->flexInputName ?: $this->name, $this->setName, 'present')} !== 1) {
 			return $this;
 		}
+		$preview = $this->admin()->previewingRowTitles();
 		try {
 			$before = $this->value;
 			$rawOrder = $input->{FlexPath::controlName($this->flexInputName ?: $this->name, $this->setName, 'order')};
@@ -482,7 +377,7 @@ class InputfieldFlexRows extends Inputfield implements BridgeComponent {
 			$this->renderRows = [];
 			$this->removedRows = [];
 			foreach($ids as $id) {
-				$row = $this->admin()->row($this->flexDraft, $this->setName, $id, $this->flexBaseRoot ?: $this->flexRoot, false);
+				$row = $this->admin()->row($this->flexDraft, $this->setName, $id, $this->flexBaseRoot ?: $this->flexRoot, $preview);
 				if(!isset($this->rowInputs[$id])) {
 					$view = $this->admin()->row($this->flexDraft, $this->setName, $id, $this->flexRoot);
 					$this->inputsFor($view);
@@ -491,6 +386,7 @@ class InputfieldFlexRows extends Inputfield implements BridgeComponent {
 				$this->renderRows[$id] = $row;
 				$removed = self::removalRequested($input, $this->flexInputName ?: $this->name, $row->address());
 				if($removed) {
+					if($preview) continue;
 					$this->removedRows[$id] = true;
 					// Processing copies retain submitted inputs for undo after a failed save.
 					// Removed rows contribute no validation errors or values to persistence.
@@ -504,19 +400,20 @@ class InputfieldFlexRows extends Inputfield implements BridgeComponent {
 				if(!FlexLazy::unloaded($this->flexRoot, $this->flexDraft, $row->address())) {
 					InputfieldFlex::applyInputs($row, $form, FlexPath::inputPrefix($this->flexInputName ?: $this->name, $row->address()));
 				}
-				foreach($form->getErrors() as $error) {
+				foreach($preview ? [] : $form->getErrors() as $error) {
 					$this->error($error);
 				}
 				$rows->add($row);
 			}
 			$this->attr('value', $rows);
-			$rows->checkLimit(true);
+			if(!$preview) $rows->checkLimit(true);
 			if($before->rawArray() !== $rows->rawArray()) {
 				$this->trackChange('value', $before, $rows);
 			}
 		} catch(FlexDefinitionException $error) {
 			throw $error;
 		} catch(\Throwable $error) {
+			if($preview) throw $error;
 			// A native child can throw before it has a chance to add a normal
 			// validation message. Classify it with the same narrow boundary as
 			// root inputs so the containing editor can lock and block the save.

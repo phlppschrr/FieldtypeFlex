@@ -61,6 +61,7 @@ return [
         'types' => [
             'text' => [
                 'label' => 'Text',
+                'rowTitle' => '[#{@index}]{.flex-muted} {heading|"Untitled"}',
                 'children' => [
                     'heading' => [
                         'type' => 'text',

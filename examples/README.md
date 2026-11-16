@@ -83,7 +83,7 @@ Use the settings supported by the selected ProcessWire Inputfield, including:
 | `type => 'rows'` | Repeatable typed collection |
 | `children` | Properties inside Objects or Row types |
 | `types` | Available Row types |
-| `rowTitle` | Dynamic titles using `{heading}`, `{@type}`, `#n`, etc. |
+| `rowTitle` | Dynamic titles using `{heading}`, `{@type}`, `{@index}` and optional styled spans. |
 | `rowCollapse` | Initial collapsed/expanded state |
 | `rowLazyLoad` | Lazy-load eligible collapsed Rows |
 | `minItems`, `maxItems` | Row count limits |

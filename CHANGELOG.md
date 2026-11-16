@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Breaking:** Migrate `rowTitle` from `heading` to `{heading}`, `#n` to `#{@index}`, `_{heading}_` to `{heading}{.flex-badge}`, and `[{heading}]` to `{heading}{.flex-muted}`. Bracketed groups now support optional segments and adjacent `{.class}` attributes.
+
 ## 0.7.0 — 2026-11-11
 
 - Add tables with native editable cells, optional headers and row labels, column widths, and shared Rows actions.

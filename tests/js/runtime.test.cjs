@@ -8,11 +8,14 @@ const source = fs.readFileSync(path.join(__dirname, '../../FieldtypeFlex.js'), '
 const maintenance = fs.readFileSync(path.join(__dirname, '../../FlexMaintenance.js'), 'utf8');
 const tick = () => new Promise(resolve => setImmediate(resolve));
 const action = name => `<button type="button" class="flex-row-action" data-flex-row-action="${name}" data-flex-remove-label="Remove" data-flex-undo-label="Undo" data-flex-show-label="Show" data-flex-hide-label="Hide"><i></i></button>`;
-function row(id, text = id, extra = '') {
-    return `<li class="Inputfield flex-row" data-flex-row="${id}" data-flex-type-label="Text" data-flex-label-format="{heading}" data-flex-label-values='{"heading":"${text}"}'>
+const ref = (ref, classes) => ({choices: [{ref}], ...(classes ? {classes} : {})});
+function row(id, text = id, extra = '', title = {}) {
+    const data = {nodes: [ref('heading')], values: {heading: text}, sources: {heading: {names: [`heading_${id}`], kind: 'text'}}, custom: {}, override: null, ...title};
+    const encoded = JSON.stringify(data).replaceAll('&', '&amp;').replaceAll("'", '&#39;');
+    return `<li class="Inputfield flex-row" data-flex-row="${id}" data-flex-type-label="Text" data-flex-title='${encoded}' ${title.refresh ? 'data-flex-title-refresh' : ''}>
     <div class="flex-row-header"><button type="button" class="flex-row-toggle"></button><span class="flex-row-title"></span><button type="button" class="flex-row-sort"></button>${action('duplicate')}${action('remove')}${action('visibility')}</div>
     <input class="flex-row-remove-value" name="remove_${id}" value="0"><input class="flex-row-hidden-value" name="hidden_${id}" value="0">
-    <div class="flex-row-content"><div data-flex-label-property="heading"><input name="heading_${id}" value="${text}"></div>${extra}</div></li>`;
+    <div class="flex-row-content"><div class="Inputfield"><input name="heading_${id}" value="${text}"></div>${extra}</div></li>`;
 }
 function set(content = row('a') + row('b'), attributes = '') {
     return `<div class="flex-rows" data-flex-set="blocks" data-flex-draft="draft" data-flex-field="content" data-flex-page-url="/edit/?id=42" data-flex-type="text" ${attributes}><ul class="flex-rows-items">${content}</ul><input class="flex-rows-order" name="order"><button type="button" class="flex-row-add">Add</button><p class="flex-rows-error"></p><p class="flex-rows-status"></p></div>`;
@@ -118,12 +121,118 @@ test('multilingual table cells hide field headers and their controls', async () 
     }
     h.close();
 });
-test('nested labels retain original sibling values and parent breadcrumbs', async () => {
-    const nested = set(row('child', 'Child')).replace('data-flex-set="blocks"', 'data-flex-set="nested"');
-    const h = await harness(set(row('parent', 'Parent', nested)));
-    const child = h.document.querySelector('[data-flex-row="child"]'); child.setAttribute('data-flex-label-format', '{@path} / {heading}');
-    h.flex.test.initRows(h.document);
-    assert.equal(child.querySelector('.flex-row-title').textContent, 'Text / Child'); h.close();
+test('nested titles react to local, parent and root inputs and preserve classes', async () => {
+    const title = {
+        nodes: [ref('@path'), {text: ' / '}, ref('heading', ['custom', 'flex-strong']),
+            {children: [{text: ' — '}, ref('parent.heading'), {text: ' / '}, ref('root.heading')], classes: ['flex-muted']}],
+        values: {heading: 'Child', '@path': 'Text', 'parent.heading': 'Parent', 'root.heading': 'Root'},
+        sources: {'heading': {names: ['heading_child'], kind: 'text'},
+            'parent.heading': {names: ['heading_parent'], kind: 'text'}, 'root.heading': {names: ['heading_root'], kind: 'text'}},
+    };
+    const nested = set(row('child', 'Child', '', title)).replace('data-flex-set="blocks"', 'data-flex-set="nested"');
+    const h = await harness('<input name="heading_root" value="Root">' + set(row('parent', 'Parent', nested)));
+    const child = h.document.querySelector('[data-flex-row="child"] .flex-row-title');
+    assert.equal(child.textContent, 'Text / Child — Parent / Root');
+    function edit(name, value) {
+        const input = h.document.querySelector(`[name="${name}"]`);
+        input.value = value;
+        input.dispatchEvent(new h.window.Event('input', {bubbles: true}));
+    }
+    edit('heading_root', '');
+    assert.equal(child.textContent, 'Text / Child');
+    assert.equal(child.querySelector('.flex-muted'), null);
+    edit('heading_child', '{heading} <b>New</b>');
+    assert.equal(child.querySelector('.custom.flex-strong').textContent, '{heading} New');
+    edit('heading_parent', 'Updated parent');
+    edit('heading_root', 'New root');
+    assert.equal(child.textContent, 'Text / {heading} New — Updated parent / New root');
+    assert.equal(h.calls.length, 0);
+    h.close();
+});
+test('titles read native inline text, date parts, Page labels and per-file descriptions', async () => {
+    const widgets = `<div class="Inputfield InputfieldTinyMCE"><div class="InputfieldTinyMCEEditor InputfieldTinyMCEInline" name="rich" contenteditable></div></div>
+        <div class="Inputfield"><input type="hidden" class="InputfieldDatetimeValue" name="date" value="2026-7-4">
+            <select name="date__y"><option>2026</option></select><select name="date__m"><option>7</option></select><select name="date__d"><option>4</option></select></div>
+        <div class="Inputfield InputfieldPageListSelect"><input type="hidden" name="page" value="5"><a class="PageListSelectName">Old</a></div>
+        <div class="Inputfield InputfieldPageAutocomplete"><input type="hidden" name="pages[]" value="6"><ol>
+            <li class="delete"><span class="itemValue">5</span><span class="itemLabel">Deleted choice</span></li>
+            <li><span class="itemValue">6</span><span class="itemLabel">Visible choice</span></li></ol></div>
+        <div class="Inputfield"><label><input type="checkbox" name="pageboxes[]" value="8" checked>Checked page</label></div>
+        <div class="Inputfield InputfieldFile" id="wrap_Inputfield_image"><ul><li><div class="gridImage__overflow"><img data-original="/files/original.png"></div>
+            <input type="hidden" name="sort_image_hash" value="0"><div data-flex-metadata-property="description"><input name="file_description" value="Old"></div></li></ul></div>`;
+    const sources = {rich: {names:['rich'], kind:'text'}, date:{names:['date'], kind:'date'},
+        page:{names:['page'], kind:'page'}, pages:{names:['pages'], kind:'page'}, pageboxes:{names:['pageboxes'], kind:'page'},
+        'image.description':{names:[], kind:'media', base:'image', leaf:'description'}, 'image.basename':{names:[], kind:'media', base:'image', leaf:'basename'}};
+    const nodes = Object.keys(sources).flatMap(name => [{children: [ref(name, [name.replace('.', '-')]), {text: ' ' }]}]);
+    const h = await harness(set(row('a', '', widgets, {nodes, sources, values:{}})));
+    const {document: d, window: w} = h;
+    const update = (selector, value) => {
+        const node = d.querySelector(selector);
+        if(value !== undefined) {
+            if(node.hasAttribute('contenteditable')) node.innerHTML = value;
+            else node.value = value;
+        }
+        node.dispatchEvent(new w.Event('input', {bubbles: true}));
+    };
+    update('[name="rich"]', '<strong>Rich text</strong>');
+    update('[name="date__d"]');
+    update('[name="page"]');
+    d.querySelector('.PageListSelectName').textContent = 'Selected after change';
+    update('[name="pages[]"]');
+    update('[name="pageboxes[]"]');
+    update('[name="file_description"]', 'Custom image description');
+    await tick();
+    assert.equal(d.querySelector('.flex-row-title').textContent, 'Rich text 2026-07-04 Selected after change Visible choice Checked page Custom image description original.png');
+    assert.equal(d.querySelector('.flex-row-title .image-description').textContent, 'Custom image description');
+    assert.equal(d.querySelector('.flex-row-title strong'), null);
+    assert.equal(h.calls.length, 0);
+    h.close();
+});
+test('hook title previews debounce edits, retain local indexes and discard stale responses', async () => {
+    const pending = [];
+    const content = row('a', 'Alpha', '', {
+        nodes: [{text: '#'}, ref('@index'), {text: ' '}, ref('heading'), {children: [{text: ' · '}, ref('@details')], classes: ['flex-muted']}],
+        custom: {'@details': 'Initial'}, refresh: true,
+    }) + row('b', 'Beta');
+    const h = await harness(set(content + '<li data-flex-external-dependencies="enabled"></li>'), {response: () => new Promise(resolve => pending.push(resolve))});
+    const {document: d, window: w} = h;
+    const external = d.createElement('div');
+    external.innerHTML = '<input type="checkbox" name="enabled" value="1" checked><input name="unrelated" value="secret">';
+    d.querySelector('.InputfieldFlex').before(external);
+    const header = d.querySelector('[data-flex-row="a"] .flex-row-title');
+    const input = d.querySelector('[name="heading_a"]');
+    const edit = value => { input.value = value; input.dispatchEvent(new w.Event('input', {bubbles: true})); };
+    const wait = () => new Promise(resolve => setTimeout(resolve, 270));
+    const respond = (index, label) => pending[index]({ok: true, json: async () => ({error: false, titles: {'blocks.a': {custom: {'@details': label}, override: null}}})});
+    assert.equal(header.textContent, '#1 Alpha · Initial');
+    edit('first'); edit('second');
+    await wait();
+    assert.equal(h.calls.length, 1);
+    assert.equal(h.calls[0].body.get('heading_a'), 'second');
+    assert.equal(h.calls[0].body.get('enabled'), '1');
+    assert.equal(h.calls[0].body.has('unrelated'), false);
+    assert.deepEqual(JSON.parse(h.calls[0].body.get('flex_title_rows')), [['blocks', 'a']]);
+    edit('Newest');
+    respond(0, 'Stale');
+    await tick();
+    assert.equal(header.textContent, '#1 Newest · Initial');
+    d.querySelector('[data-flex-row="a"] .flex-row-sort').dispatchEvent(new w.KeyboardEvent('keydown', {key: 'End', bubbles: true}));
+    assert.equal(header.textContent, '#2 Newest · Initial');
+    await wait();
+    assert.equal(h.calls.length, 2);
+    respond(1, '<em>Safe</em>');
+    await tick();
+    assert.equal(header.querySelector('.flex-muted').textContent, ' · <em>Safe</em>');
+    assert.equal(header.querySelector('em'), null);
+    await wait();
+    assert.equal(h.calls.length, 2);
+    const enabled = d.querySelector('[name="enabled"]');
+    enabled.checked = false;
+    enabled.dispatchEvent(new w.Event('change', {bubbles: true}));
+    await wait();
+    assert.equal(h.calls.length, 3);
+    assert.equal(h.calls[2].body.has('enabled'), false);
+    h.close();
 });
 test('successful controls match AJAX serialization, empty selections and disabled fieldsets', async () => {
     const h = await harness(); const {document: d, flex} = h;

@@ -55,7 +55,7 @@ namespace FieldtypeFlex {
                 row.dispatchEvent(new Event(open ? 'opened' : 'closed', {bubbles: true}));
             }
         },
-        events(reloaded: (scope: HTMLElement) => void, toggled: (row: HTMLElement, open: boolean) => void, tinyChanged: (scope: HTMLElement) => void, mediaRefresh: (draft: string, path: string) => void): void {
+        events(reloaded: (scope: HTMLElement) => void, toggled: (row: HTMLElement, open: boolean) => void, changed: (scope: HTMLElement) => void, mediaRefresh: (draft: string, path: string) => void): void {
             document.addEventListener('reloaded', event => {
                 if(event.target instanceof HTMLElement && event.target.matches('.Inputfield')) reloaded(event.target);
             });
@@ -63,7 +63,7 @@ namespace FieldtypeFlex {
                 if(event.target instanceof HTMLElement && event.target.matches('.flex-row')) toggled(event.target, name === 'opened');
             }));
             document.addEventListener('change', event => {
-                if(event.target instanceof HTMLElement && event.target.matches('.InputfieldTinyMCE[data-flex-label-property]')) tinyChanged(event.target);
+                if(event.target instanceof HTMLElement && event.target.matches('.Inputfield')) changed(event.target);
             });
             // Upstream custom events are jQuery-only. Bind when a legacy child loads the stack.
             let bound = false;
@@ -77,8 +77,8 @@ namespace FieldtypeFlex {
                 $(document).on('opened.flexRows closed.flexRows', '.flex-row', function(event) {
                     if(!event.originalEvent && event.target === this) toggled(event.target, event.type === 'opened');
                 });
-                $(document).on('change.flexRows', '.InputfieldTinyMCE[data-flex-label-property]', function(event) {
-                    if(!event.originalEvent && event.target === this) tinyChanged(event.target);
+                $(document).on('change.flexRows', '.Inputfield', function(event) {
+                    if(!event.originalEvent && event.target instanceof HTMLElement && event.target.closest('.Inputfield') === this) changed(event.target);
                 });
                 $(document).on('flexMediaRefresh.flexRows', (_event, draft, path) => {
                     if(typeof draft === 'string' && typeof path === 'string') mediaRefresh(draft, path);

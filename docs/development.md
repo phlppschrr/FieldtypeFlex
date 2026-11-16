@@ -41,7 +41,7 @@ repeated roundtrips, target renames, subdirectory changes, hidden/nested Rows,
 languages, File/Image metadata, selective saves, stale conflicts and rollback.
 Run suites sequentially against one fixture; their owned baseline field name is shared.
 
-The admin suite executes the production PHP and JavaScript Row-title parsers
+The admin suite executes the PHP Row title compiler and both production evaluators
 against `tests/fixtures/row-titles.json`, including final renderer/fallback cases.
 Node.js must be available on PATH (already present in DDEV and used by CI's JS
 syntax checks). Run the JS cases alone with `node tests/js/row-title-parts.cjs`;

@@ -195,8 +195,9 @@
     flex: 1;
     min-width: 0;
 }
-.flex-row-type-badge {
-    flex: none;
+.flex-row-title .flex-badge {
+    display: inline-block;
+    vertical-align: middle;
     max-width: 12rem;
     overflow: hidden;
     padding: .125rem .4rem;
@@ -207,13 +208,10 @@
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.flex-row-deemphasized {
-    opacity: .7;
-}
-.flex-row-title > .flex-row-type-badge {
-    display: inline-block;
-    vertical-align: middle;
-}
+.flex-row-title .flex-muted { opacity: .7; }
+.flex-row-title .flex-strong { font-weight: 700; }
+.flex-row-title .flex-small { font-size: .8em; }
+.flex-row-title .flex-mono { font-family: ui-monospace, monospace; }
 .flex-row-title {
     flex: 1;
     min-width: 0;
