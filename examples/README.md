@@ -29,12 +29,20 @@ return [
             ],
         ],
     ],
+    'prices' => [
+        'type' => 'table',
+        'columns' => [
+            'service' => ['type' => 'text'],
+            'price' => ['type' => 'float', 'width' => '7rem'],
+        ],
+    ],
 ];
 ```
 
 - **Native inputs** use regular ProcessWire Inputfield types and settings.
 - **Objects** group fixed properties under a separate value scope.
 - **Rows** define repeatable collections with named types and their own properties.
+- **Tables** let editors add rows with the same fixed set of columns.
 - **Fieldsets** group inputs visually without introducing a value scope.
 
 ## Configuration cheat sheet
@@ -75,18 +83,25 @@ Use the settings supported by the selected ProcessWire Inputfield, including:
 
 `inheritField` requires a matching Inputfield type. Local settings override inherited settings; stored values are not copied.
 
-### Objects and Rows
+### Objects, Rows and Tables
 
 | Setting | Purpose |
 | --- | --- |
 | `type => 'object'` | Fixed nested properties |
 | `type => 'rows'` | Repeatable typed collection |
+| `type => 'table'` | Table with a fixed set of columns and repeatable rows |
 | `children` | Properties inside Objects or Row types |
 | `types` | Available Row types |
 | `rowTitle` | Dynamic titles using `{heading}`, `{@type}`, `#n`, etc. |
 | `rowCollapse` | Initial collapsed/expanded state |
 | `rowLazyLoad` | Lazy-load eligible collapsed Rows |
-| `minItems`, `maxItems` | Row count limits |
+| `columns` | Named table columns in display order, each with its own Inputfield definition |
+| `editableHeaders => true` | Let editors change the table headings, which start with the column labels |
+| `rowLabels => true` | Add an editable label at the start of each table row |
+| `width` | Optional column width in positive `rem` or `px`, e.g. `'7rem'` |
+| `minItems`, `maxItems` | Row count limits for Rows and Tables |
+
+See the [Tables API](../API.md#tables) for supported Inputfields.
 
 ### Conditional inputs
 
