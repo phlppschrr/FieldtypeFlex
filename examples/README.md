@@ -114,7 +114,7 @@ Use the settings supported by the selected ProcessWire Inputfield, including:
 | [Choices](05-choices.php) | Select, Radios, Checkboxes, TextTags | None |
 | [References and media](06-references-media.php) | Page references, files, images, custom metadata | Adapt Page selectors; TinyMCE |
 | [Typed and nested Rows](07-rows.php) | Mixed blocks, nesting, dependencies, Row titles | TinyMCE, LanguageSupport modules |
-| [Tables](08-tables.php) | Fixed and editable headings, row labels and column widths | None |
+| [Tables](08-tables.php) | Fixed and editable headings, row labels, column widths and a PDF field in a detail row | None |
 | [Advanced settings](09-advanced.php) | Fieldsets, Objects, inheritance, renames | Adapt source Fields; TinyMCE, LanguageSupport modules |
 
 Some examples need existing Fields or installed modules. Check the comments in each file.

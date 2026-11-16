@@ -212,7 +212,9 @@ Formatting, languages, change tracking and renames apply recursively. Names and 
 
 Read `$page->content->prices->rows` (`FlexRows`) or add a row with `$table->rows->addRow('row', ['service' => 'Advice'])`. Column labels are fixed by default. `editableHeaders => true` exposes `$table->headers->service` with the column label as its initial value. `rowLabels => true` adds the reserved `$row->row_label` property. Disabling either option or removing a column retains its stored values. Table `useLanguages` applies to generated headings and row labels. Set it on each data column separately as needed.
 
-Cells support Text, Email, URL, Integer, Float, plain Textarea, Checkbox, Toggle, Select, Radios, Checkboxes, SelectMultiple, AsmSelect, TextTags and Datetime. Page references support Select, SelectMultiple, AsmSelect, PageAutocomplete, Checkboxes, Radios, TextTags, PageListSelect and PageListSelectMultiple. File, Image, PageList and TinyMCE editors open in a full-width row. TinyMCE supports iframe and inline modes. [Examples with fixed and editable headings](examples/08-tables.php).
+Edit Text, Email, URL, Integer, Float, plain Textarea, Checkbox, Toggle, Select, Radios, Checkboxes, SelectMultiple, AsmSelect, TextTags and Datetime directly in cells. Page references can use Select, SelectMultiple, AsmSelect, PageAutocomplete, Checkboxes, Radios or TextTags in cells.
+
+File, Image, PageListSelect, PageListSelectMultiple and TinyMCE (iframe or inline) open in a full-width detail row below the selected row. See the [table examples](examples/08-tables.php).
 
 ## Rows
 
