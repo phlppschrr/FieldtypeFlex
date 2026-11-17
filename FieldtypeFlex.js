@@ -543,6 +543,7 @@ var FieldtypeFlex;
     const titleRequests = new WeakMap();
     const disabledBeforeRemoval = new WeakMap();
     const busyTrees = new WeakSet();
+    const rowMenus = '.flex-table-more, .flex-row-clipboard, .flex-row-add-menu';
     const tableEditors = new WeakMap();
     const initializedDetailEditors = new WeakSet();
     function rowState(row) {
@@ -650,22 +651,24 @@ var FieldtypeFlex;
     }
     function updateActions(set) {
         const count = activeRows(set).length, min = Number(FieldtypeFlex.attr(set, 'data-flex-min')) || 0, max = Number(FieldtypeFlex.attr(set, 'data-flex-max')) || 0, busy = treeBusy(set);
-        const typeControl = set.querySelector(':scope > .flex-row-type-control');
-        if (typeControl && set.hasAttribute('data-flex-type')) {
-            typeControl.hidden = count > 0;
-            if (typeControl.hidden)
-                FieldtypeFlex.one(typeControl, 'select').selectedIndex = 0;
+        const atLimit = max > 0 && count >= max;
+        const menu = set.querySelector(':scope > .flex-row-add-menu');
+        if (menu) {
+            menu.hidden = count > 0;
+            if (menu.hidden)
+                menu.open = false;
+            FieldtypeFlex.one(set, ':scope > .flex-row-add').hidden = !menu.hidden;
         }
-        FieldtypeFlex.all(set, ':scope > .flex-row-add').forEach(button => button.disabled = busy || (max > 0 && count >= max));
+        FieldtypeFlex.all(set, ':scope > .flex-row-add, :scope > .flex-row-type, :scope > .flex-row-add-menu button').forEach(control => control.disabled = busy || atLimit);
         rows(set).forEach(row => {
             const header = FieldtypeFlex.one(row, ':scope > .flex-row-header');
             const toggle = header.querySelector('.flex-row-toggle');
             const removed = row.matches('.flex-row-remove-pending');
             if (toggle)
                 toggle.disabled = busy;
-            FieldtypeFlex.one(header, '[data-flex-row-action="duplicate"]').disabled = busy || (max > 0 && count >= max);
-            FieldtypeFlex.all(header, '.flex-clipboard-actions > button').forEach(button => {
-                button.disabled = busy || removed || FieldtypeFlex.attr(button, 'data-flex-row-action') !== 'clipboard-copy' && max > 0 && count >= max;
+            FieldtypeFlex.one(header, '[data-flex-row-action="duplicate"]').disabled = busy || atLimit;
+            FieldtypeFlex.all(header, '[data-flex-row-action="clipboard-copy"], [data-flex-row-action^="paste-"]').forEach(button => {
+                button.disabled = busy || removed || FieldtypeFlex.attr(button, 'data-flex-row-action') !== 'clipboard-copy' && atLimit;
             });
             FieldtypeFlex.one(header, '[data-flex-row-action="remove"]').disabled = busy || (!removed && count <= min);
             FieldtypeFlex.one(row, ':scope > .flex-row-header .flex-row-sort, :scope > .flex-table-sort > .flex-row-sort').disabled = busy || removed || count < 2;
@@ -1120,17 +1123,50 @@ var FieldtypeFlex;
         if (!treeBusy(button))
             closeTableEditor(FieldtypeFlex.closest(button, '.flex-table'), true);
     });
+    function positionTableMenu() {
+        const menu = document.querySelector('.flex-table-more[open]');
+        if (!menu)
+            return;
+        const summary = FieldtypeFlex.one(menu, 'summary');
+        const panel = FieldtypeFlex.one(menu, '.flex-table-secondary');
+        if (typeof panel.showPopover === 'function' && !panel.matches(':popover-open')) {
+            panel.setAttribute('popover', 'manual');
+            panel.showPopover();
+        }
+        const anchor = summary.getBoundingClientRect();
+        const margin = 8;
+        const width = document.documentElement.clientWidth || window.innerWidth;
+        const height = document.documentElement.clientHeight || window.innerHeight;
+        const rtl = getComputedStyle(summary).direction === 'rtl';
+        const left = rtl ? anchor.right : anchor.left - panel.offsetWidth;
+        panel.style.left = Math.max(margin, Math.min(left, width - panel.offsetWidth - margin)) + 'px';
+        panel.style.top = Math.max(margin, Math.min(anchor.top, height - panel.offsetHeight - margin)) + 'px';
+    }
+    document.addEventListener('toggle', event => {
+        const menu = event.target;
+        if (!(menu instanceof HTMLDetailsElement) || !menu.matches('.flex-table-more'))
+            return;
+        if (menu.open)
+            positionTableMenu();
+        else {
+            const panel = FieldtypeFlex.one(menu, '.flex-table-secondary');
+            if (typeof panel.hidePopover === 'function' && panel.matches(':popover-open'))
+                panel.hidePopover();
+        }
+    }, true);
+    document.addEventListener('scroll', positionTableMenu, { capture: true, passive: true });
+    window.addEventListener('resize', positionTableMenu);
     for (const name of ['click', 'focusin'])
         document.addEventListener(name, event => {
             const target = event.target;
             if (!(target instanceof Node))
                 return;
-            FieldtypeFlex.all(document, ':is(.flex-table-more, .flex-row-clipboard)[open]').forEach(details => {
+            FieldtypeFlex.all(document, `:is(${rowMenus})[open]`).forEach(details => {
                 if (!details.contains(target))
                     details.open = false;
             });
         }, true);
-    FieldtypeFlex.delegate('keydown', ':is(.flex-table-more, .flex-row-clipboard)[open]', (event, details) => {
+    FieldtypeFlex.delegate('keydown', `:is(${rowMenus})[open]`, (event, details) => {
         if (event.key !== 'Escape')
             return;
         event.preventDefault();
@@ -1227,22 +1263,31 @@ var FieldtypeFlex;
         else
             FieldtypeFlex.classic.confirm(message('removeAll', 'Remove all items?'), apply);
     });
-    FieldtypeFlex.delegate('click', '.flex-row-add, .flex-row-action', (event, button) => { void rowAction(event, button); });
-    async function rowAction(event, button) {
+    FieldtypeFlex.delegate('click', '.flex-row-add, .flex-row-action', (event, control) => { void rowAction(event, control); });
+    FieldtypeFlex.delegate('change', '.flex-row-type', (event, control) => { void rowAction(event, control); });
+    async function rowAction(event, control) {
         event.preventDefault();
         event.stopPropagation();
-        const set = FieldtypeFlex.closest(button, '.flex-rows'), row = button.closest('.flex-row');
-        if (button.disabled || treeBusy(set))
+        const set = FieldtypeFlex.closest(control, '.flex-rows');
+        const ancestor = control.closest('.flex-row');
+        const row = ancestor?.closest('.flex-rows') === set ? ancestor : null;
+        if (control.disabled || treeBusy(set))
             return;
-        const more = button.closest('.flex-table-more, .flex-row-clipboard');
+        const more = control.closest(rowMenus);
         if (more) {
             more.open = false;
             FieldtypeFlex.one(more, 'summary').focus();
         }
-        const type = set.querySelector(':scope > .flex-row-type-control .flex-row-type')?.value;
-        let action = FieldtypeFlex.attr(button, 'data-flex-row-action');
-        if (button.matches('.flex-row-add'))
+        let type = FieldtypeFlex.attr(set, 'data-flex-type'), action = FieldtypeFlex.attr(control, 'data-flex-row-action');
+        if (control instanceof HTMLSelectElement) {
+            type = control.value;
+            if (!type)
+                return;
+            control.selectedIndex = 0;
             action = type === '@clipboard' ? 'paste-end' : 'add';
+        }
+        else if (control.matches('.flex-row-add'))
+            action = 'add';
         const pasting = action.startsWith('paste-');
         const error = FieldtypeFlex.one(set, ':scope > .flex-rows-error');
         const status = FieldtypeFlex.one(set, ':scope > .flex-rows-status');
@@ -1282,11 +1327,14 @@ var FieldtypeFlex;
             const hidden = !row.matches('.flex-row-hidden');
             row.classList.toggle('flex-row-hidden', hidden);
             FieldtypeFlex.change(FieldtypeFlex.one(row, ':scope > .flex-row-hidden-value, :scope > .flex-table-actions .flex-row-hidden-value'), hidden ? '1' : '0');
-            const label = FieldtypeFlex.attr(button, hidden ? 'data-flex-show-label' : 'data-flex-hide-label');
-            button.setAttribute('aria-pressed', String(hidden));
-            button.setAttribute('aria-label', label);
-            button.title = label;
-            const icon = FieldtypeFlex.one(button, 'i');
+            const label = FieldtypeFlex.attr(control, hidden ? 'data-flex-show-label' : 'data-flex-hide-label');
+            control.setAttribute('aria-pressed', String(hidden));
+            control.setAttribute('aria-label', label);
+            control.title = label;
+            const text = control.querySelector('.flex-row-action-label');
+            if (text)
+                text.textContent = label;
+            const icon = FieldtypeFlex.one(control, 'i');
             icon.classList.toggle('fa-eye', !hidden);
             icon.classList.toggle('fa-eye-slash', hidden);
             return;
@@ -1300,7 +1348,7 @@ var FieldtypeFlex;
             rowState(row).removalReady = true;
             order(set);
             queueTitleRefresh(FieldtypeFlex.closest(set, '.InputfieldFlex'));
-            button.focus();
+            control.focus();
             return;
         }
         if (row)
@@ -1320,7 +1368,7 @@ var FieldtypeFlex;
             });
             data.set('flex_orders', JSON.stringify(orders));
             if (action === 'add')
-                data.set('flex_type', type || FieldtypeFlex.attr(set, 'data-flex-type'));
+                data.set('flex_type', type);
             else if (action === 'duplicate' && row)
                 appendSource(data, row);
             if (pasting) {
@@ -1353,12 +1401,8 @@ var FieldtypeFlex;
             queueTitleRefresh(FieldtypeFlex.closest(set, '.InputfieldFlex'));
             focus = fresh.querySelector(':scope > .flex-row-header .flex-row-toggle, :scope > .flex-table-actions summary') || undefined;
             FieldtypeFlex.classic.added(fresh);
-            if (pasting) {
+            if (pasting)
                 status.textContent = [message('rowPasted', 'Row pasted.'), result.warning].filter(Boolean).join(' ');
-                const selection = set.querySelector(':scope > .flex-row-type-control .flex-row-type');
-                if (selection?.value === '@clipboard')
-                    selection.selectedIndex = 0;
-            }
         }
         catch (problem) {
             error.textContent = pasting ? clipboardError(problem) : errorMessage(problem);

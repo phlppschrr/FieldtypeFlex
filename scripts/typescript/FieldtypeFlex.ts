@@ -7,6 +7,7 @@ namespace FieldtypeFlex {
     const titleRequests = new WeakMap<HTMLElement, {revision: number; timer?: number; queued: boolean}>();
     const disabledBeforeRemoval = new WeakMap<Control, boolean>();
     const busyTrees = new WeakSet<HTMLElement>();
+    const rowMenus = '.flex-table-more, .flex-row-clipboard, .flex-row-add-menu';
     const tableEditors = new WeakMap<HTMLElement, {button: HTMLButtonElement; editor: HTMLElement; detail: HTMLTableRowElement}>();
     const initializedDetailEditors = new WeakSet<HTMLElement>();
     function rowState(row: HTMLElement): RowState {
@@ -89,20 +90,22 @@ namespace FieldtypeFlex {
     }
     function updateActions(set: HTMLElement): void {
         const count = activeRows(set).length, min = Number(attr(set, 'data-flex-min')) || 0, max = Number(attr(set, 'data-flex-max')) || 0, busy = treeBusy(set);
-        const typeControl = set.querySelector<HTMLElement>(':scope > .flex-row-type-control');
-        if(typeControl && set.hasAttribute('data-flex-type')) {
-            typeControl.hidden = count > 0;
-            if(typeControl.hidden) one<HTMLSelectElement>(typeControl, 'select').selectedIndex = 0;
+        const atLimit = max > 0 && count >= max;
+        const menu = set.querySelector<HTMLDetailsElement>(':scope > .flex-row-add-menu');
+        if(menu) {
+            menu.hidden = count > 0;
+            if(menu.hidden) menu.open = false;
+            one<HTMLButtonElement>(set, ':scope > .flex-row-add').hidden = !menu.hidden;
         }
-        all<HTMLButtonElement>(set, ':scope > .flex-row-add').forEach(button => button.disabled = busy || (max > 0 && count >= max));
+        all<HTMLButtonElement | HTMLSelectElement>(set, ':scope > .flex-row-add, :scope > .flex-row-type, :scope > .flex-row-add-menu button').forEach(control => control.disabled = busy || atLimit);
         rows(set).forEach(row => {
             const header = one(row, ':scope > .flex-row-header');
             const toggle = header.querySelector<HTMLButtonElement>('.flex-row-toggle');
             const removed = row.matches('.flex-row-remove-pending');
             if(toggle) toggle.disabled = busy;
-            one<HTMLButtonElement>(header, '[data-flex-row-action="duplicate"]').disabled = busy || (max > 0 && count >= max);
-            all<HTMLButtonElement>(header, '.flex-clipboard-actions > button').forEach(button => {
-                button.disabled = busy || removed || attr(button, 'data-flex-row-action') !== 'clipboard-copy' && max > 0 && count >= max;
+            one<HTMLButtonElement>(header, '[data-flex-row-action="duplicate"]').disabled = busy || atLimit;
+            all<HTMLButtonElement>(header, '[data-flex-row-action="clipboard-copy"], [data-flex-row-action^="paste-"]').forEach(button => {
+                button.disabled = busy || removed || attr(button, 'data-flex-row-action') !== 'clipboard-copy' && atLimit;
             });
             one<HTMLButtonElement>(header, '[data-flex-row-action="remove"]').disabled = busy || (!removed && count <= min);
             one<HTMLButtonElement>(row, ':scope > .flex-row-header .flex-row-sort, :scope > .flex-table-sort > .flex-row-sort').disabled = busy || removed || count < 2;
@@ -455,14 +458,43 @@ namespace FieldtypeFlex {
     delegate('click', '.flex-table-editor-close', (_event, button) => {
         if(!treeBusy(button)) closeTableEditor(closest(button, '.flex-table'), true);
     });
+    function positionTableMenu(): void {
+        const menu = document.querySelector<HTMLDetailsElement>('.flex-table-more[open]');
+        if(!menu) return;
+        const summary = one(menu, 'summary');
+        const panel = one(menu, '.flex-table-secondary');
+        if(typeof panel.showPopover === 'function' && !panel.matches(':popover-open')) {
+            panel.setAttribute('popover', 'manual');
+            panel.showPopover();
+        }
+        const anchor = summary.getBoundingClientRect();
+        const margin = 8;
+        const width = document.documentElement.clientWidth || window.innerWidth;
+        const height = document.documentElement.clientHeight || window.innerHeight;
+        const rtl = getComputedStyle(summary).direction === 'rtl';
+        const left = rtl ? anchor.right : anchor.left - panel.offsetWidth;
+        panel.style.left = Math.max(margin, Math.min(left, width - panel.offsetWidth - margin)) + 'px';
+        panel.style.top = Math.max(margin, Math.min(anchor.top, height - panel.offsetHeight - margin)) + 'px';
+    }
+    document.addEventListener('toggle', event => {
+        const menu = event.target;
+        if(!(menu instanceof HTMLDetailsElement) || !menu.matches('.flex-table-more')) return;
+        if(menu.open) positionTableMenu();
+        else {
+            const panel = one(menu, '.flex-table-secondary');
+            if(typeof panel.hidePopover === 'function' && panel.matches(':popover-open')) panel.hidePopover();
+        }
+    }, true);
+    document.addEventListener('scroll', positionTableMenu, {capture: true, passive: true});
+    window.addEventListener('resize', positionTableMenu);
     for(const name of ['click', 'focusin']) document.addEventListener(name, event => {
         const target = event.target;
         if(!(target instanceof Node)) return;
-        all<HTMLDetailsElement>(document, ':is(.flex-table-more, .flex-row-clipboard)[open]').forEach(details => {
+        all<HTMLDetailsElement>(document, `:is(${rowMenus})[open]`).forEach(details => {
             if(!details.contains(target)) details.open = false;
         });
     }, true);
-    delegate('keydown', ':is(.flex-table-more, .flex-row-clipboard)[open]', (event, details) => {
+    delegate('keydown', `:is(${rowMenus})[open]`, (event, details) => {
         if(event.key !== 'Escape') return;
         event.preventDefault(); event.stopPropagation();
         (details as HTMLDetailsElement).open = false;
@@ -525,19 +557,26 @@ namespace FieldtypeFlex {
         const apply = () => rows(set).forEach(row => { if(row.matches('.flex-row-remove-pending') === undo) one<HTMLButtonElement>(row, ':scope > .flex-row-header [data-flex-row-action="remove"]').click(); });
         if(undo) apply(); else classic.confirm(message('removeAll', 'Remove all items?'), apply);
     });
-    delegate('click', '.flex-row-add, .flex-row-action', (event, button) => { void rowAction(event, button as HTMLButtonElement); });
-    async function rowAction(event: MouseEvent, button: HTMLButtonElement): Promise<void> {
+    delegate('click', '.flex-row-add, .flex-row-action', (event, control) => { void rowAction(event, control as HTMLButtonElement); });
+    delegate('change', '.flex-row-type', (event, control) => { void rowAction(event, control as HTMLSelectElement); });
+    async function rowAction(event: Event, control: HTMLButtonElement | HTMLSelectElement): Promise<void> {
         event.preventDefault(); event.stopPropagation();
-        const set = closest(button, '.flex-rows'), row = button.closest<HTMLElement>('.flex-row');
-        if(button.disabled || treeBusy(set)) return;
-        const more = button.closest<HTMLDetailsElement>('.flex-table-more, .flex-row-clipboard');
+        const set = closest(control, '.flex-rows');
+        const ancestor = control.closest<HTMLElement>('.flex-row');
+        const row = ancestor?.closest('.flex-rows') === set ? ancestor : null;
+        if(control.disabled || treeBusy(set)) return;
+        const more = control.closest<HTMLDetailsElement>(rowMenus);
         if(more) {
             more.open = false;
             one(more, 'summary').focus();
         }
-        const type = set.querySelector<HTMLSelectElement>(':scope > .flex-row-type-control .flex-row-type')?.value;
-        let action = attr(button, 'data-flex-row-action');
-        if(button.matches('.flex-row-add')) action = type === '@clipboard' ? 'paste-end' : 'add';
+        let type = attr(set, 'data-flex-type'), action = attr(control, 'data-flex-row-action');
+        if(control instanceof HTMLSelectElement) {
+            type = control.value;
+            if(!type) return;
+            control.selectedIndex = 0;
+            action = type === '@clipboard' ? 'paste-end' : 'add';
+        } else if(control.matches('.flex-row-add')) action = 'add';
         const pasting = action.startsWith('paste-');
         const error = one(set, ':scope > .flex-rows-error');
         const status = one(set, ':scope > .flex-rows-status');
@@ -569,13 +608,15 @@ namespace FieldtypeFlex {
         if(action === 'visibility' && row) {
             const hidden = !row.matches('.flex-row-hidden'); row.classList.toggle('flex-row-hidden', hidden);
             change(one<HTMLInputElement>(row, ':scope > .flex-row-hidden-value, :scope > .flex-table-actions .flex-row-hidden-value'), hidden ? '1' : '0');
-            const label = attr(button, hidden ? 'data-flex-show-label' : 'data-flex-hide-label');
-            button.setAttribute('aria-pressed', String(hidden)); button.setAttribute('aria-label', label); button.title = label;
-            const icon = one(button, 'i'); icon.classList.toggle('fa-eye', !hidden); icon.classList.toggle('fa-eye-slash', hidden); return;
+            const label = attr(control, hidden ? 'data-flex-show-label' : 'data-flex-hide-label');
+            control.setAttribute('aria-pressed', String(hidden)); control.setAttribute('aria-label', label); control.title = label;
+            const text = control.querySelector('.flex-row-action-label');
+            if(text) text.textContent = label;
+            const icon = one(control, 'i'); icon.classList.toggle('fa-eye', !hidden); icon.classList.toggle('fa-eye-slash', hidden); return;
         }
         if(action === 'remove' && row) {
             const removed = !row.matches('.flex-row-remove-pending'); window.tinymce?.triggerSave(); if(removed) openRow(row, false);
-            removalState(row, removed); rowState(row).removalReady = true; order(set); queueTitleRefresh(closest(set, '.InputfieldFlex')); button.focus(); return;
+            removalState(row, removed); rowState(row).removalReady = true; order(set); queueTitleRefresh(closest(set, '.InputfieldFlex')); control.focus(); return;
         }
         if(row) closeRowEditors(row);
         if(action === 'duplicate' && row && attr(row, 'data-flex-loaded') === '0' && !(await loadRow(row))) return;
@@ -590,7 +631,7 @@ namespace FieldtypeFlex {
                 if(!current.closest('.flex-row-remove-pending')) orders[attr(current, 'data-flex-set')] = activeRows(current).map(row => attr(row, 'data-flex-row'));
             });
             data.set('flex_orders', JSON.stringify(orders));
-            if(action === 'add') data.set('flex_type', type || attr(set, 'data-flex-type'));
+            if(action === 'add') data.set('flex_type', type);
             else if(action === 'duplicate' && row) appendSource(data, row);
             if(pasting) {
                 data.set('flex_clipboard', clipboard);
@@ -610,11 +651,7 @@ namespace FieldtypeFlex {
             queueTitleRefresh(closest(set, '.InputfieldFlex'));
             focus = fresh.querySelector<HTMLElement>(':scope > .flex-row-header .flex-row-toggle, :scope > .flex-table-actions summary') || undefined;
             classic.added(fresh);
-            if(pasting) {
-                status.textContent = [message('rowPasted', 'Row pasted.'), result.warning].filter(Boolean).join(' ');
-                const selection = set.querySelector<HTMLSelectElement>(':scope > .flex-row-type-control .flex-row-type');
-                if(selection?.value === '@clipboard') selection.selectedIndex = 0;
-            }
+            if(pasting) status.textContent = [message('rowPasted', 'Row pasted.'), result.warning].filter(Boolean).join(' ');
         } catch(problem) { error.textContent = pasting ? clipboardError(problem) : errorMessage(problem); }
         finally { setTreeBusy(set, false); }
         focus?.focus();

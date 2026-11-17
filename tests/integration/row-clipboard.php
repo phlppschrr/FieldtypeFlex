@@ -109,7 +109,10 @@ $render = static function(Page $owner, Field $field): array {
 [, $html, $post, $draft] = $render($page, $source);
 [$targetEditor, $targetHtml, $targetPost, $targetDraft] = $render($second, $target);
 $assert(str_contains($html, 'fa-copy') && str_contains($html, 'fa-clipboard'), 'clipboard and Duplicate use separate action icons');
-$assert(str_contains($targetHtml, '<option value="@clipboard">Paste from Clipboard</option>'), 'a single-type empty collection includes the paste action');
+$assert(str_contains($html, '<select class="flex-row-type InputfieldSetWidth" aria-label="New item type"><option value="" selected disabled>Add item</option>'), 'multiple types show a standalone picker with a neutral option');
+$assert(str_contains($html, '<option value="@clipboard">Paste from Clipboard</option>'), 'the type picker offers the paste action');
+$assert(str_contains($targetHtml, '<details class="flex-row-add-menu">') && str_contains($targetHtml, 'data-flex-row-action="paste-end">Paste from Clipboard</button>'), 'an empty single-type collection offers paste in the add menu');
+$assert(!str_contains($targetHtml, '<select class="flex-row-type'), 'single-type collections omit the type picker');
 
 $ajax = static function(Page $owner, Field $field, string $token, array $data, bool $csrf = true) use ($wire, $type): array {
 	$server = $_SERVER;

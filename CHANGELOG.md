@@ -7,6 +7,11 @@
 - Resolve pasted Page references across installations by exact page path, parent path and template name.
 - Copy rows through the browser clipboard and paste them into compatible collections, with warnings for values or files that could not be imported.
 
+### Changed
+
+- Add rows directly from the type picker and use a button for collections with a single type.
+- Show an icon and a text label for every action in the table row menu.
+
 ## 1.0.0-beta.1 - 2026-11-16
 
 ### Added

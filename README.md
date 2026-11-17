@@ -136,10 +136,12 @@ $withGalleries = $pages->find('content.blocks.gallery.count>1');
 
 Use the clipboard menu in a row header or the **More row actions** menu in a table.
 **Copy Row to Clipboard** includes the current editor values. **Paste Row Above**
-and **Paste Row Below** insert a new row. To append a row, select **Paste from
-Clipboard** in the Add item type picker and click **Add item**. Paste uses the
-target collection's row types, settings and defaults. Save the page to commit
-the inserted rows and media.
+and **Paste Row Below** insert a new row. Select a type in **Add item** to
+append it immediately, or choose **Paste from Clipboard** to append a copied
+row. Collections with one type use an **Add item** button, which offers both
+actions when the collection is empty. Paste uses the target collection's row
+types, settings and defaults. Save the page to commit the inserted rows and
+media.
 
 Clipboard access needs HTTPS and browser permission. When copying across
 installations, language values match by language name. Page references resolve

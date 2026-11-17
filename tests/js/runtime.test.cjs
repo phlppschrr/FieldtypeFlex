@@ -21,7 +21,7 @@ function set(content = row('a') + row('b'), attributes = '') {
     return `<div class="flex-rows" data-flex-set="blocks" data-flex-draft="draft" data-flex-field="content" data-flex-page-url="/edit/?id=42" data-flex-type="text" ${attributes}><ul class="flex-rows-items">${content}</ul><input class="flex-rows-order" name="order"><button type="button" class="flex-row-add">Add</button><p class="flex-rows-error"></p><p class="flex-rows-status"></p></div>`;
 }
 function tableRow(id, text = id) {
-    return `<tr class="flex-row" data-flex-row="${id}" data-flex-type="row"><td class="flex-table-sort"><button type="button" class="flex-row-sort">Sort</button></td><td class="flex-table-cell"><ul class="Inputfields"><li class="Inputfield"><input name="cell_${id}" value="${text}" required></li></ul></td><td class="flex-row-header flex-table-actions"><details class="flex-table-more"><summary>More</summary><button type="button" data-flex-row-action="duplicate" class="flex-row-action">Duplicate</button><button type="button" data-flex-row-action="visibility" class="flex-row-action" data-flex-hide-label="Hide" data-flex-show-label="Show"><i></i></button></details><button type="button" data-flex-row-action="remove" class="flex-row-action" data-flex-remove-label="Remove" data-flex-undo-label="Undo">Remove</button><span class="flex-row-transport"><input class="flex-row-remove-value" value="0"><input class="flex-row-hidden-value" value="0"></span></td></tr>`;
+    return `<tr class="flex-row" data-flex-row="${id}" data-flex-type="row"><td class="flex-table-sort"><button type="button" class="flex-row-sort">Sort</button></td><td class="flex-table-cell"><ul class="Inputfields"><li class="Inputfield"><input name="cell_${id}" value="${text}" required></li></ul></td><td class="flex-row-header flex-table-actions"><details class="flex-table-more"><summary>More</summary><div class="flex-table-secondary flex-clipboard-actions"><button type="button" data-flex-row-action="duplicate" class="flex-row-action"><i class="fa-copy"></i><span class="flex-row-action-label">Duplicate</span></button><button type="button" data-flex-row-action="visibility" class="flex-row-action" data-flex-hide-label="Hide" data-flex-show-label="Show"><i class="fa-eye"></i><span class="flex-row-action-label">Hide</span></button></div></details><button type="button" data-flex-row-action="remove" class="flex-row-action" data-flex-remove-label="Remove" data-flex-undo-label="Undo">Remove</button><span class="flex-row-transport"><input class="flex-row-remove-value" value="0"><input class="flex-row-hidden-value" value="0"></span></td></tr>`;
 }
 function tableSet(content = tableRow('a') + tableRow('b')) {
     return set('').replace('class="flex-rows"', 'class="flex-rows flex-table"').replace('<ul class="flex-rows-items"></ul>', `<div class="flex-table-scroll"><table><thead><tr><th>Sort</th><th>Cell</th><th>Actions</th></tr></thead><tbody class="flex-rows-items">${content}</tbody></table></div>`);
@@ -59,8 +59,15 @@ test('table rows share keyboard order, visibility, removal and undo without card
     assert.equal(more.open, false);
     trigger.click();
     assert.equal(more.open, true);
-    a.querySelector('[data-flex-row-action="visibility"]').click(); assert.equal(a.querySelector('.flex-row-hidden-value').value, '1');
+    const visibility = a.querySelector('[data-flex-row-action="visibility"]');
+    visibility.click();
+    assert.equal(a.querySelector('.flex-row-hidden-value').value, '1');
+    assert.equal(visibility.querySelector('.flex-row-action-label').textContent, 'Show');
+    assert(visibility.querySelector('i').classList.contains('fa-eye-slash'));
     assert.equal(more.open, false); assert.equal(d.activeElement, trigger);
+    visibility.click();
+    assert.equal(visibility.querySelector('.flex-row-action-label').textContent, 'Hide');
+    assert(visibility.querySelector('i').classList.contains('fa-eye'));
     trigger.click();
     more.querySelector('button').dispatchEvent(new h.window.KeyboardEvent('keydown', {key:'Escape', bubbles:true}));
     assert.equal(more.open, false); assert.equal(d.activeElement, trigger);
@@ -73,6 +80,24 @@ test('table rows share keyboard order, visibility, removal and undo without card
     assert.equal(a.querySelectorAll(':scope > input').length, 0, 'transport remains valid table markup');
     a.querySelector('[data-flex-row-action="remove"]').click(); assert(!a.querySelector('[name="cell_a"]').disabled);
     assert.equal(handle.disabled, false); h.close();
+});
+test('the table action overlay stays anchored and inside the viewport', async () => {
+    const h = await harness(tableSet(tableRow('a')));
+    const menu = h.document.querySelector('.flex-table-more');
+    const trigger = menu.querySelector('summary');
+    const panel = menu.querySelector('.flex-table-secondary');
+    let position = {left: 400, right: 430, top: 300};
+    trigger.getBoundingClientRect = () => position;
+    Object.defineProperties(panel, {offsetWidth: {value: 200}, offsetHeight: {value: 160}});
+    trigger.click();
+    menu.dispatchEvent(new h.window.Event('toggle'));
+    assert.equal(panel.style.left, '200px');
+    assert.equal(panel.style.top, '300px');
+    position = {left: 80, right: 110, top: h.window.innerHeight - 40};
+    menu.dispatchEvent(new h.window.Event('scroll'));
+    assert.equal(panel.style.left, '8px');
+    assert.equal(panel.style.top, h.window.innerHeight - 168 + 'px');
+    h.close();
 });
 test('AJAX table duplication includes unsaved cells and inserts a native table row', async () => {
     const h = await harness(tableSet(tableRow('a')), {response:async () => ({ok:true,json:async () => ({html:tableRow('copy','Copied')})})});
@@ -464,10 +489,25 @@ test('classic lifecycle translates jQuery collections into Elements and handles 
     assert.equal(received.length,1); assert.equal(received[0][1],child); assert.equal(received[0][2],true);
     last[3].handler({},'draft','images'); last[3].handler({}); assert.deepEqual(received[1],['media','draft','images']); assert.equal(received.length,2); h.close();
 });
-test('native add uses the selected type and appends a new Row', async () => {
-    const markup=set(row('a')).replace('data-flex-type="text"', '').replace('<button type="button" class="flex-row-add">', '<div class="flex-row-type-control"><select class="flex-row-type"><option value="image" selected>Image</option></select></div><button type="button" class="flex-row-add">');
-    const h=await harness(markup); h.document.querySelector('.flex-row-add').click(); await tick();
-    assert.equal(h.calls[0].body.get('flex_type'),'image'); assert.equal(h.calls[0].body.get('flex_action'),'add'); assert.equal(h.document.querySelector('.flex-rows-order').value,'a,new'); h.close();
+test('the standalone type picker adds the same type repeatedly and observes the row limit', async () => {
+    let sequence = 0;
+    const h = await harness(pickerSet(row('a'), 'data-flex-max="3"'), {
+        response: async () => ({ok: true, json: async () => ({html: row('added-' + ++sequence)})}),
+    });
+    const picker = h.document.querySelector('.flex-row-type');
+    assert.equal(picker.value, '');
+    assert.equal(h.document.querySelector('.flex-row-add'), null);
+    for(const _ of [1, 2]) {
+        picker.value = 'image';
+        picker.dispatchEvent(new h.window.Event('change', {bubbles: true}));
+        assert.equal(picker.value, '');
+        assert.equal(picker.disabled, true);
+        await tick();
+    }
+    assert.deepEqual(h.calls.map(call => [call.body.get('flex_action'), call.body.get('flex_type')]), [['add', 'image'], ['add', 'image']]);
+    assert.equal(h.document.querySelector('.flex-rows-order').value, 'a,added-1,added-2');
+    assert.equal(picker.disabled, true);
+    h.close();
 });
 function nativeAdmin(w, calls) {
     w.Bridge = {
@@ -565,14 +605,18 @@ function clipboardMenu() {
         ['clipboard-copy', 'Copy Row to Clipboard'], ['paste-above', 'Paste Row Above'], ['paste-below', 'Paste Row Below']
     ].map(([action, text]) => `<button type="button" class="flex-row-action" data-flex-row-action="${action}">${text}</button>`).join('')}</div></details>`;
 }
-function clipboardSet(content, attributes = '') {
-    return set(content, attributes).replace('<button type="button" class="flex-row-add">',
-        '<label class="flex-row-type-control"><select class="flex-row-type"><option value="text">Text</option><option value="@clipboard">Paste from Clipboard</option></select></label><button type="button" class="flex-row-add">');
+function pickerSet(content, attributes = '') {
+    return set(content, attributes).replace(' data-flex-type="text"', '').replace('<button type="button" class="flex-row-add">Add</button>',
+        '<select class="flex-row-type"><option value="" selected disabled>Add item</option><option value="text">Text</option><option value="image">Image</option><option value="@clipboard">Paste from Clipboard</option></select>');
+}
+function singleTypeSet(content = '', attributes = '') {
+    return set(content, attributes).replace('<button type="button" class="flex-row-add">Add</button>',
+        '<button type="button" class="flex-row-add">Add</button><details class="flex-row-add-menu"><summary>Add</summary><div class="flex-clipboard-actions"><button type="button" class="flex-row-action" data-flex-row-action="add">Add</button><button type="button" class="flex-row-action" data-flex-row-action="paste-end">Paste from Clipboard</button></div></details>');
 }
 test('clipboard write begins in the click before collecting live form values via AJAX', async () => {
     const events = [];
     const clipboard = '{"format":"fieldtype-flex-row","version":1}';
-    const h = await harness(clipboardSet(row('a').replace('</span>', '</span>' + clipboardMenu())), {
+    const h = await harness(pickerSet(row('a').replace('</span>', '</span>' + clipboardMenu())), {
         before(w) {
             w.ClipboardItem = class { constructor(data) { this.data = data; } };
             Object.defineProperty(w.navigator, 'clipboard', {value: {
@@ -615,7 +659,7 @@ test('clipboard write begins in the click before collecting live form values via
 test('clipboard read places a fresh row above or below an anchor and preserves unsaved target inputs', async () => {
     const events = [];
     const clipboard = '{"format":"fieldtype-flex-row","version":1}';
-    const h = await harness(clipboardSet(row('a') + row('b').replace('</span>', '</span>' + clipboardMenu())), {
+    const h = await harness(pickerSet(row('a') + row('b').replace('</span>', '</span>' + clipboardMenu())), {
         before(w) {
             Object.defineProperty(w.navigator, 'clipboard', {value: {readText() { events.push('read'); return Promise.resolve(clipboard); }}});
         },
@@ -642,7 +686,7 @@ test('clipboard read places a fresh row above or below an anchor and preserves u
     h.close();
 });
 test('the empty nested type picker pastes to its own set and reports clipboard permission failures', async () => {
-    const nested = clipboardSet('').replace('data-flex-set="blocks"', 'data-flex-set="blocks.a.children"');
+    const nested = pickerSet('').replace('data-flex-set="blocks"', 'data-flex-set="blocks.a.children"');
     let deny = true;
     const h = await harness(set(row('a', 'Parent', nested)), {
         before(w) {
@@ -653,21 +697,60 @@ test('the empty nested type picker pastes to its own set and reports clipboard p
         response: async () => ({ok: true, json: async () => ({html: row('child')})}),
     });
     const d = h.document, childSet = d.querySelector('[data-flex-set="blocks.a.children"]');
-    const picker = childSet.querySelector('select'), add = childSet.querySelector('.flex-row-add');
-    assert.equal(picker.parentElement.hidden, false);
-    picker.value = '@clipboard';
-    add.click();
+    const picker = childSet.querySelector('select');
+    const paste = () => {
+        picker.value = '@clipboard';
+        picker.dispatchEvent(new h.window.Event('change', {bubbles: true}));
+    };
+    assert.equal(picker.value, '');
+    paste();
     await tick();
     assert.match(childSet.querySelector('.flex-rows-error').textContent, /Clipboard access was denied/);
     assert.equal(h.calls.length, 0);
+    assert.equal(picker.value, '');
     deny = false;
-    add.click();
+    paste();
     await tick();
     assert.equal(h.calls[0].body.get('flex_set'), 'blocks.a.children');
     assert.equal(h.calls[0].body.get('flex_action'), 'paste-end');
     assert.equal(h.calls[0].body.get('flex_source'), null);
     assert.equal(childSet.querySelector('.flex-rows-order').value, 'child');
     assert.equal(childSet.querySelector('.flex-rows-error').textContent, '');
-    assert.equal(picker.parentElement.hidden, true);
+    assert.equal(picker.value, '');
+    assert.equal(picker.disabled, false);
+    h.close();
+});
+
+test('a single-type collection switches between its empty menu and the direct add button', async () => {
+    let sequence = 0;
+    const h = await harness(singleTypeSet(), {
+        before(w) {
+            Object.defineProperty(w.navigator, 'clipboard', {value: {readText: async () => 'JSON'}});
+        },
+        response: async () => ({ok: true, json: async () => ({html: row('added-' + ++sequence)})}),
+    });
+    const d = h.document;
+    const add = d.querySelector('.flex-row-add');
+    const menu = d.querySelector('.flex-row-add-menu');
+    assert.equal(d.querySelector('select'), null);
+    assert.equal(add.hidden, true);
+    assert.equal(menu.hidden, false);
+    menu.querySelector('summary').click();
+    menu.querySelector('[data-flex-row-action="paste-end"]').click();
+    await tick();
+    assert.equal(h.calls[0].body.get('flex_action'), 'paste-end');
+    assert.equal(h.calls[0].body.get('flex_source'), null);
+    assert.equal(add.hidden, false);
+    assert.equal(menu.hidden, true);
+    assert.equal(menu.open, false);
+    d.querySelector('[data-flex-row-action="remove"]').click();
+    assert.equal(add.hidden, true);
+    assert.equal(menu.hidden, false);
+    menu.querySelector('summary').click();
+    menu.querySelector('[data-flex-row-action="add"]').click();
+    await tick();
+    add.click();
+    await tick();
+    assert.deepEqual(h.calls.slice(1).map(call => [call.body.get('flex_action'), call.body.get('flex_type')]), [['add', 'text'], ['add', 'text']]);
     h.close();
 });

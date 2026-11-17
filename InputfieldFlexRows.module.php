@@ -225,15 +225,18 @@ class InputfieldFlexRows extends Inputfield implements BridgeComponent {
 			$state = '';
 			if($action === 'remove') $state = ' aria-pressed="' . ($removed ? 'true' : 'false') . '" data-flex-remove-label="' . $entities($removeLabel) . '" data-flex-undo-label="' . $entities($undoLabel) . '"';
 			if($action === 'visibility') $state = ' aria-pressed="' . ($row->isHidden() ? 'true' : 'false') . '" data-flex-hide-label="' . $entities($hideLabel) . '" data-flex-show-label="' . $entities($showLabel) . '"';
-			$buttons[$action] = '<button type="button" class="flex-row-action" data-flex-row-action="' . $action . '" title="' . $entities($actionLabel) . '" aria-label="' . $entities($actionLabel) . '"' . $state . '><i class="fa fa-fw fa-' . $icon . '" aria-hidden="true"></i></button>';
+			$text = $table && $action !== 'remove' ? '<span class="flex-row-action-label">' . $entities($actionLabel) . '</span>' : '';
+			$buttons[$action] = '<button type="button" class="flex-row-action" data-flex-row-action="' . $action . '" title="' . $entities($actionLabel) . '" aria-label="' . $entities($actionLabel) . '"' . $state . '><i class="fa fa-fw fa-' . $icon . '" aria-hidden="true"></i>' . $text . '</button>';
 		}
 		$clipboard = '';
 		foreach([
-			'clipboard-copy' => $this->_('Copy Row to Clipboard'),
-			'paste-above' => $this->_('Paste Row Above'),
-			'paste-below' => $this->_('Paste Row Below'),
-		] as $action => $text) {
-			$clipboard .= '<button type="button" class="flex-row-action" data-flex-row-action="' . $action . '">' . $entities($text) . '</button>';
+			'clipboard-copy' => ['clipboard', $this->_('Copy Row to Clipboard')],
+			'paste-above' => ['arrow-up', $this->_('Paste Row Above')],
+			'paste-below' => ['arrow-down', $this->_('Paste Row Below')],
+		] as $action => [$icon, $text]) {
+			$label = $entities($text);
+			if($table) $label = '<i class="fa fa-fw fa-' . $icon . '" aria-hidden="true"></i><span class="flex-row-action-label">' . $label . '</span>';
+			$clipboard .= '<button type="button" class="flex-row-action" data-flex-row-action="' . $action . '">' . $label . '</button>';
 		}
 		if(!$table) {
 			$label = $entities($this->_('Row clipboard'));
@@ -243,7 +246,7 @@ class InputfieldFlexRows extends Inputfield implements BridgeComponent {
 		}
 		$label = $entities($this->_('More row actions'));
 		return '<details class="flex-table-more"><summary title="' . $label . '"><i class="fa fa-fw fa-ellipsis-h" aria-hidden="true"></i><span class="flex-table-sr">' . $label . '</span></summary>' .
-			'<div class="flex-table-secondary">' . $buttons['duplicate'] . $buttons['visibility'] . '<div class="flex-clipboard-actions">' . $clipboard . '</div></div></details>' . $buttons['remove'];
+			'<div class="flex-table-secondary flex-clipboard-actions">' . $buttons['duplicate'] . $buttons['visibility'] . $clipboard . '</div></details>' . $buttons['remove'];
 	}
 
 	/** Render a native cell without changing global markup or its processing parent. */
@@ -368,28 +371,33 @@ class InputfieldFlexRows extends Inputfield implements BridgeComponent {
 		}
 		$entities = fn($v) => $this->wire()->sanitizer->entities((string) $v);
 		$settings = $this->definition['settings'];
-		$addLabel = $settings['addRowLabel'] ?? $this->_('Add item');
+		$addLabel = $entities($settings['addRowLabel'] ?? $this->_('Add item'));
+		$pasteLabel = $entities($this->_('Paste from Clipboard'));
 		$types = $this->definition['types'];
 		$attributes = '';
-		$singleType = count($types) === 1;
-		if($singleType) {
-			$attributes .= ' data-flex-type="' . $entities((string) array_key_first($types)) . '"';
+		if(count($types) === 1) {
+			$attributes = ' data-flex-type="' . $entities((string) array_key_first($types)) . '"';
+			$empty = !count($rows);
+			$addText = '<i class="fa fa-plus-circle" aria-hidden="true"></i> ' . $addLabel;
+			$addControl = '<button type="button" class="ui-button flex-row-add"' . ($empty ? ' hidden' : '') . '>' . $addText . '</button>' .
+				'<details class="flex-row-add-menu"' . ($empty ? '' : ' hidden') . '>' .
+				'<summary class="ui-button">' . $addText . ' <i class="fa fa-angle-down" aria-hidden="true"></i></summary>' .
+				'<div class="flex-clipboard-actions"><button type="button" class="flex-row-action" data-flex-row-action="add">' . $addLabel . '</button>' .
+				'<button type="button" class="flex-row-action" data-flex-row-action="paste-end">' . $pasteLabel . '</button></div></details>';
+		} else {
+			$options = '<option value="" selected disabled>' . $addLabel . '</option>';
+			foreach($types as $type => $typeDefinition) {
+				$options .= '<option value="' . $entities((string) $type) . '">' . $entities((string) ($typeDefinition['label'] ?? $type)) . '</option>';
+			}
+			$options .= '<option value="@clipboard">' . $pasteLabel . '</option>';
+			$addControl = '<select class="flex-row-type InputfieldSetWidth" aria-label="' . $entities($this->_('New item type')) . '">' . $options . '</select>';
 		}
-		$typeId = 'Inputfield_' . $this->name . '__type';
-		$options = '';
-		foreach($types as $type => $typeDefinition) {
-			$options .= '<option value="' . $entities((string) $type) . '">' . $entities((string) ($typeDefinition['label'] ?? $type)) . '</option>';
-		}
-		$options .= '<option value="@clipboard">' . $entities($this->_('Paste from Clipboard')) . '</option>';
-		$typeLabel = $entities($this->_('New item type'));
-		// Native column-width rules must not stretch this compact select to 100%.
-		$typeControl = '<label class="flex-row-type-control" for="' . $entities($typeId) . '"' . ($singleType && count($rows) ? ' hidden' : '') . '><span>' . $typeLabel . '</span><select class="flex-row-type InputfieldSetWidth" id="' . $entities($typeId) . '" aria-label="' . $typeLabel . '">' . $options . '</select></label>';
 		$table = isset($settings['_flexTable']);
 		$items = $table ? $this->renderTable($html) : '<ul class="Inputfields flex-rows-items">' . $html . '</ul>';
 		return '<div class="flex-rows' . ($table ? ' flex-table' : '') . '" data-flex-set="' . $entities($this->setName) . '" data-flex-draft="' . $entities($this->flexDraft) . '" data-flex-page-url="' . $entities($this->flexRoot->ownerPage()->editUrl()) . '" data-flex-field="' . $entities($this->flexRoot->ownerField()->name) . '" data-flex-min="' . (int) ($settings['minItems'] ?? 0) . '" data-flex-max="' . (int) ($settings['maxItems'] ?? 0) . '"' . $attributes . '>' .
 			'<input type="hidden" name="' . $entities(FlexPath::controlName($this->flexInputName ?: $this->name, $this->setName, 'present')) . '" value="1">' .
 			'<input type="hidden" class="flex-rows-order" name="' . $entities(FlexPath::controlName($this->flexInputName ?: $this->name, $this->setName, 'order')) . '" value="' . implode(',', $ids) . '">' .
-			$items . $typeControl . '<button type="button" class="ui-button flex-row-add"><i class="fa fa-plus-circle" aria-hidden="true"></i> ' . $entities($addLabel) . '</button>' .
+			$items . $addControl .
 			'<p class="flex-rows-status uk-hidden-visually" role="status" aria-live="polite"></p><p class="flex-rows-error" role="alert"></p></div>';
 	}
 

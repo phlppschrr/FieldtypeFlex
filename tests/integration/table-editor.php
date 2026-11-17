@@ -30,6 +30,15 @@ $postFrom = static function(string $html): array {
 	return $post;
 };
 $editor = $makeEditor(); $html = $editor->render(); $post = $postFrom($html);
+foreach([
+	'copy' => 'Duplicate',
+	'eye' => 'Hide item',
+	'clipboard' => 'Copy Row to Clipboard',
+	'arrow-up' => 'Paste Row Above',
+	'arrow-down' => 'Paste Row Below',
+] as $icon => $label) {
+	$assert(str_contains($html, 'fa-' . $icon . '" aria-hidden="true"></i><span class="flex-row-action-label">' . $label . '</span>'), "table menu shows the icon and label for $label");
+}
 $ap = FlexPath::inputPrefix($name, $a->address()); $bp = FlexPath::inputPrefix($name, $b->address());
 $hp = FlexPath::inputPrefix($name, 'grid.headers');
 $post[$hp . 'text'] = ''; $post[$hp . 'enabled'] = '0';
