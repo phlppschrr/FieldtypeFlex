@@ -135,7 +135,7 @@ test('table detail editor keeps thumbnails and unsaved form values through focus
 test('iframe table editors keep pending text and clear the native loaded marker on close', async () => {
     const content = tableRow('a').replace('<ul class="Inputfields">', `<button class="flex-table-preview" type="button" data-flex-preview="richtext" hidden><span></span></button>
         <div class="flex-table-editor"><div class="InputfieldTinyMCE"><div class="InputfieldTinyMCEPlaceholder"></div>
-        <textarea class="InputfieldTinyMCEEditor InputfieldTinyMCENormal" name="rich_a">&lt;p&gt;Initial&lt;/p&gt;</textarea></div>
+        <textarea id="rich_a" class="InputfieldTinyMCEEditor InputfieldTinyMCENormal" name="rich_a">&lt;p&gt;Initial&lt;/p&gt;</textarea></div>
         <button class="flex-table-editor-close" type="button" hidden>Done</button><ul class="Inputfields">`).replace('</li></ul></td>', '</li></ul></div></td>');
     const h = await harness(tableSet(content));
     const {document: d, flex} = h;
@@ -144,19 +144,26 @@ test('iframe table editors keep pending text and clear the native loaded marker 
     const close = d.querySelector('.flex-table-editor-close');
     let setups = 0;
     flex.classic.setup = async () => { setups++; input.classList.add('InputfieldTinyMCELoaded'); };
-    flex.classic.saveReady = () => { input.value = '<p>Pending &amp; saved</p>'; };
-    flex.classic.destroyEditors = () => { assert.equal(input.value, '<p>Pending &amp; saved</p>'); };
+    const tiny = {initialized: false, save() {
+        assert(this.initialized);
+        input.value = '<p>Pending &amp; saved</p>';
+    }};
+    h.window.tinymce = {get: id => id === input.id ? tiny : undefined};
     assert.equal(preview.textContent, 'Initial');
     preview.click();
     assert.equal(d.querySelector('.InputfieldTinyMCEPlaceholder'), null);
     assert.equal(input.closest('tr').className, 'flex-table-detail');
+    close.click();
+    assert.equal(preview.textContent, 'Initial');
+    preview.click();
+    tiny.initialized = true;
     close.click();
     assert.equal(preview.textContent, 'Pending & saved');
     assert(input.classList.contains('InputfieldTinyMCELazy'));
     assert(!input.classList.contains('InputfieldTinyMCELoaded'));
     assert.equal(new h.window.FormData(input.form).get('rich_a'), '<p>Pending &amp; saved</p>');
     preview.click();
-    assert.equal(setups, 2);
+    assert.equal(setups, 3);
     h.close();
 });
 test('clicking a table cell focuses its visible enabled field and leaves tabs and actions alone', async () => {
@@ -185,6 +192,62 @@ test('clicking a table cell focuses its visible enabled field and leaves tabs an
     active.disabled = true;
     tab.focus(); cell.click();
     assert.equal(d.activeElement, tab);
+    const preview = d.createElement('button');
+    preview.type = 'button';
+    preview.className = 'flex-table-preview';
+    preview.setAttribute('aria-expanded', 'false');
+    preview.innerHTML = '<span>Preview</span>';
+    const editor = d.createElement('div');
+    editor.className = 'flex-table-editor';
+    editor.hidden = true;
+    editor.innerHTML = '<button class="flex-table-editor-close" hidden>Done</button>';
+    cell.replaceChildren(preview, editor);
+    preview.getClientRects = () => [{width: 100, height: 30}];
+    cell.click();
+    assert.equal(preview.getAttribute('aria-expanded'), 'true');
+    assert.equal(d.activeElement, editor);
+    preview.focus();
+    cell.click();
+    assert.equal(preview.getAttribute('aria-expanded'), 'true');
+    assert.equal(d.activeElement, editor);
+    preview.click();
+    assert.equal(preview.getAttribute('aria-expanded'), 'false');
+    h.close();
+});
+test('a table tag dropdown escapes the scroll container until Selectize closes it', async () => {
+    const h = await harness(tableSet(tableRow('a')));
+    const d = h.document;
+    d.querySelector('table').classList.add('flex-table-grid');
+    const scroll = d.querySelector('.flex-table-scroll');
+    const source = d.querySelector('[name="cell_a"]');
+    source.hidden = true;
+    source.insertAdjacentHTML('afterend', '<div class="selectize-control"><input><div class="selectize-dropdown"></div></div>');
+    const wrapper = source.nextElementSibling;
+    const input = wrapper.querySelector('input');
+    const menu = wrapper.querySelector('.selectize-dropdown');
+    const callbacks = new Map();
+    const settings = {dropdownParent: null};
+    let positions = 0;
+    const widget = {settings, isOpen: true, $dropdown: [menu],
+        on(event, callback) { callbacks.set(event, callback); },
+        positionDropdown() { positions++; assert.equal(settings.dropdownParent, 'body'); },
+        close() { this.isOpen = false; callbacks.get('dropdown_close')(); },
+    };
+    source.selectize = widget;
+    input.focus();
+    assert.equal(menu.parentElement, d.body);
+    assert.equal(positions, 1);
+    scroll.dispatchEvent(new h.window.Event('scroll'));
+    assert.equal(widget.isOpen, false);
+    assert.equal(menu.parentElement, wrapper);
+    assert.equal(settings.dropdownParent, null);
+    input.blur(); input.focus();
+    widget.isOpen = true;
+    callbacks.get('dropdown_open')();
+    assert.equal(menu.parentElement, d.body);
+    assert.equal(positions, 2);
+    widget.close();
+    assert.equal(menu.parentElement, wrapper);
     h.close();
 });
 test('multilingual table cells hide field headers and their controls', async () => {

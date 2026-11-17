@@ -113,6 +113,7 @@ var FieldtypeFlex;
 // Admin integration: Bridge public APIs, with the classic ProcessWire stack as fallback.
 var FieldtypeFlex;
 (function (FieldtypeFlex) {
+    const tableTagMenus = new WeakSet();
     FieldtypeFlex.classic = {
         async setup(scope) {
             const theme = FieldtypeFlex.bridgeTheme();
@@ -203,6 +204,32 @@ var FieldtypeFlex;
         saveReady(scope) {
             if (window.jQuery)
                 FieldtypeFlex.all(scope, '.InputfieldTinyMCE').forEach(input => window.jQuery(input).trigger('saveReady'));
+        },
+        tableTags(input) {
+            const wrapper = input.closest('.selectize-control');
+            const scroll = wrapper?.closest('.flex-table-scroll');
+            const source = wrapper?.previousElementSibling;
+            const widget = source?.selectize;
+            if (!wrapper || !scroll || !widget || widget.settings.dropdownParent || tableTagMenus.has(widget))
+                return;
+            const menu = widget.$dropdown[0];
+            const close = () => widget.close();
+            const open = () => {
+                // The table must stay horizontally scrollable. Use Selectize's body positioning while its menu is open.
+                widget.settings.dropdownParent = 'body';
+                document.body.append(menu);
+                widget.positionDropdown();
+                scroll.addEventListener('scroll', close, { passive: true });
+            };
+            widget.on('dropdown_open', open);
+            widget.on('dropdown_close', () => {
+                scroll.removeEventListener('scroll', close);
+                widget.settings.dropdownParent = null;
+                wrapper.append(menu);
+            });
+            tableTagMenus.add(widget);
+            if (widget.isOpen)
+                open();
         },
         destroyEditors(scope) {
             if (window.jQuery)
@@ -863,14 +890,23 @@ var FieldtypeFlex;
             return;
         const { button, editor, detail } = active;
         const richText = button.matches('[data-flex-preview="richtext"]');
-        if (richText)
+        const iframes = richText ? FieldtypeFlex.all(editor, '.InputfieldTinyMCENormal') : [];
+        if (iframes.length) {
+            // Leaving a cell can happen before TinyMCE has initialized its iframe.
+            iframes.forEach(input => {
+                const tiny = window.tinymce?.get(input.id);
+                if (tiny?.initialized)
+                    tiny.save();
+            });
+        }
+        else if (richText)
             FieldtypeFlex.classic.saveReady(editor);
         updateTablePreview(button, editor);
         editor.hidden = true;
-        if (richText && editor.querySelector('.InputfieldTinyMCENormal')) {
+        if (iframes.length) {
             // TinyMCE iframes are recreated after moving back into the detail row.
             FieldtypeFlex.classic.destroyEditors(editor);
-            FieldtypeFlex.all(editor, '.InputfieldTinyMCENormal').forEach(input => {
+            iframes.forEach(input => {
                 input.classList.remove('InputfieldTinyMCELoaded');
                 input.classList.add('InputfieldTinyMCELazy');
             });
@@ -1059,16 +1095,29 @@ var FieldtypeFlex;
         event.preventDefault();
         tableColumnResizer(handle)?.(event.key === 'ArrowRight' ? 16 : -16);
     });
-    FieldtypeFlex.delegate('click', '.flex-table-grid > tbody > tr > .flex-table-cell, .flex-table-grid > thead > tr > th', (event, cell) => {
+    const tableInputs = '.flex-table-grid > tbody > .flex-row > .flex-table-cell, .flex-table-grid > thead > tr > th';
+    const cellControl = 'input:not([type="hidden"]), textarea, select, button, [contenteditable]:not([contenteditable="false"])';
+    function visibleControl(control) {
+        return !control.matches(':disabled') && !!control.getClientRects().length && getComputedStyle(control).visibility === 'visible';
+    }
+    FieldtypeFlex.delegate('click', tableInputs, (event, cell) => {
         const target = event.target;
         if (event.defaultPrevented || !(target instanceof Element) || target.closest('td, th') !== cell)
             return;
-        if (target.closest('input, textarea, select, button, a, label, [contenteditable], [role="button"], [role="tab"]'))
+        if (target.closest('input, textarea, select, button, a, label, summary, [contenteditable], [role="button"], [role="tab"]'))
             return;
         if (window.getSelection()?.type === 'Range')
             return;
-        const control = FieldtypeFlex.all(cell, '.flex-table-input > .InputfieldContent :is(input:not([type="hidden"]), textarea, select):not(:disabled)')
-            .find(input => input.getClientRects().length && getComputedStyle(input).visibility === 'visible');
+        const preview = cell.querySelector(':scope > .flex-table-preview');
+        if (preview && visibleControl(preview)) {
+            const active = tableEditors.get(FieldtypeFlex.closest(cell, '.flex-table'));
+            if (active?.button === preview)
+                active.editor.focus({ preventScroll: true });
+            else
+                openTableEditor(preview);
+            return;
+        }
+        const control = FieldtypeFlex.all(cell, `:scope > .Inputfields > .flex-table-input > .InputfieldContent :is(${cellControl})`).find(visibleControl);
         control?.focus({ preventScroll: true });
     });
     FieldtypeFlex.delegate('click', '.flex-row-retry', (event, button) => { event.preventDefault(); void loadRow(FieldtypeFlex.closest(button, '.flex-row')); });
@@ -1090,7 +1139,9 @@ var FieldtypeFlex;
             closeAfterPointer = undefined;
         }, true);
     }
-    FieldtypeFlex.delegate('focusin', tableCells, (_event, cell) => {
+    FieldtypeFlex.delegate('focusin', tableCells, (event, cell) => {
+        if (event.target instanceof HTMLInputElement)
+            FieldtypeFlex.classic.tableTags(event.target);
         const set = FieldtypeFlex.closest(cell, '.flex-table');
         const active = tableEditors.get(set);
         if (!active || active.button.parentElement === cell)

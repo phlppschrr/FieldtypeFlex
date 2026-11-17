@@ -2,6 +2,12 @@
 
 ## WIP
 
+### Fixed
+
+- Add padding to table choices, activate native fields and detail editors from empty cell space, and keep tag suggestions visible beyond the table edge.
+- Let TinyMCE previews use the available row height for multiple lines.
+- Avoid a TinyMCE error when leaving a table cell before its editor is ready.
+
 ## 1.0.0-beta.1 - 2026-11-16
 
 ### Added
