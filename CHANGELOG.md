@@ -2,6 +2,8 @@
 
 ## WIP
 
+## 1.0.0-beta.2 - 2026-11-17
+
 ### Added
 
 - Paste from the collection header, and select, copy, hide or mark multiple rows for removal.
@@ -17,6 +19,7 @@
 ### Fixed
 
 - Open the collection menu above the editor without adding a scrollbar to the field header.
+- Show native upload errors, including the configured file limit, when a Flex upload is rejected.
 
 ## 1.0.0-beta.1 - 2026-11-16
 
