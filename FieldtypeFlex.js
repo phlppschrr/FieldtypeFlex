@@ -543,7 +543,10 @@ var FieldtypeFlex;
     const titleRequests = new WeakMap();
     const disabledBeforeRemoval = new WeakMap();
     const busyTrees = new WeakSet();
-    const rowMenus = '.flex-table-more, .flex-row-clipboard, .flex-row-add-menu';
+    const overlayMenus = '.flex-table-more, .flex-collection-menu';
+    const rowMenus = `${overlayMenus}, .flex-row-clipboard`;
+    const collectionMenus = new WeakMap();
+    const selection = new WeakMap();
     const tableEditors = new WeakMap();
     const initializedDetailEditors = new WeakSet();
     function rowState(row) {
@@ -652,28 +655,28 @@ var FieldtypeFlex;
     function updateActions(set) {
         const count = activeRows(set).length, min = Number(FieldtypeFlex.attr(set, 'data-flex-min')) || 0, max = Number(FieldtypeFlex.attr(set, 'data-flex-max')) || 0, busy = treeBusy(set);
         const atLimit = max > 0 && count >= max;
-        const menu = set.querySelector(':scope > .flex-row-add-menu');
+        const selecting = selection.has(set);
+        const menu = collectionMenus.get(set);
         if (menu) {
-            menu.hidden = count > 0;
-            if (menu.hidden)
-                menu.open = false;
-            FieldtypeFlex.one(set, ':scope > .flex-row-add').hidden = !menu.hidden;
+            FieldtypeFlex.one(menu, '[data-flex-selection-action="start"]').disabled = busy || selecting || count === 0;
+            FieldtypeFlex.one(menu, '[data-flex-row-action="paste-end"]').disabled = busy || selecting || atLimit;
         }
-        FieldtypeFlex.all(set, ':scope > .flex-row-add, :scope > .flex-row-type, :scope > .flex-row-add-menu button').forEach(control => control.disabled = busy || atLimit);
+        FieldtypeFlex.all(set, ':scope > .flex-row-add, :scope > .flex-row-type').forEach(control => control.disabled = busy || selecting || atLimit);
         rows(set).forEach(row => {
             const header = FieldtypeFlex.one(row, ':scope > .flex-row-header');
             const toggle = header.querySelector('.flex-row-toggle');
             const removed = row.matches('.flex-row-remove-pending');
             if (toggle)
                 toggle.disabled = busy;
-            FieldtypeFlex.one(header, '[data-flex-row-action="duplicate"]').disabled = busy || atLimit;
+            FieldtypeFlex.one(header, '[data-flex-row-action="duplicate"]').disabled = busy || selecting || atLimit;
             FieldtypeFlex.all(header, '[data-flex-row-action="clipboard-copy"], [data-flex-row-action^="paste-"]').forEach(button => {
-                button.disabled = busy || removed || FieldtypeFlex.attr(button, 'data-flex-row-action') !== 'clipboard-copy' && atLimit;
+                button.disabled = busy || selecting || removed || FieldtypeFlex.attr(button, 'data-flex-row-action') !== 'clipboard-copy' && atLimit;
             });
-            FieldtypeFlex.one(header, '[data-flex-row-action="remove"]').disabled = busy || (!removed && count <= min);
-            FieldtypeFlex.one(row, ':scope > .flex-row-header .flex-row-sort, :scope > .flex-table-sort > .flex-row-sort').disabled = busy || removed || count < 2;
+            FieldtypeFlex.one(header, '[data-flex-row-action="remove"]').disabled = busy || selecting || (!removed && count <= min);
+            FieldtypeFlex.one(row, ':scope > .flex-row-header .flex-row-sort, :scope > .flex-table-sort > .flex-row-sort').disabled = busy || selecting || removed || count < 2;
         });
-        FieldtypeFlex.sortable.disabled(rowList(set), busy || count < 2);
+        FieldtypeFlex.sortable.disabled(rowList(set), busy || selecting || count < 2);
+        updateSelection(set);
     }
     function order(set) {
         FieldtypeFlex.change(FieldtypeFlex.one(set, ':scope > .flex-rows-order'), rows(set).map(row => FieldtypeFlex.attr(row, 'data-flex-row')).join(','));
@@ -947,6 +950,7 @@ var FieldtypeFlex;
         if (context instanceof HTMLElement && context.matches('.flex-rows'))
             sets.unshift(context);
         sets.forEach(set => {
+            mountCollectionMenu(set);
             let errorPreview;
             rows(set).forEach(row => {
                 FieldtypeFlex.all(row, ':scope > .flex-table-cell > .flex-table-preview[hidden]').forEach(button => {
@@ -975,6 +979,163 @@ var FieldtypeFlex;
             updateActions(set);
         });
     }
+    function mountCollectionMenu(set) {
+        const menu = set.querySelector(':scope > .flex-collection-menu');
+        if (!menu)
+            return;
+        const header = set.closest('.Inputfield')?.querySelector(':scope > .InputfieldHeader');
+        if (header && getComputedStyle(header).display !== 'none') {
+            // A native field reload replaces its content while keeping the header.
+            FieldtypeFlex.all(header, ':scope > .flex-collection-menu').filter(previous => FieldtypeFlex.attr(previous, 'data-flex-rows-for') === set.id).forEach(previous => previous.remove());
+            header.append(menu);
+        }
+        menu.hidden = false;
+        collectionMenus.set(set, menu);
+    }
+    function actionSet(control) {
+        const menu = control.closest('.flex-collection-menu');
+        return menu ? document.getElementById(FieldtypeFlex.attr(menu, 'data-flex-rows-for')) : control.closest('.flex-rows');
+    }
+    function selectionControl(row) {
+        return row.querySelector(':scope > .flex-row-header .flex-row-select, :scope > .flex-table-sort > .flex-row-select');
+    }
+    function setSelectionMode(set, active) {
+        set.classList.toggle('flex-selection-active', active);
+        FieldtypeFlex.one(set, ':scope > .flex-selection-toolbar').hidden = !active;
+        for (const row of rows(set)) {
+            const control = selectionControl(row);
+            if (control) {
+                control.hidden = !active;
+                control.checked = false;
+            }
+            FieldtypeFlex.all(row, ':scope > .flex-row-header .flex-row-toggle, :scope > .flex-table-cell > *').forEach(editor => editor.toggleAttribute('inert', active));
+        }
+    }
+    function updateSelection(set) {
+        const current = selection.get(set);
+        if (!current)
+            return;
+        const active = activeRows(set);
+        const chosen = active.filter(row => current.rows.has(row));
+        const busy = treeBusy(set);
+        for (const row of rows(set)) {
+            const control = selectionControl(row);
+            if (!control)
+                continue;
+            const removed = row.matches('.flex-row-remove-pending');
+            control.checked = current.rows.has(row) && !removed;
+            control.disabled = busy || removed;
+        }
+        const bar = FieldtypeFlex.one(set, ':scope > .flex-selection-toolbar');
+        const counter = FieldtypeFlex.one(bar, '.flex-selection-count');
+        counter.textContent = FieldtypeFlex.attr(counter, 'data-flex-count').replace('{count}', String(chosen.length));
+        FieldtypeFlex.one(bar, '[data-flex-selection-action="copy"]').disabled = busy || !chosen.length;
+        FieldtypeFlex.one(bar, '[data-flex-selection-action="hide"]').disabled = busy || !chosen.some(row => !row.matches('.flex-row-hidden'));
+        FieldtypeFlex.one(bar, '[data-flex-selection-action="remove"]').disabled = busy || !chosen.length || active.length - chosen.length < Number(FieldtypeFlex.attr(set, 'data-flex-min'));
+        FieldtypeFlex.one(bar, '[data-flex-selection-action="done"]').disabled = busy;
+    }
+    function finishSelection(set) {
+        const current = selection.get(set);
+        if (!current)
+            return;
+        selection.delete(set);
+        setSelectionMode(set, false);
+        current.expanded.forEach(row => {
+            if (row.isConnected && !row.matches('.flex-row-remove-pending'))
+                openRow(row, true);
+        });
+        updateActions(set);
+    }
+    function selectRow(event) {
+        if (!(event.target instanceof Element))
+            return;
+        const target = event.target;
+        const header = target.closest('.flex-row-header');
+        const row = target.closest('.flex-row');
+        if (!row)
+            return;
+        const set = row.closest('.flex-rows');
+        const current = set && selection.get(set);
+        if (!set || !current || (row.tagName !== 'TR' && header?.parentElement !== row))
+            return;
+        const control = selectionControl(row);
+        event.stopImmediatePropagation();
+        if (target !== control || control.disabled)
+            event.preventDefault();
+        if (!control || control.disabled)
+            return;
+        const active = activeRows(set);
+        if (event.shiftKey && current.anchor && active.includes(current.anchor)) {
+            const from = active.indexOf(current.anchor), to = active.indexOf(row);
+            active.slice(Math.min(from, to), Math.max(from, to) + 1).forEach(item => current.rows.add(item));
+        }
+        else {
+            if (!current.rows.delete(row))
+                current.rows.add(row);
+            current.anchor = row;
+        }
+        control.focus({ preventScroll: true });
+        updateSelection(set);
+    }
+    document.addEventListener('click', selectRow, true);
+    FieldtypeFlex.delegate('click', '[data-flex-selection-action]', (event, control) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const set = actionSet(control);
+        if (!set || treeBusy(set) || control.disabled)
+            return;
+        const action = FieldtypeFlex.attr(control, 'data-flex-selection-action');
+        if (action === 'start') {
+            if (!activeRows(set).length)
+                return;
+            FieldtypeFlex.all(FieldtypeFlex.closest(set, '.InputfieldFlex'), '.flex-selection-active').forEach(finishSelection);
+            const owner = set.closest('.Inputfield');
+            if (owner?.matches('.InputfieldStateCollapsed'))
+                FieldtypeFlex.classic.toggle(owner, true);
+            window.tinymce?.triggerSave();
+            FieldtypeFlex.classic.saveReady(set);
+            closeTableEditor(set);
+            const expanded = activeRows(set).filter(row => row.tagName !== 'TR' && !row.matches('.InputfieldStateCollapsed'));
+            expanded.forEach(row => { closeRowEditors(row); openRow(row, false); });
+            selection.set(set, { rows: new Set(), expanded });
+            setSelectionMode(set, true);
+            const menu = collectionMenus.get(set);
+            if (menu)
+                menu.open = false;
+            updateActions(set);
+            selectionControl(activeRows(set)[0])?.focus();
+            return;
+        }
+        const current = selection.get(set);
+        if (!current)
+            return;
+        if (action === 'done') {
+            finishSelection(set);
+            collectionMenus.get(set)?.querySelector('summary')?.focus();
+            return;
+        }
+        const chosen = activeRows(set).filter(row => current.rows.has(row));
+        if (action === 'copy' && chosen.length) {
+            void writeClipboard(set, chosen);
+        }
+        else if (action === 'hide') {
+            chosen.forEach(row => setVisibility(row, true));
+            FieldtypeFlex.closest(set, '.InputfieldFlex').classList.add('InputfieldStateChanged');
+            queueTitleRefresh(FieldtypeFlex.closest(set, '.InputfieldFlex'));
+            updateActions(set);
+            if (control.disabled)
+                FieldtypeFlex.one(set, '[data-flex-selection-action="done"]').focus();
+        }
+        else if (action === 'remove' && activeRows(set).length - chosen.length >= Number(FieldtypeFlex.attr(set, 'data-flex-min'))) {
+            window.tinymce?.triggerSave();
+            chosen.forEach(row => { removalState(row, true); rowState(row).removalReady = true; });
+            current.rows.clear();
+            current.anchor = undefined;
+            order(set);
+            queueTitleRefresh(FieldtypeFlex.closest(set, '.InputfieldFlex'));
+            FieldtypeFlex.one(set, '[data-flex-selection-action="done"]').focus();
+        }
+    });
     function formError(form, text, pending) {
         let error = form.querySelector(':scope > .flex-form-limit-error');
         if (!error) {
@@ -1123,12 +1284,9 @@ var FieldtypeFlex;
         if (!treeBusy(button))
             closeTableEditor(FieldtypeFlex.closest(button, '.flex-table'), true);
     });
-    function positionTableMenu() {
-        const menu = document.querySelector('.flex-table-more[open]');
-        if (!menu)
-            return;
-        const summary = FieldtypeFlex.one(menu, 'summary');
-        const panel = FieldtypeFlex.one(menu, '.flex-table-secondary');
+    function positionMenu(menu) {
+        const summary = FieldtypeFlex.one(menu, ':scope > summary');
+        const panel = FieldtypeFlex.one(menu, ':scope > .flex-clipboard-actions');
         if (typeof panel.showPopover === 'function' && !panel.matches(':popover-open')) {
             panel.setAttribute('popover', 'manual');
             panel.showPopover();
@@ -1138,24 +1296,33 @@ var FieldtypeFlex;
         const width = document.documentElement.clientWidth || window.innerWidth;
         const height = document.documentElement.clientHeight || window.innerHeight;
         const rtl = getComputedStyle(summary).direction === 'rtl';
-        const left = rtl ? anchor.right : anchor.left - panel.offsetWidth;
+        let left = rtl ? anchor.right : anchor.left - panel.offsetWidth;
+        let top = anchor.top;
+        if (menu.matches('.flex-collection-menu')) {
+            const header = menu.parentElement?.matches('.InputfieldHeader') ? menu.parentElement.getBoundingClientRect() : anchor;
+            left = rtl ? anchor.left : anchor.right - panel.offsetWidth;
+            top = header.bottom + panel.offsetHeight + margin <= height ? header.bottom : header.top - panel.offsetHeight;
+        }
         panel.style.left = Math.max(margin, Math.min(left, width - panel.offsetWidth - margin)) + 'px';
-        panel.style.top = Math.max(margin, Math.min(anchor.top, height - panel.offsetHeight - margin)) + 'px';
+        panel.style.top = Math.max(margin, Math.min(top, height - panel.offsetHeight - margin)) + 'px';
     }
     document.addEventListener('toggle', event => {
         const menu = event.target;
-        if (!(menu instanceof HTMLDetailsElement) || !menu.matches('.flex-table-more'))
+        if (!(menu instanceof HTMLDetailsElement) || !menu.matches(overlayMenus))
             return;
         if (menu.open)
-            positionTableMenu();
+            positionMenu(menu);
         else {
-            const panel = FieldtypeFlex.one(menu, '.flex-table-secondary');
+            const panel = FieldtypeFlex.one(menu, ':scope > .flex-clipboard-actions');
             if (typeof panel.hidePopover === 'function' && panel.matches(':popover-open'))
                 panel.hidePopover();
         }
     }, true);
-    document.addEventListener('scroll', positionTableMenu, { capture: true, passive: true });
-    window.addEventListener('resize', positionTableMenu);
+    function positionOpenMenus() {
+        FieldtypeFlex.all(document, `:is(${overlayMenus})[open]`).forEach(positionMenu);
+    }
+    document.addEventListener('scroll', positionOpenMenus, { capture: true, passive: true });
+    window.addEventListener('resize', positionOpenMenus);
     for (const name of ['click', 'focusin'])
         document.addEventListener(name, event => {
             const target = event.target;
@@ -1238,6 +1405,9 @@ var FieldtypeFlex;
     document.addEventListener('invalid', event => {
         if (!(event.target instanceof Element))
             return;
+        const selecting = event.target.closest('.flex-selection-active');
+        if (selecting)
+            finishSelection(selecting);
         for (let row = event.target.closest('.flex-row'); row; row = row.parentElement?.closest('.flex-row') || null)
             openRow(row, true);
         const editor = event.target.closest('.flex-table-editor[hidden]');
@@ -1268,7 +1438,9 @@ var FieldtypeFlex;
     async function rowAction(event, control) {
         event.preventDefault();
         event.stopPropagation();
-        const set = FieldtypeFlex.closest(control, '.flex-rows');
+        const set = actionSet(control);
+        if (!set)
+            return;
         const ancestor = control.closest('.flex-row');
         const row = ancestor?.closest('.flex-rows') === set ? ancestor : null;
         if (control.disabled || treeBusy(set))
@@ -1284,7 +1456,7 @@ var FieldtypeFlex;
             if (!type)
                 return;
             control.selectedIndex = 0;
-            action = type === '@clipboard' ? 'paste-end' : 'add';
+            action = 'add';
         }
         else if (control.matches('.flex-row-add'))
             action = 'add';
@@ -1295,48 +1467,11 @@ var FieldtypeFlex;
         status.textContent = '';
         status.classList.toggle('uk-hidden-visually', action !== 'clipboard-copy' && !pasting);
         if (action === 'clipboard-copy' && row) {
-            setTreeBusy(set, true);
-            try {
-                const clipboard = navigator.clipboard;
-                if (!clipboard?.writeText)
-                    throw new Error(message('clipboardUnavailable', 'The clipboard is unavailable. Open the editor over HTTPS.'));
-                const text = Promise.resolve().then(() => copyRow(set, row));
-                // WebKit needs the write to start in the click handler, before the AJAX result.
-                if (window.ClipboardItem && clipboard.write) {
-                    const blob = text.then(value => new Blob([value], { type: 'text/plain' }));
-                    const writing = clipboard.write([new ClipboardItem({ 'text/plain': blob })]);
-                    await Promise.all([text, writing.catch(async (problem) => {
-                            await text;
-                            throw problem;
-                        })]);
-                }
-                else {
-                    await clipboard.writeText(await text);
-                }
-                status.textContent = message('rowCopied', 'Row copied to the clipboard.');
-            }
-            catch (problem) {
-                error.textContent = clipboardError(problem);
-            }
-            finally {
-                setTreeBusy(set, false);
-            }
+            await writeClipboard(set, [row]);
             return;
         }
         if (action === 'visibility' && row) {
-            const hidden = !row.matches('.flex-row-hidden');
-            row.classList.toggle('flex-row-hidden', hidden);
-            FieldtypeFlex.change(FieldtypeFlex.one(row, ':scope > .flex-row-hidden-value, :scope > .flex-table-actions .flex-row-hidden-value'), hidden ? '1' : '0');
-            const label = FieldtypeFlex.attr(control, hidden ? 'data-flex-show-label' : 'data-flex-hide-label');
-            control.setAttribute('aria-pressed', String(hidden));
-            control.setAttribute('aria-label', label);
-            control.title = label;
-            const text = control.querySelector('.flex-row-action-label');
-            if (text)
-                text.textContent = label;
-            const icon = FieldtypeFlex.one(control, 'i');
-            icon.classList.toggle('fa-eye', !hidden);
-            icon.classList.toggle('fa-eye-slash', hidden);
+            setVisibility(row, !row.matches('.flex-row-hidden'));
             return;
         }
         if (action === 'remove' && row) {
@@ -1386,23 +1521,32 @@ var FieldtypeFlex;
                 throw new Error(result.message || message('unableToAdd', 'Unable to add item'));
             if (!set.isConnected)
                 return;
-            const fresh = FieldtypeFlex.parseHTML(result.html);
+            const inserted = (result.rows ?? [result]).map(item => FieldtypeFlex.parseHTML(item.html));
             if (action === 'paste-above' && row)
-                row.before(fresh);
+                row.before(...inserted);
             else if ((action === 'duplicate' || action === 'paste-below') && row)
-                row.after(fresh);
+                row.after(...inserted);
             else
-                rowList(set).append(fresh);
-            await FieldtypeFlex.activateScripts(fresh, response);
+                rowList(set).append(...inserted);
+            const owner = set.closest('.Inputfield');
+            if (owner?.matches('.InputfieldStateCollapsed'))
+                FieldtypeFlex.classic.toggle(owner, true);
+            for (const fresh of inserted)
+                await FieldtypeFlex.activateScripts(fresh, response);
             order(set);
-            await FieldtypeFlex.classic.setup(fresh);
+            for (const fresh of inserted)
+                await FieldtypeFlex.classic.setup(fresh);
             initRows(set);
-            [fresh, ...FieldtypeFlex.all(fresh, '.flex-row[data-flex-title]')].forEach(row => syncTitleSources(row));
+            for (const fresh of inserted) {
+                [fresh, ...FieldtypeFlex.all(fresh, '.flex-row[data-flex-title]')].forEach(row => syncTitleSources(row));
+                FieldtypeFlex.classic.added(fresh);
+            }
             queueTitleRefresh(FieldtypeFlex.closest(set, '.InputfieldFlex'));
-            focus = fresh.querySelector(':scope > .flex-row-header .flex-row-toggle, :scope > .flex-table-actions summary') || undefined;
-            FieldtypeFlex.classic.added(fresh);
-            if (pasting)
-                status.textContent = [message('rowPasted', 'Row pasted.'), result.warning].filter(Boolean).join(' ');
+            focus = inserted[0]?.querySelector(':scope > .flex-row-header .flex-row-toggle, :scope > .flex-table-actions summary') || undefined;
+            if (pasting) {
+                const pasted = inserted.length === 1 ? message('rowPasted', 'Row pasted.') : message('rowsPasted', 'Rows pasted.');
+                status.textContent = [pasted, result.warning].filter(Boolean).join(' ');
+            }
         }
         catch (problem) {
             error.textContent = pasting ? clipboardError(problem) : errorMessage(problem);
@@ -1412,17 +1556,68 @@ var FieldtypeFlex;
         }
         focus?.focus();
     }
+    function setVisibility(row, hidden) {
+        if (row.matches('.flex-row-hidden') === hidden)
+            return;
+        row.classList.toggle('flex-row-hidden', hidden);
+        FieldtypeFlex.change(FieldtypeFlex.one(row, ':scope > .flex-row-hidden-value, :scope > .flex-table-actions .flex-row-hidden-value'), hidden ? '1' : '0');
+        const control = FieldtypeFlex.one(row, ':scope > .flex-row-header [data-flex-row-action="visibility"]');
+        const label = FieldtypeFlex.attr(control, hidden ? 'data-flex-show-label' : 'data-flex-hide-label');
+        control.setAttribute('aria-pressed', String(hidden));
+        control.setAttribute('aria-label', label);
+        control.title = label;
+        const text = control.querySelector('.flex-row-action-label');
+        if (text)
+            text.textContent = label;
+        const icon = FieldtypeFlex.one(control, 'i');
+        icon.classList.toggle('fa-eye', !hidden);
+        icon.classList.toggle('fa-eye-slash', hidden);
+    }
+    async function writeClipboard(set, sources) {
+        const error = FieldtypeFlex.one(set, ':scope > .flex-rows-error'), status = FieldtypeFlex.one(set, ':scope > .flex-rows-status');
+        error.textContent = '';
+        status.textContent = '';
+        status.classList.remove('uk-hidden-visually');
+        setTreeBusy(set, true);
+        try {
+            const clipboard = navigator.clipboard;
+            if (!clipboard?.writeText)
+                throw new Error(message('clipboardUnavailable', 'The clipboard is unavailable. Open the editor over HTTPS.'));
+            const text = Promise.resolve().then(() => copyRows(set, sources));
+            // WebKit needs the write to start in the click handler, before the AJAX result.
+            if (window.ClipboardItem && clipboard.write) {
+                const blob = text.then(value => new Blob([value], { type: 'text/plain' }));
+                const writing = clipboard.write([new ClipboardItem({ 'text/plain': blob })]);
+                await Promise.all([text, writing.catch(async (problem) => {
+                        await text;
+                        throw problem;
+                    })]);
+            }
+            else {
+                await clipboard.writeText(await text);
+            }
+            status.textContent = sources.length === 1 ? message('rowCopied', 'Row copied to the clipboard.') : message('rowsCopied', 'Rows copied to the clipboard.');
+        }
+        catch (problem) {
+            error.textContent = clipboardError(problem);
+        }
+        finally {
+            setTreeBusy(set, false);
+        }
+    }
     function appendSource(data, row) {
         data.set('flex_source', FieldtypeFlex.attr(row, 'data-flex-row'));
         // A Repeater owner URL must not be overridden by the main PageEdit id.
         FieldtypeFlex.serialize(FieldtypeFlex.closest(row, 'form')).forEach(([name, value]) => { if (name !== 'id')
             data.append(name, value); });
     }
-    async function copyRow(set, row) {
+    async function copyRows(set, sources) {
         window.tinymce?.triggerSave();
         FieldtypeFlex.classic.saveReady(FieldtypeFlex.closest(set, '.InputfieldFlex'));
         const data = new URLSearchParams({ flex_action: 'clipboard-copy', flex_set: FieldtypeFlex.attr(set, 'data-flex-set') });
-        appendSource(data, row);
+        appendSource(data, sources[0]);
+        if (sources.length > 1)
+            data.set('flex_sources', sources.map(row => FieldtypeFlex.attr(row, 'data-flex-row')).join(','));
         const token = csrf();
         if (token)
             data.set(token.name, token.value);

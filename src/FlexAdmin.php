@@ -621,9 +621,9 @@ class FlexAdmin extends Wire {
 	}
 
 	/** Process current form values through the same scoped inputs for copy and duplicate. */
-	private function submittedRow(string $token, array $draft, string $set, FlexValue $value, bool $clipboard = false): FlexRow {
+	private function submittedRow(string $token, array $draft, string $set, FlexValue $value, string $id, ?WireInputData $post = null): FlexRow {
 		$input = $this->wire()->input;
-		$source = $this->row($token, $set, (string) $input->post('flex_source'), $value);
+		$source = $this->row($token, $set, $id, $value);
 		$postedType = $input->post('flex_type');
 		if($postedType !== null && $postedType !== $source->rowType()) {
 			throw new WirePermissionException($this->_('An existing Flex row cannot change type'));
@@ -631,12 +631,7 @@ class FlexAdmin extends Wire {
 		InputfieldFlexRows::applyVisibility($source, $input->post, $draft['input']);
 		$prefix = FlexPath::inputPrefix($draft['input'], $source->address());
 		$inputs = $source->definitions()->getInputfields($source, $prefix, $token, $value);
-		$post = FlexLazy::prepare($value, $token, $input->post);
-		if($clipboard) {
-			// Copying a row must not create Page references from the native add-items control.
-			$data = array_filter($post->getArray(), static fn($key) => !preg_match('/^_.*_add_items$/D', $key), ARRAY_FILTER_USE_KEY);
-			$post = $this->wire(new WireInputData($data));
-		}
+		$post ??= FlexLazy::prepare($value, $token, $input->post);
 		$form = FlexDependencies::processInput($inputs, $value->ownerPage(), $post);
 		if(!FlexLazy::unloaded($value, $token, $source->address())) InputfieldFlex::applyInputs($source, $form, $prefix);
 		if($form->getErrors()) throw new WireException(implode('; ', $form->getErrors()));
@@ -712,9 +707,24 @@ class FlexAdmin extends Wire {
 				if($this->wire()->input->post('flex_complete') !== $token) throw new WireException($this->_('Incomplete Flex row request; check the PHP input limits'));
 				$set = (string) $this->wire()->input->post('flex_set');
 				$this->collection($token, $set, $value, true);
-				$source = $this->submittedRow($token, $draft, $set, $value, true);
+				$input = $this->wire()->input;
+				$selection = $input->post('flex_sources');
+				$sources = is_string($selection) ? explode(',', $selection) : [(string) $input->post('flex_source')];
+				if(count($sources) > 2000 || count(array_unique($sources)) !== count($sources)) {
+					throw new WirePermissionException($this->_('Invalid Flex editor context'));
+				}
+				// Copying rows must not create Page references from the native add-items control.
+				$post = FlexLazy::prepare($value, $token, $input->post);
+				$data = array_filter($post->getArray(), static fn($key) => !preg_match('/^_.*_add_items$/D', $key), ARRAY_FILTER_USE_KEY);
+				$selected = [];
+				foreach($sources as $id) {
+					if(!preg_match('/^[a-f0-9]{32}$/D', $id) || InputfieldFlexRows::removalRequested($post, $draft['input'], "$set.$id")) {
+						throw new WirePermissionException($this->_('Invalid Flex editor context'));
+					}
+					$selected[] = $this->submittedRow($token, $draft, $set, $value, $id, $this->wire(new WireInputData($data)));
+				}
 				$clipboard = $this->wire(new FlexClipboard());
-				$response = ['error' => false, 'clipboard' => $clipboard->export($source)];
+				$response = ['error' => false, 'clipboard' => $clipboard->export($selected)];
 			} else if(in_array($action, ['add', 'duplicate', 'paste-above', 'paste-below', 'paste-end'], true)) {
 				if($this->wire()->input->post('flex_complete') !== $token) {
 					throw new WireException($this->_('Incomplete Flex row request; check the PHP input limits'));
@@ -762,20 +772,20 @@ class FlexAdmin extends Wire {
 				$this->put($token, $draft);
 				$rows = new FlexRows($page, $field, $set, $definition);
 				if($action === 'duplicate') {
-					$source = $this->submittedRow($token, $draft, $set, $value);
+					$source = $this->submittedRow($token, $draft, $set, $value, (string) $this->wire()->input->post('flex_source'));
 					$rows->add($source);
-					$row = $rows->duplicateRow($source->rowId());
+					$created = [$rows->duplicateRow($source->rowId())];
 				} else if($pasting) {
 					$clipboard = $this->wire(new FlexClipboard());
-					$row = $clipboard->paste($rows, $definition, $this->wire()->input->post('flex_clipboard'), $token);
+					$created = $clipboard->paste($rows, $definition, $this->wire()->input->post('flex_clipboard'), $token, count($ids));
 					$this->assertFresh($token, $page, $field);
 				} else {
-					$row = $rows->addRow((string) $this->wire()->input->post('flex_type'));
+					$created = [$rows->addRow((string) $this->wire()->input->post('flex_type'))];
 				}
-				$this->registerRow($token, $set, $row, $pasting ? $value : null);
+				foreach($created as $row) $this->registerRow($token, $set, $row, $pasting ? $value : null);
 				if($pasting) {
 					$updated = $this->draft($token);
-					array_splice($ids, $position, 0, [$row->rowId()]);
+					array_splice($ids, $position, 0, array_map(static fn(FlexRow $row) => $row->rowId(), $created));
 					$updated['orders'][$set] = $ids;
 					$this->put($token, $updated);
 				}
@@ -787,11 +797,11 @@ class FlexAdmin extends Wire {
 				$input->flexRoot = $value;
 				$input->setName = $set;
 				$input->flexInputName = $draft['input'];
-				$response = [
-					'error' => false,
-					'id'    => $row->rowId(),
-					'html'  => $input->renderRow($row, $position + 1, true),
-				];
+				$rendered = [];
+				foreach($created as $index => $row) {
+					$rendered[] = ['id' => $row->rowId(), 'html' => $input->renderRow($row, $position + $index + 1, true)];
+				}
+				$response = ['error' => false] + (count($rendered) === 1 ? $rendered[0] : ['rows' => $rendered]);
 				if($pasting) $response['warning'] = $clipboard->warningSummary();
 			} else if($action === 'media-render') {
 				$address = (string) $this->wire()->input->post('flex_path');

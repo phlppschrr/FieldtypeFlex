@@ -8,12 +8,13 @@ const source = fs.readFileSync(path.join(__dirname, '../../FieldtypeFlex.js'), '
 const maintenance = fs.readFileSync(path.join(__dirname, '../../FlexMaintenance.js'), 'utf8');
 const tick = () => new Promise(resolve => setImmediate(resolve));
 const action = name => `<button type="button" class="flex-row-action" data-flex-row-action="${name}" data-flex-remove-label="Remove" data-flex-undo-label="Undo" data-flex-show-label="Show" data-flex-hide-label="Hide"><i></i></button>`;
+const rowCheckbox = '<input type="checkbox" class="flex-row-select InputfieldIgnoreChanges" aria-label="Select row" hidden>';
 const ref = (ref, classes) => ({choices: [{ref}], ...(classes ? {classes} : {})});
 function row(id, text = id, extra = '', title = {}) {
     const data = {nodes: [ref('heading')], values: {heading: text}, sources: {heading: {names: [`heading_${id}`], kind: 'text'}}, custom: {}, override: null, ...title};
     const encoded = JSON.stringify(data).replaceAll('&', '&amp;').replaceAll("'", '&#39;');
     return `<li class="Inputfield flex-row" data-flex-row="${id}" data-flex-type-label="Text" data-flex-title='${encoded}' ${title.refresh ? 'data-flex-title-refresh' : ''}>
-    <div class="flex-row-header"><button type="button" class="flex-row-toggle"></button><span class="flex-row-title"></span><button type="button" class="flex-row-sort"></button>${action('duplicate')}${action('remove')}${action('visibility')}</div>
+    <div class="flex-row-header">${rowCheckbox}<button type="button" class="flex-row-toggle"></button><span class="flex-row-title"></span><button type="button" class="flex-row-sort"></button>${action('duplicate')}${action('remove')}${action('visibility')}</div>
     <input class="flex-row-remove-value" name="remove_${id}" value="0"><input class="flex-row-hidden-value" name="hidden_${id}" value="0">
     <div class="flex-row-content"><div class="Inputfield"><input name="heading_${id}" value="${text}"></div>${extra}</div></li>`;
 }
@@ -21,7 +22,7 @@ function set(content = row('a') + row('b'), attributes = '') {
     return `<div class="flex-rows" data-flex-set="blocks" data-flex-draft="draft" data-flex-field="content" data-flex-page-url="/edit/?id=42" data-flex-type="text" ${attributes}><ul class="flex-rows-items">${content}</ul><input class="flex-rows-order" name="order"><button type="button" class="flex-row-add">Add</button><p class="flex-rows-error"></p><p class="flex-rows-status"></p></div>`;
 }
 function tableRow(id, text = id) {
-    return `<tr class="flex-row" data-flex-row="${id}" data-flex-type="row"><td class="flex-table-sort"><button type="button" class="flex-row-sort">Sort</button></td><td class="flex-table-cell"><ul class="Inputfields"><li class="Inputfield"><input name="cell_${id}" value="${text}" required></li></ul></td><td class="flex-row-header flex-table-actions"><details class="flex-table-more"><summary>More</summary><div class="flex-table-secondary flex-clipboard-actions"><button type="button" data-flex-row-action="duplicate" class="flex-row-action"><i class="fa-copy"></i><span class="flex-row-action-label">Duplicate</span></button><button type="button" data-flex-row-action="visibility" class="flex-row-action" data-flex-hide-label="Hide" data-flex-show-label="Show"><i class="fa-eye"></i><span class="flex-row-action-label">Hide</span></button></div></details><button type="button" data-flex-row-action="remove" class="flex-row-action" data-flex-remove-label="Remove" data-flex-undo-label="Undo">Remove</button><span class="flex-row-transport"><input class="flex-row-remove-value" value="0"><input class="flex-row-hidden-value" value="0"></span></td></tr>`;
+    return `<tr class="flex-row" data-flex-row="${id}" data-flex-type="row"><td class="flex-table-sort"><button type="button" class="flex-row-sort">Sort</button>${rowCheckbox}</td><td class="flex-table-cell"><ul class="Inputfields"><li class="Inputfield"><input name="cell_${id}" value="${text}" required></li></ul></td><td class="flex-row-header flex-table-actions"><details class="flex-table-more"><summary>More</summary><div class="flex-table-secondary flex-clipboard-actions"><button type="button" data-flex-row-action="duplicate" class="flex-row-action"><i class="fa-copy"></i><span class="flex-row-action-label">Duplicate</span></button><button type="button" data-flex-row-action="visibility" class="flex-row-action" data-flex-hide-label="Hide" data-flex-show-label="Show"><i class="fa-eye"></i><span class="flex-row-action-label">Hide</span></button></div></details><button type="button" data-flex-row-action="remove" class="flex-row-action" data-flex-remove-label="Remove" data-flex-undo-label="Undo">Remove</button><span class="flex-row-transport"><input class="flex-row-remove-value" value="0"><input class="flex-row-hidden-value" value="0"></span></td></tr>`;
 }
 function tableSet(content = tableRow('a') + tableRow('b')) {
     return set('').replace('class="flex-rows"', 'class="flex-rows flex-table"').replace('<ul class="flex-rows-items"></ul>', `<div class="flex-table-scroll"><table><thead><tr><th>Sort</th><th>Cell</th><th>Actions</th></tr></thead><tbody class="flex-rows-items">${content}</tbody></table></div>`);
@@ -607,11 +608,18 @@ function clipboardMenu() {
 }
 function pickerSet(content, attributes = '') {
     return set(content, attributes).replace(' data-flex-type="text"', '').replace('<button type="button" class="flex-row-add">Add</button>',
-        '<select class="flex-row-type"><option value="" selected disabled>Add item</option><option value="text">Text</option><option value="image">Image</option><option value="@clipboard">Paste from Clipboard</option></select>');
+        '<select class="flex-row-type"><option value="" selected disabled>Add item</option><option value="text">Text</option><option value="image">Image</option></select>');
 }
-function singleTypeSet(content = '', attributes = '') {
-    return set(content, attributes).replace('<button type="button" class="flex-row-add">Add</button>',
-        '<button type="button" class="flex-row-add">Add</button><details class="flex-row-add-menu"><summary>Add</summary><div class="flex-clipboard-actions"><button type="button" class="flex-row-action" data-flex-row-action="add">Add</button><button type="button" class="flex-row-action" data-flex-row-action="paste-end">Paste from Clipboard</button></div></details>');
+function collectionSet(key, markup) {
+    const id = 'collection-' + key;
+    const menu = `<details class="flex-collection-menu" data-flex-rows-for="${id}" hidden><summary>Collection actions</summary>
+        <div class="flex-clipboard-actions"><button type="button" data-flex-selection-action="start">Select rows</button>
+        <button type="button" class="flex-row-action" data-flex-row-action="paste-end">Paste from Clipboard</button></div></details>`;
+    const toolbar = `<div class="flex-selection-toolbar" hidden><span class="flex-selection-count" data-flex-count="{count} selected"></span>
+        ${['copy', 'hide', 'remove', 'done'].map(action => `<button type="button" data-flex-selection-action="${action}">${action}</button>`).join('')}</div>`;
+    const setMarkup = markup.replace('data-flex-set="blocks"', `id="${id}" data-flex-set="${key}"`)
+        .replace(/<p class="flex-rows-error"><\/p><p class="flex-rows-status"><\/p><\/div>$/, toolbar + '<p class="flex-rows-error"></p><p class="flex-rows-status"></p>' + menu + '</div>');
+    return `<div class="Inputfield"><div class="InputfieldHeader">${key}</div><div class="InputfieldContent">${setMarkup}</div></div>`;
 }
 test('clipboard write begins in the click before collecting live form values via AJAX', async () => {
     const events = [];
@@ -685,8 +693,8 @@ test('clipboard read places a fresh row above or below an anchor and preserves u
     assert.match(d.querySelector('.flex-rows-status').textContent, /Row pasted.*image\.png/);
     h.close();
 });
-test('the empty nested type picker pastes to its own set and reports clipboard permission failures', async () => {
-    const nested = pickerSet('').replace('data-flex-set="blocks"', 'data-flex-set="blocks.a.children"');
+test('a nested collection header pastes a batch into an empty set and supports retry', async () => {
+    const nested = collectionSet('blocks.a.children', set(''));
     let deny = true;
     const h = await harness(set(row('a', 'Parent', nested)), {
         before(w) {
@@ -694,63 +702,161 @@ test('the empty nested type picker pastes to its own set and reports clipboard p
                 return deny ? Promise.reject(new w.DOMException('Permission denied', 'NotAllowedError')) : Promise.resolve('JSON');
             }}});
         },
-        response: async () => ({ok: true, json: async () => ({html: row('child')})}),
+        response: async () => ({ok: true, json: async () => ({rows: [{html: row('child-a')}, {html: row('child-b')}]})}),
     });
     const d = h.document, childSet = d.querySelector('[data-flex-set="blocks.a.children"]');
-    const picker = childSet.querySelector('select');
-    const paste = () => {
-        picker.value = '@clipboard';
-        picker.dispatchEvent(new h.window.Event('change', {bubbles: true}));
-    };
-    assert.equal(picker.value, '');
-    paste();
+    const menu = d.querySelector('.InputfieldHeader > .flex-collection-menu');
+    assert(menu);
+    const paste = menu.querySelector('[data-flex-row-action="paste-end"]');
+    assert.equal(childSet.querySelector('.flex-row-add').hidden, false);
+    menu.querySelector('summary').click();
+    paste.click();
     await tick();
     assert.match(childSet.querySelector('.flex-rows-error').textContent, /Clipboard access was denied/);
     assert.equal(h.calls.length, 0);
-    assert.equal(picker.value, '');
     deny = false;
-    paste();
+    menu.querySelector('summary').click();
+    paste.click();
     await tick();
     assert.equal(h.calls[0].body.get('flex_set'), 'blocks.a.children');
     assert.equal(h.calls[0].body.get('flex_action'), 'paste-end');
     assert.equal(h.calls[0].body.get('flex_source'), null);
-    assert.equal(childSet.querySelector('.flex-rows-order').value, 'child');
+    assert.equal(childSet.querySelector('.flex-rows-order').value, 'child-a,child-b');
     assert.equal(childSet.querySelector('.flex-rows-error').textContent, '');
-    assert.equal(picker.value, '');
-    assert.equal(picker.disabled, false);
+    assert.equal(childSet.querySelector('.flex-rows-status').textContent, 'Rows pasted.');
     h.close();
 });
 
-test('a single-type collection switches between its empty menu and the direct add button', async () => {
-    let sequence = 0;
-    const h = await harness(singleTypeSet(), {
+test('the collection menu opens below the field header or above near the viewport edge', async () => {
+    const h = await harness(collectionSet('blocks', set(row('a'))));
+    const menu = h.document.querySelector('.InputfieldHeader > .flex-collection-menu');
+    const trigger = menu.querySelector('summary');
+    const panel = menu.querySelector('.flex-clipboard-actions');
+    const matches = panel.matches.bind(panel);
+    let inTopLayer = false;
+    panel.matches = selector => selector === ':popover-open' ? inTopLayer : matches(selector);
+    panel.showPopover = () => { inTopLayer = true; };
+    panel.hidePopover = () => { inTopLayer = false; };
+    let anchor = {left: 400, right: 430, top: 300, bottom: 320};
+    trigger.getBoundingClientRect = () => anchor;
+    menu.parentElement.getBoundingClientRect = () => ({top: anchor.top - 10, bottom: anchor.bottom + 20});
+    Object.defineProperties(panel, {offsetWidth: {value: 200}, offsetHeight: {value: 160}});
+    trigger.click();
+    menu.dispatchEvent(new h.window.Event('toggle'));
+    assert.equal(panel.getAttribute('popover'), 'manual');
+    assert(inTopLayer);
+    assert.equal(panel.style.left, '230px');
+    assert.equal(panel.style.top, '340px');
+    anchor = {left: 64, right: 94, top: h.window.innerHeight - 50, bottom: h.window.innerHeight - 30};
+    h.window.dispatchEvent(new h.window.Event('resize'));
+    assert.equal(panel.style.left, '8px');
+    assert.equal(panel.style.top, h.window.innerHeight - 220 + 'px');
+    menu.open = false;
+    menu.dispatchEvent(new h.window.Event('toggle'));
+    assert(!inTopLayer);
+    h.close();
+});
+
+test('a native collection reload replaces its mounted header menu', async () => {
+    const h = await harness(collectionSet('blocks', set(row('a'))));
+    const d = h.document;
+    const oldMenu = d.querySelector('.InputfieldHeader > .flex-collection-menu');
+    const owner = oldMenu.closest('.Inputfield');
+    const refreshed = d.createElement('div');
+    refreshed.innerHTML = collectionSet('blocks', set(''));
+    owner.querySelector(':scope > .InputfieldContent').replaceWith(refreshed.querySelector('.InputfieldContent'));
+    owner.dispatchEvent(new d.defaultView.CustomEvent('reloaded', {bubbles: true}));
+    const menus = owner.querySelectorAll(':scope > .InputfieldHeader > .flex-collection-menu');
+    assert.equal(menus.length, 1);
+    assert.equal(oldMenu.isConnected, false);
+    assert(menus[0].querySelector('[data-flex-selection-action="start"]').disabled);
+    assert(!menus[0].querySelector('[data-flex-row-action="paste-end"]').disabled);
+    h.close();
+});
+
+test('collection selection collapses cards, adds a shift range, copies live values and respects removal limits', async () => {
+    const h = await harness(collectionSet('blocks', set(row('a') + row('b').replace('Inputfield flex-row', 'Inputfield flex-row InputfieldStateCollapsed') + row('c') + row('d'), 'data-flex-min="2"')), {
         before(w) {
-            Object.defineProperty(w.navigator, 'clipboard', {value: {readText: async () => 'JSON'}});
+            Object.defineProperty(w.navigator, 'clipboard', {value: {writeText: async () => {}}});
         },
-        response: async () => ({ok: true, json: async () => ({html: row('added-' + ++sequence)})}),
+        response: async () => ({ok: true, json: async () => ({clipboard: 'copied'})}),
     });
     const d = h.document;
-    const add = d.querySelector('.flex-row-add');
-    const menu = d.querySelector('.flex-row-add-menu');
-    assert.equal(d.querySelector('select'), null);
-    assert.equal(add.hidden, true);
-    assert.equal(menu.hidden, false);
+    const menu = d.querySelector('.flex-collection-menu');
+    const bar = d.querySelector('.flex-selection-toolbar');
+    const card = id => d.querySelector(`[data-flex-row="${id}"]`);
+    const checkbox = id => card(id).querySelector('.flex-row-select');
+    const button = action => bar.querySelector(`[data-flex-selection-action="${action}"]`);
+    const click = (id, options) => card(id).querySelector('.flex-row-header').dispatchEvent(new h.window.MouseEvent('click', {bubbles: true, ...options}));
     menu.querySelector('summary').click();
-    menu.querySelector('[data-flex-row-action="paste-end"]').click();
+    menu.querySelector('[data-flex-selection-action="start"]').click();
+    assert(!bar.hidden);
+    assert.equal(d.querySelectorAll('.flex-row.InputfieldStateCollapsed').length, 4);
+    assert.equal(d.activeElement, checkbox('a'));
+    assert(!checkbox('a').hidden);
+    assert(card('a').querySelector('.flex-row-toggle').hasAttribute('inert'));
+    checkbox('c').click();
+    assert(checkbox('c').checked);
+    click('a', {shiftKey: true});
+    click('b', {ctrlKey: true});
+    assert.equal(bar.querySelector('.flex-selection-count').textContent, '2 selected');
+    assert(checkbox('a').checked);
+    assert(!checkbox('b').checked);
+    click('d', {metaKey: true});
+    assert(button('remove').disabled);
+    click('d', {metaKey: true});
+    assert(!button('remove').disabled);
+    d.querySelector('[name="heading_a"]').value = 'Live value';
+    button('copy').click();
     await tick();
-    assert.equal(h.calls[0].body.get('flex_action'), 'paste-end');
-    assert.equal(h.calls[0].body.get('flex_source'), null);
-    assert.equal(add.hidden, false);
-    assert.equal(menu.hidden, true);
-    assert.equal(menu.open, false);
-    d.querySelector('[data-flex-row-action="remove"]').click();
-    assert.equal(add.hidden, true);
-    assert.equal(menu.hidden, false);
-    menu.querySelector('summary').click();
-    menu.querySelector('[data-flex-row-action="add"]').click();
-    await tick();
-    add.click();
-    await tick();
-    assert.deepEqual(h.calls.slice(1).map(call => [call.body.get('flex_action'), call.body.get('flex_type')]), [['add', 'text'], ['add', 'text']]);
+    assert.equal(h.calls[0].body.get('flex_sources'), 'a,c');
+    assert.equal(h.calls[0].body.get('heading_a'), 'Live value');
+    button('hide').click();
+    assert.equal(d.querySelectorAll('.flex-row-hidden').length, 2);
+    button('remove').click();
+    assert.equal(d.querySelectorAll('.flex-row-remove-pending').length, 2);
+    button('done').click();
+    assert(bar.hidden);
+    assert(d.querySelector('[data-flex-row="b"]').matches('.InputfieldStateCollapsed'));
+    assert(!d.querySelector('[data-flex-row="d"]').matches('.InputfieldStateCollapsed'));
+    assert(checkbox('d').hidden);
+    assert(!checkbox('d').checked);
+    assert(!card('d').querySelector('.flex-row-toggle').hasAttribute('inert'));
+    const restore = d.querySelector('[data-flex-row="a"] [data-flex-row-action="remove"]');
+    restore.click();
+    assert.equal(d.querySelector('[name="heading_a"]').value, 'Live value');
+    assert(!d.querySelector('[name="heading_a"]').disabled);
+    h.close();
+});
+
+test('table selection uses the whole row and suspends cell editing without changing submitted values', async () => {
+    const h = await harness(collectionSet('blocks', tableSet(tableRow('a') + tableRow('b') + tableRow('c'))));
+    const d = h.document;
+    const row = id => d.querySelector(`[data-flex-row="${id}"]`);
+    const cell = id => row(id).querySelector('.flex-table-cell');
+    const checkbox = id => row(id).querySelector('.flex-row-select');
+    const input = cell('a').querySelector('input');
+    input.value = 'Pending edit';
+    d.querySelector('[data-flex-selection-action="start"]').click();
+    assert(!checkbox('a').hidden);
+    assert.equal(d.activeElement, checkbox('a'));
+    assert(input.closest('[inert]'));
+    assert(!input.disabled);
+    assert.equal(new h.window.FormData(d.querySelector('form')).get('cell_a'), 'Pending edit');
+    cell('a').click();
+    assert(checkbox('a').checked);
+    assert.equal(d.activeElement, checkbox('a'));
+    cell('c').dispatchEvent(new h.window.MouseEvent('click', {bubbles: true, shiftKey: true}));
+    assert(['a', 'b', 'c'].every(id => checkbox(id).checked));
+    checkbox('b').click();
+    assert(!checkbox('b').checked);
+    row('a').lastElementChild.click();
+    assert(!checkbox('a').checked);
+    d.querySelector('[data-flex-selection-action="done"]').click();
+    assert(checkbox('a').hidden);
+    assert(!checkbox('c').checked);
+    assert.equal(input.closest('[inert]'), null);
+    input.focus();
+    assert.equal(d.activeElement, input);
     h.close();
 });

@@ -110,8 +110,9 @@ $render = static function(Page $owner, Field $field): array {
 [$targetEditor, $targetHtml, $targetPost, $targetDraft] = $render($second, $target);
 $assert(str_contains($html, 'fa-copy') && str_contains($html, 'fa-clipboard'), 'clipboard and Duplicate use separate action icons');
 $assert(str_contains($html, '<select class="flex-row-type InputfieldSetWidth" aria-label="New item type"><option value="" selected disabled>Add item</option>'), 'multiple types show a standalone picker with a neutral option');
-$assert(str_contains($html, '<option value="@clipboard">Paste from Clipboard</option>'), 'the type picker offers the paste action');
-$assert(str_contains($targetHtml, '<details class="flex-row-add-menu">') && str_contains($targetHtml, 'data-flex-row-action="paste-end">Paste from Clipboard</button>'), 'an empty single-type collection offers paste in the add menu');
+$assert(str_contains($html, 'data-flex-selection-action="start"') && str_contains($html, 'class="flex-selection-toolbar" hidden'), 'editable collections render scoped selection controls');
+$assert(!str_contains($html, 'value="@clipboard"'), 'the add picker lists only row types');
+$assert(str_contains($targetHtml, 'data-flex-rows-for="flex_set_') && str_contains($targetHtml, 'data-flex-row-action="paste-end"'), 'empty nested collections retain a scoped paste action');
 $assert(!str_contains($targetHtml, '<select class="flex-row-type'), 'single-type collections omit the type picker');
 
 $ajax = static function(Page $owner, Field $field, string $token, array $data, bool $csrf = true) use ($wire, $type): array {
@@ -251,6 +252,28 @@ $assert(str_contains($cross['warning'], 'amount') && str_contains($cross['warnin
 $assert(str_contains($actual->body, 'https://example.test/original-link/') && !str_contains($actual->body, 'bad()'), 'HTML is purified and relative links retain their source site');
 $same(true, $ajax($second, $target, $targetDraft, $paste($targetSet, 'paste-end', [$cross['id']], $text))['error'], 'paste enforces the target collection maximum');
 
+// Batch copy uses the same submitted values and preserves the selected order.
+$batchPost = ['flex_sources' => $banner->rowId() . ',' . $card->rowId()] + $copy + $post;
+$batch = $ajax($page, $source, $draft, $batchPost);
+$same(false, $batch['error'], 'copying multiple rows succeeds through the existing endpoint');
+$batchPayload = json_decode($batch['clipboard'], true, 100, JSON_THROW_ON_ERROR);
+$same('fieldtype-flex-rows', $batchPayload['format'], 'multiple rows use a distinct clipboard format');
+$same(['banner', 'card'], array_column($batchPayload['rows'], 'type'), 'a batch retains selection order');
+$same('Unsaved heading', $batchPayload['rows'][1]['values']['heading']['value'], 'a batch includes pending source edits');
+$same(true, $ajax($page, $source, $draft, ['flex_sources' => $card->rowId() . ',' . $card->rowId()] + $copy + $post)['error'], 'copy rejects duplicate selected row IDs');
+$previousDraft = $type->admin()->draft($draft);
+$batchRejected = $ajax($page, $source, $draft, $paste('empty', 'paste-end', [$empty['id']], $batch['clipboard']));
+$same(true, $batchRejected['error'], 'an incompatible batch is rejected before it inserts any rows');
+$same($previousDraft, $type->admin()->draft($draft), 'a rejected batch leaves the editor draft intact');
+$batchLimit = $ajax($second, $target, $targetDraft, $paste($targetSet, 'paste-end', [], $batch['clipboard']));
+$assert($batchLimit['error'] && str_contains($batchLimit['message'], 'Maximum'), 'the whole batch must fit the available row limit');
+$batchPaste = $ajax($page, $source, $draft, $paste('items', 'paste-above', $ids, $batch['clipboard'], $banner->rowId()));
+$same(false, $batchPaste['error'], 'a batch can be pasted at an existing row anchor');
+$same(2, count($batchPaste['rows']), 'the editor receives both new rows');
+$batchIds = array_column($batchPaste['rows'], 'id');
+$same([...array_slice($ids, 0, 2), ...$batchIds, ...array_slice($ids, 2)], $type->admin()->draft($draft)['orders']['items'], 'anchored paste keeps the batch contiguous and ordered');
+$assert(count(array_unique([...$ids, ...$batchIds])) === count($ids) + 2, 'batch row identities are newly assigned');
+
 // Normal native PageEdit processing merges draft rows with pending target edits.
 $targetPost[FlexPath::controlName($target->name, $targetSet, 'order')] = $cross['id'];
 $targetPost[FlexPath::inputPrefix($target->name, $parent->address()) . 'caption'] = 'Unsaved target';
@@ -277,7 +300,7 @@ $probeReference = static function(array $entry, string $site) use ($wire, $type,
 	$data['site'] = $site;
 	$data['row']['values'] = ['link' => $entry];
 	$clipboard = $wire->wire(new FlexClipboard());
-	$row = $clipboard->paste($probeParent->children, $probeParent->definitions()->property('children'), json_encode($data, JSON_THROW_ON_ERROR), $targetDraft);
+	[$row] = $clipboard->paste($probeParent->children, $probeParent->definitions()->property('children'), json_encode($data, JSON_THROW_ON_ERROR), $targetDraft);
 	return [$row->link instanceof Page ? $row->link->id : $row->link, $clipboard->warningSummary()];
 };
 $legacyEntry = ['kind' => 'page', 'value' => $firstReference->id];

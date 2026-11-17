@@ -4,6 +4,7 @@
 
 ### Added
 
+- Paste from the collection header, and select, copy, hide or mark multiple rows for removal.
 - Resolve pasted Page references across installations by exact page path, parent path and template name.
 - Copy rows through the browser clipboard and paste them into compatible collections, with warnings for values or files that could not be imported.
 
@@ -11,6 +12,11 @@
 
 - Add rows directly from the type picker and use a button for collections with a single type.
 - Show an icon and a text label for every action in the table row menu.
+- Use checkboxes for row selection and make the entire table row select on click in selection mode.
+
+### Fixed
+
+- Open the collection menu above the editor without adding a scrollbar to the field header.
 
 ## 1.0.0-beta.1 - 2026-11-16
 

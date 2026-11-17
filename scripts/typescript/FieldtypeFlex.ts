@@ -1,5 +1,5 @@
 namespace FieldtypeFlex {
-    interface RowResponse {html: string; error?: boolean; message?: string; warning?: string;}
+    interface RowResponse {html: string; rows?: {html: string}[]; error?: boolean; message?: string; warning?: string;}
     interface ClipboardResponse {clipboard: string; error?: boolean; message?: string;}
     interface UploadItem {markup: string; error?: boolean; message?: string;}
     interface RowState { title?: TitleData; removalReady?: boolean; load?: Promise<boolean>; }
@@ -7,7 +7,10 @@ namespace FieldtypeFlex {
     const titleRequests = new WeakMap<HTMLElement, {revision: number; timer?: number; queued: boolean}>();
     const disabledBeforeRemoval = new WeakMap<Control, boolean>();
     const busyTrees = new WeakSet<HTMLElement>();
-    const rowMenus = '.flex-table-more, .flex-row-clipboard, .flex-row-add-menu';
+    const overlayMenus = '.flex-table-more, .flex-collection-menu';
+    const rowMenus = `${overlayMenus}, .flex-row-clipboard`;
+    const collectionMenus = new WeakMap<HTMLElement, HTMLDetailsElement>();
+    const selection = new WeakMap<HTMLElement, {rows: Set<HTMLElement>; expanded: HTMLElement[]; anchor?: HTMLElement}>();
     const tableEditors = new WeakMap<HTMLElement, {button: HTMLButtonElement; editor: HTMLElement; detail: HTMLTableRowElement}>();
     const initializedDetailEditors = new WeakSet<HTMLElement>();
     function rowState(row: HTMLElement): RowState {
@@ -91,26 +94,27 @@ namespace FieldtypeFlex {
     function updateActions(set: HTMLElement): void {
         const count = activeRows(set).length, min = Number(attr(set, 'data-flex-min')) || 0, max = Number(attr(set, 'data-flex-max')) || 0, busy = treeBusy(set);
         const atLimit = max > 0 && count >= max;
-        const menu = set.querySelector<HTMLDetailsElement>(':scope > .flex-row-add-menu');
+        const selecting = selection.has(set);
+        const menu = collectionMenus.get(set);
         if(menu) {
-            menu.hidden = count > 0;
-            if(menu.hidden) menu.open = false;
-            one<HTMLButtonElement>(set, ':scope > .flex-row-add').hidden = !menu.hidden;
+            one<HTMLButtonElement>(menu, '[data-flex-selection-action="start"]').disabled = busy || selecting || count === 0;
+            one<HTMLButtonElement>(menu, '[data-flex-row-action="paste-end"]').disabled = busy || selecting || atLimit;
         }
-        all<HTMLButtonElement | HTMLSelectElement>(set, ':scope > .flex-row-add, :scope > .flex-row-type, :scope > .flex-row-add-menu button').forEach(control => control.disabled = busy || atLimit);
+        all<HTMLButtonElement | HTMLSelectElement>(set, ':scope > .flex-row-add, :scope > .flex-row-type').forEach(control => control.disabled = busy || selecting || atLimit);
         rows(set).forEach(row => {
             const header = one(row, ':scope > .flex-row-header');
             const toggle = header.querySelector<HTMLButtonElement>('.flex-row-toggle');
             const removed = row.matches('.flex-row-remove-pending');
             if(toggle) toggle.disabled = busy;
-            one<HTMLButtonElement>(header, '[data-flex-row-action="duplicate"]').disabled = busy || atLimit;
+            one<HTMLButtonElement>(header, '[data-flex-row-action="duplicate"]').disabled = busy || selecting || atLimit;
             all<HTMLButtonElement>(header, '[data-flex-row-action="clipboard-copy"], [data-flex-row-action^="paste-"]').forEach(button => {
-                button.disabled = busy || removed || attr(button, 'data-flex-row-action') !== 'clipboard-copy' && atLimit;
+                button.disabled = busy || selecting || removed || attr(button, 'data-flex-row-action') !== 'clipboard-copy' && atLimit;
             });
-            one<HTMLButtonElement>(header, '[data-flex-row-action="remove"]').disabled = busy || (!removed && count <= min);
-            one<HTMLButtonElement>(row, ':scope > .flex-row-header .flex-row-sort, :scope > .flex-table-sort > .flex-row-sort').disabled = busy || removed || count < 2;
+            one<HTMLButtonElement>(header, '[data-flex-row-action="remove"]').disabled = busy || selecting || (!removed && count <= min);
+            one<HTMLButtonElement>(row, ':scope > .flex-row-header .flex-row-sort, :scope > .flex-table-sort > .flex-row-sort').disabled = busy || selecting || removed || count < 2;
         });
-        sortable.disabled(rowList(set), busy || count < 2);
+        sortable.disabled(rowList(set), busy || selecting || count < 2);
+        updateSelection(set);
     }
     function order(set: HTMLElement): void {
         change(one<HTMLInputElement>(set, ':scope > .flex-rows-order'), rows(set).map(row => attr(row, 'data-flex-row')).join(','));
@@ -328,6 +332,7 @@ namespace FieldtypeFlex {
     function initRows(context: ParentNode): void {
         const sets = all(context, '.flex-rows'); if(context instanceof HTMLElement && context.matches('.flex-rows')) sets.unshift(context);
         sets.forEach(set => {
+            mountCollectionMenu(set);
             let errorPreview: HTMLButtonElement | undefined;
             rows(set).forEach(row => {
                 all<HTMLButtonElement>(row, ':scope > .flex-table-cell > .flex-table-preview[hidden]').forEach(button => {
@@ -349,6 +354,142 @@ namespace FieldtypeFlex {
             updateLabels(set); updateActions(set);
         });
     }
+    function mountCollectionMenu(set: HTMLElement): void {
+        const menu = set.querySelector<HTMLDetailsElement>(':scope > .flex-collection-menu');
+        if(!menu) return;
+        const header = set.closest('.Inputfield')?.querySelector(':scope > .InputfieldHeader');
+        if(header && getComputedStyle(header).display !== 'none') {
+            // A native field reload replaces its content while keeping the header.
+            all(header, ':scope > .flex-collection-menu').filter(previous => attr(previous, 'data-flex-rows-for') === set.id).forEach(previous => previous.remove());
+            header.append(menu);
+        }
+        menu.hidden = false;
+        collectionMenus.set(set, menu);
+    }
+    function actionSet(control: HTMLElement): HTMLElement | null {
+        const menu = control.closest('.flex-collection-menu');
+        return menu ? document.getElementById(attr(menu, 'data-flex-rows-for')) : control.closest('.flex-rows');
+    }
+    function selectionControl(row: HTMLElement): HTMLInputElement | null {
+        return row.querySelector(':scope > .flex-row-header .flex-row-select, :scope > .flex-table-sort > .flex-row-select');
+    }
+    function setSelectionMode(set: HTMLElement, active: boolean): void {
+        set.classList.toggle('flex-selection-active', active);
+        one<HTMLElement>(set, ':scope > .flex-selection-toolbar').hidden = !active;
+        for(const row of rows(set)) {
+            const control = selectionControl(row);
+            if(control) {
+                control.hidden = !active;
+                control.checked = false;
+            }
+            all(row, ':scope > .flex-row-header .flex-row-toggle, :scope > .flex-table-cell > *').forEach(editor => editor.toggleAttribute('inert', active));
+        }
+    }
+    function updateSelection(set: HTMLElement): void {
+        const current = selection.get(set);
+        if(!current) return;
+        const active = activeRows(set);
+        const chosen = active.filter(row => current.rows.has(row));
+        const busy = treeBusy(set);
+        for(const row of rows(set)) {
+            const control = selectionControl(row);
+            if(!control) continue;
+            const removed = row.matches('.flex-row-remove-pending');
+            control.checked = current.rows.has(row) && !removed;
+            control.disabled = busy || removed;
+        }
+        const bar = one(set, ':scope > .flex-selection-toolbar');
+        const counter = one(bar, '.flex-selection-count');
+        counter.textContent = attr(counter, 'data-flex-count').replace('{count}', String(chosen.length));
+        one<HTMLButtonElement>(bar, '[data-flex-selection-action="copy"]').disabled = busy || !chosen.length;
+        one<HTMLButtonElement>(bar, '[data-flex-selection-action="hide"]').disabled = busy || !chosen.some(row => !row.matches('.flex-row-hidden'));
+        one<HTMLButtonElement>(bar, '[data-flex-selection-action="remove"]').disabled = busy || !chosen.length || active.length - chosen.length < Number(attr(set, 'data-flex-min'));
+        one<HTMLButtonElement>(bar, '[data-flex-selection-action="done"]').disabled = busy;
+    }
+    function finishSelection(set: HTMLElement): void {
+        const current = selection.get(set);
+        if(!current) return;
+        selection.delete(set);
+        setSelectionMode(set, false);
+        current.expanded.forEach(row => {
+            if(row.isConnected && !row.matches('.flex-row-remove-pending')) openRow(row, true);
+        });
+        updateActions(set);
+    }
+    function selectRow(event: MouseEvent): void {
+        if(!(event.target instanceof Element)) return;
+        const target = event.target;
+        const header = target.closest('.flex-row-header');
+        const row = target.closest<HTMLElement>('.flex-row');
+        if(!row) return;
+        const set = row.closest<HTMLElement>('.flex-rows');
+        const current = set && selection.get(set);
+        if(!set || !current || (row.tagName !== 'TR' && header?.parentElement !== row)) return;
+        const control = selectionControl(row);
+        event.stopImmediatePropagation();
+        if(target !== control || control.disabled) event.preventDefault();
+        if(!control || control.disabled) return;
+        const active = activeRows(set);
+        if(event.shiftKey && current.anchor && active.includes(current.anchor)) {
+            const from = active.indexOf(current.anchor), to = active.indexOf(row);
+            active.slice(Math.min(from, to), Math.max(from, to) + 1).forEach(item => current.rows.add(item));
+        } else {
+            if(!current.rows.delete(row)) current.rows.add(row);
+            current.anchor = row;
+        }
+        control.focus({preventScroll: true});
+        updateSelection(set);
+    }
+    document.addEventListener('click', selectRow, true);
+    delegate('click', '[data-flex-selection-action]', (event, control) => {
+        event.preventDefault(); event.stopPropagation();
+        const set = actionSet(control);
+        if(!set || treeBusy(set) || (control as HTMLButtonElement).disabled) return;
+        const action = attr(control, 'data-flex-selection-action');
+        if(action === 'start') {
+            if(!activeRows(set).length) return;
+            all(closest(set, '.InputfieldFlex'), '.flex-selection-active').forEach(finishSelection);
+            const owner = set.closest<HTMLElement>('.Inputfield');
+            if(owner?.matches('.InputfieldStateCollapsed')) classic.toggle(owner, true);
+            window.tinymce?.triggerSave();
+            classic.saveReady(set);
+            closeTableEditor(set);
+            const expanded = activeRows(set).filter(row => row.tagName !== 'TR' && !row.matches('.InputfieldStateCollapsed'));
+            expanded.forEach(row => { closeRowEditors(row); openRow(row, false); });
+            selection.set(set, {rows: new Set(), expanded});
+            setSelectionMode(set, true);
+            const menu = collectionMenus.get(set);
+            if(menu) menu.open = false;
+            updateActions(set);
+            selectionControl(activeRows(set)[0])?.focus();
+            return;
+        }
+        const current = selection.get(set);
+        if(!current) return;
+        if(action === 'done') {
+            finishSelection(set);
+            collectionMenus.get(set)?.querySelector('summary')?.focus();
+            return;
+        }
+        const chosen = activeRows(set).filter(row => current.rows.has(row));
+        if(action === 'copy' && chosen.length) {
+            void writeClipboard(set, chosen);
+        } else if(action === 'hide') {
+            chosen.forEach(row => setVisibility(row, true));
+            closest(set, '.InputfieldFlex').classList.add('InputfieldStateChanged');
+            queueTitleRefresh(closest(set, '.InputfieldFlex'));
+            updateActions(set);
+            if((control as HTMLButtonElement).disabled) one<HTMLElement>(set, '[data-flex-selection-action="done"]').focus();
+        } else if(action === 'remove' && activeRows(set).length - chosen.length >= Number(attr(set, 'data-flex-min'))) {
+            window.tinymce?.triggerSave();
+            chosen.forEach(row => { removalState(row, true); rowState(row).removalReady = true; });
+            current.rows.clear();
+            current.anchor = undefined;
+            order(set);
+            queueTitleRefresh(closest(set, '.InputfieldFlex'));
+            one<HTMLElement>(set, '[data-flex-selection-action="done"]').focus();
+        }
+    });
     function formError(form: HTMLFormElement, text: string, pending: boolean): void {
         let error = form.querySelector<HTMLElement>(':scope > .flex-form-limit-error');
         if(!error) { error = document.createElement('p'); error.className = 'flex-form-limit-error notice-error'; error.setAttribute('role', 'alert'); error.tabIndex = -1; form.prepend(error); }
@@ -458,11 +599,9 @@ namespace FieldtypeFlex {
     delegate('click', '.flex-table-editor-close', (_event, button) => {
         if(!treeBusy(button)) closeTableEditor(closest(button, '.flex-table'), true);
     });
-    function positionTableMenu(): void {
-        const menu = document.querySelector<HTMLDetailsElement>('.flex-table-more[open]');
-        if(!menu) return;
-        const summary = one(menu, 'summary');
-        const panel = one(menu, '.flex-table-secondary');
+    function positionMenu(menu: HTMLDetailsElement): void {
+        const summary = one(menu, ':scope > summary');
+        const panel = one(menu, ':scope > .flex-clipboard-actions');
         if(typeof panel.showPopover === 'function' && !panel.matches(':popover-open')) {
             panel.setAttribute('popover', 'manual');
             panel.showPopover();
@@ -472,21 +611,30 @@ namespace FieldtypeFlex {
         const width = document.documentElement.clientWidth || window.innerWidth;
         const height = document.documentElement.clientHeight || window.innerHeight;
         const rtl = getComputedStyle(summary).direction === 'rtl';
-        const left = rtl ? anchor.right : anchor.left - panel.offsetWidth;
+        let left = rtl ? anchor.right : anchor.left - panel.offsetWidth;
+        let top = anchor.top;
+        if(menu.matches('.flex-collection-menu')) {
+            const header = menu.parentElement?.matches('.InputfieldHeader') ? menu.parentElement.getBoundingClientRect() : anchor;
+            left = rtl ? anchor.left : anchor.right - panel.offsetWidth;
+            top = header.bottom + panel.offsetHeight + margin <= height ? header.bottom : header.top - panel.offsetHeight;
+        }
         panel.style.left = Math.max(margin, Math.min(left, width - panel.offsetWidth - margin)) + 'px';
-        panel.style.top = Math.max(margin, Math.min(anchor.top, height - panel.offsetHeight - margin)) + 'px';
+        panel.style.top = Math.max(margin, Math.min(top, height - panel.offsetHeight - margin)) + 'px';
     }
     document.addEventListener('toggle', event => {
         const menu = event.target;
-        if(!(menu instanceof HTMLDetailsElement) || !menu.matches('.flex-table-more')) return;
-        if(menu.open) positionTableMenu();
+        if(!(menu instanceof HTMLDetailsElement) || !menu.matches(overlayMenus)) return;
+        if(menu.open) positionMenu(menu);
         else {
-            const panel = one(menu, '.flex-table-secondary');
+            const panel = one(menu, ':scope > .flex-clipboard-actions');
             if(typeof panel.hidePopover === 'function' && panel.matches(':popover-open')) panel.hidePopover();
         }
     }, true);
-    document.addEventListener('scroll', positionTableMenu, {capture: true, passive: true});
-    window.addEventListener('resize', positionTableMenu);
+    function positionOpenMenus(): void {
+        all<HTMLDetailsElement>(document, `:is(${overlayMenus})[open]`).forEach(positionMenu);
+    }
+    document.addEventListener('scroll', positionOpenMenus, {capture: true, passive: true});
+    window.addEventListener('resize', positionOpenMenus);
     for(const name of ['click', 'focusin']) document.addEventListener(name, event => {
         const target = event.target;
         if(!(target instanceof Node)) return;
@@ -540,6 +688,8 @@ namespace FieldtypeFlex {
     let openingInvalidDetail = false;
     document.addEventListener('invalid', event => {
         if(!(event.target instanceof Element)) return;
+        const selecting = event.target.closest<HTMLElement>('.flex-selection-active');
+        if(selecting) finishSelection(selecting);
         for(let row = event.target.closest<HTMLElement>('.flex-row'); row; row = row.parentElement?.closest<HTMLElement>('.flex-row') || null) openRow(row, true);
         const editor = event.target.closest<HTMLElement>('.flex-table-editor[hidden]');
         const button = editor?.previousElementSibling;
@@ -561,7 +711,8 @@ namespace FieldtypeFlex {
     delegate('change', '.flex-row-type', (event, control) => { void rowAction(event, control as HTMLSelectElement); });
     async function rowAction(event: Event, control: HTMLButtonElement | HTMLSelectElement): Promise<void> {
         event.preventDefault(); event.stopPropagation();
-        const set = closest(control, '.flex-rows');
+        const set = actionSet(control);
+        if(!set) return;
         const ancestor = control.closest<HTMLElement>('.flex-row');
         const row = ancestor?.closest('.flex-rows') === set ? ancestor : null;
         if(control.disabled || treeBusy(set)) return;
@@ -575,7 +726,7 @@ namespace FieldtypeFlex {
             type = control.value;
             if(!type) return;
             control.selectedIndex = 0;
-            action = type === '@clipboard' ? 'paste-end' : 'add';
+            action = 'add';
         } else if(control.matches('.flex-row-add')) action = 'add';
         const pasting = action.startsWith('paste-');
         const error = one(set, ':scope > .flex-rows-error');
@@ -584,35 +735,12 @@ namespace FieldtypeFlex {
         status.textContent = '';
         status.classList.toggle('uk-hidden-visually', action !== 'clipboard-copy' && !pasting);
         if(action === 'clipboard-copy' && row) {
-            setTreeBusy(set, true);
-            try {
-                const clipboard = navigator.clipboard;
-                if(!clipboard?.writeText) throw new Error(message('clipboardUnavailable', 'The clipboard is unavailable. Open the editor over HTTPS.'));
-                const text = Promise.resolve().then(() => copyRow(set, row));
-                // WebKit needs the write to start in the click handler, before the AJAX result.
-                if(window.ClipboardItem && clipboard.write) {
-                    const blob = text.then(value => new Blob([value], {type: 'text/plain'}));
-                    const writing = clipboard.write([new ClipboardItem({'text/plain': blob})]);
-                    await Promise.all([text, writing.catch(async problem => {
-                        await text;
-                        throw problem;
-                    })]);
-                } else {
-                    await clipboard.writeText(await text);
-                }
-                status.textContent = message('rowCopied', 'Row copied to the clipboard.');
-            } catch(problem) { error.textContent = clipboardError(problem); }
-            finally { setTreeBusy(set, false); }
+            await writeClipboard(set, [row]);
             return;
         }
         if(action === 'visibility' && row) {
-            const hidden = !row.matches('.flex-row-hidden'); row.classList.toggle('flex-row-hidden', hidden);
-            change(one<HTMLInputElement>(row, ':scope > .flex-row-hidden-value, :scope > .flex-table-actions .flex-row-hidden-value'), hidden ? '1' : '0');
-            const label = attr(control, hidden ? 'data-flex-show-label' : 'data-flex-hide-label');
-            control.setAttribute('aria-pressed', String(hidden)); control.setAttribute('aria-label', label); control.title = label;
-            const text = control.querySelector('.flex-row-action-label');
-            if(text) text.textContent = label;
-            const icon = one(control, 'i'); icon.classList.toggle('fa-eye', !hidden); icon.classList.toggle('fa-eye-slash', hidden); return;
+            setVisibility(row, !row.matches('.flex-row-hidden'));
+            return;
         }
         if(action === 'remove' && row) {
             const removed = !row.matches('.flex-row-remove-pending'); window.tinymce?.triggerSave(); if(removed) openRow(row, false);
@@ -642,30 +770,77 @@ namespace FieldtypeFlex {
             const result: RowResponse = await response.json();
             if(!response.ok || result.error) throw new Error(result.message || message('unableToAdd', 'Unable to add item'));
             if(!set.isConnected) return;
-            const fresh = parseHTML(result.html);
-            if(action === 'paste-above' && row) row.before(fresh);
-            else if((action === 'duplicate' || action === 'paste-below') && row) row.after(fresh);
-            else rowList(set).append(fresh);
-            await activateScripts(fresh, response); order(set); await classic.setup(fresh); initRows(set);
-            [fresh, ...all(fresh, '.flex-row[data-flex-title]')].forEach(row => syncTitleSources(row));
+            const inserted = (result.rows ?? [result]).map(item => parseHTML(item.html));
+            if(action === 'paste-above' && row) row.before(...inserted);
+            else if((action === 'duplicate' || action === 'paste-below') && row) row.after(...inserted);
+            else rowList(set).append(...inserted);
+            const owner = set.closest<HTMLElement>('.Inputfield');
+            if(owner?.matches('.InputfieldStateCollapsed')) classic.toggle(owner, true);
+            for(const fresh of inserted) await activateScripts(fresh, response);
+            order(set);
+            for(const fresh of inserted) await classic.setup(fresh);
+            initRows(set);
+            for(const fresh of inserted) {
+                [fresh, ...all(fresh, '.flex-row[data-flex-title]')].forEach(row => syncTitleSources(row));
+                classic.added(fresh);
+            }
             queueTitleRefresh(closest(set, '.InputfieldFlex'));
-            focus = fresh.querySelector<HTMLElement>(':scope > .flex-row-header .flex-row-toggle, :scope > .flex-table-actions summary') || undefined;
-            classic.added(fresh);
-            if(pasting) status.textContent = [message('rowPasted', 'Row pasted.'), result.warning].filter(Boolean).join(' ');
+            focus = inserted[0]?.querySelector<HTMLElement>(':scope > .flex-row-header .flex-row-toggle, :scope > .flex-table-actions summary') || undefined;
+            if(pasting) {
+                const pasted = inserted.length === 1 ? message('rowPasted', 'Row pasted.') : message('rowsPasted', 'Rows pasted.');
+                status.textContent = [pasted, result.warning].filter(Boolean).join(' ');
+            }
         } catch(problem) { error.textContent = pasting ? clipboardError(problem) : errorMessage(problem); }
         finally { setTreeBusy(set, false); }
         focus?.focus();
+    }
+    function setVisibility(row: HTMLElement, hidden: boolean): void {
+        if(row.matches('.flex-row-hidden') === hidden) return;
+        row.classList.toggle('flex-row-hidden', hidden);
+        change(one<HTMLInputElement>(row, ':scope > .flex-row-hidden-value, :scope > .flex-table-actions .flex-row-hidden-value'), hidden ? '1' : '0');
+        const control = one(row, ':scope > .flex-row-header [data-flex-row-action="visibility"]');
+        const label = attr(control, hidden ? 'data-flex-show-label' : 'data-flex-hide-label');
+        control.setAttribute('aria-pressed', String(hidden)); control.setAttribute('aria-label', label); control.title = label;
+        const text = control.querySelector('.flex-row-action-label');
+        if(text) text.textContent = label;
+        const icon = one(control, 'i'); icon.classList.toggle('fa-eye', !hidden); icon.classList.toggle('fa-eye-slash', hidden);
+    }
+    async function writeClipboard(set: HTMLElement, sources: HTMLElement[]): Promise<void> {
+        const error = one(set, ':scope > .flex-rows-error'), status = one(set, ':scope > .flex-rows-status');
+        error.textContent = '';
+        status.textContent = '';
+        status.classList.remove('uk-hidden-visually');
+        setTreeBusy(set, true);
+        try {
+            const clipboard = navigator.clipboard;
+            if(!clipboard?.writeText) throw new Error(message('clipboardUnavailable', 'The clipboard is unavailable. Open the editor over HTTPS.'));
+            const text = Promise.resolve().then(() => copyRows(set, sources));
+            // WebKit needs the write to start in the click handler, before the AJAX result.
+            if(window.ClipboardItem && clipboard.write) {
+                const blob = text.then(value => new Blob([value], {type: 'text/plain'}));
+                const writing = clipboard.write([new ClipboardItem({'text/plain': blob})]);
+                await Promise.all([text, writing.catch(async problem => {
+                    await text;
+                    throw problem;
+                })]);
+            } else {
+                await clipboard.writeText(await text);
+            }
+            status.textContent = sources.length === 1 ? message('rowCopied', 'Row copied to the clipboard.') : message('rowsCopied', 'Rows copied to the clipboard.');
+        } catch(problem) { error.textContent = clipboardError(problem); }
+        finally { setTreeBusy(set, false); }
     }
     function appendSource(data: URLSearchParams, row: HTMLElement): void {
         data.set('flex_source', attr(row, 'data-flex-row'));
         // A Repeater owner URL must not be overridden by the main PageEdit id.
         serialize(closest(row, 'form')).forEach(([name, value]) => { if(name !== 'id') data.append(name, value); });
     }
-    async function copyRow(set: HTMLElement, row: HTMLElement): Promise<string> {
+    async function copyRows(set: HTMLElement, sources: HTMLElement[]): Promise<string> {
         window.tinymce?.triggerSave();
         classic.saveReady(closest(set, '.InputfieldFlex'));
         const data = new URLSearchParams({flex_action: 'clipboard-copy', flex_set: attr(set, 'data-flex-set')});
-        appendSource(data, row);
+        appendSource(data, sources[0]);
+        if(sources.length > 1) data.set('flex_sources', sources.map(row => attr(row, 'data-flex-row')).join(','));
         const token = csrf(); if(token) data.set(token.name, token.value);
         data.set('flex_complete', attr(set, 'data-flex-draft'));
         const response = await fetch(attr(set, 'data-flex-page-url'), {method: 'POST', credentials: 'same-origin', headers: requestHeaders(set), body: data});

@@ -139,6 +139,8 @@ class InputfieldFlex extends Inputfield implements BridgeComponent {
 			'clipboardUnavailable' => $this->_('The clipboard is unavailable. Open the editor in a browser that supports clipboard access over HTTPS.'),
 			'clipboardDenied'      => $this->_('Clipboard access was denied. Allow access in your browser and try again.'),
 			'rowCopied'            => $this->_('Row copied to the clipboard.'),
+			'rowsCopied'           => $this->_('Rows copied to the clipboard.'),
+			'rowsPasted'           => $this->_('Rows pasted.'),
 			'rowPasted'            => $this->_('Row pasted.'),
 			'unableToAdd'           => $this->_('Unable to add item'),
 			'unableToLoad'          => $this->_('Unable to load item'),

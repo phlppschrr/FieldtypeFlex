@@ -366,3 +366,13 @@ The row is too large for the clipboard.,Die Zeile ist zu groß für die Zwischen
 Row type %s is unavailable in this collection.,Der Zeilentyp %s ist in dieser Sammlung nicht verfügbar.,,site/modules/FieldtypeFlex/src/FlexClipboard.php,023e9f90a4419b8114c6bcce95eea23e
 Skipped or adjusted %1$d values or files: %2$s,%1$d Werte oder Dateien übersprungen oder angepasst: %2$s,,site/modules/FieldtypeFlex/src/FlexClipboard.php,c73ce5080f6c9deaedb4323af1402767
 The clipboard does not contain a supported FieldtypeFlex row.,Die Zwischenablage enthält keine unterstützte FieldtypeFlex-Zeile.,,site/modules/FieldtypeFlex/src/FlexClipboard.php,767ccc7da8e9de5260a6dc109fd79126
+Select row,Zeile auswählen,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,bc2a8d43c82f4a68a6779ba2f249476c
+Collection actions,Aktionen für diese Sammlung,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,8a78e339facdb3ee2b9f06d6df483e58
+Select rows,Zeilen auswählen,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,bf50311a064b02629d2d5f26efffefe9
+{count} selected,{count} ausgewählt,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,ef1b031573031a3eca39e4b16e1eacec
+Copy,Kopieren,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,5fb63579fc981698f97d55bfecb213ea
+Hide,Ausblenden,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,62a5e490880a92eef74f167d9dc6dca0
+Mark for removal,Zum Löschen markieren,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,6ce9aa1fcaf478ea243a5d506fd6ee7d
+Rows copied to the clipboard.,Zeilen in die Zwischenablage kopiert.,,site/modules/FieldtypeFlex/InputfieldFlex.module.php,6d950a02362c9627a0eb932648fdb3e5
+Rows pasted.,Zeilen eingefügt.,,site/modules/FieldtypeFlex/InputfieldFlex.module.php,93f33c4c3874409ab6da73db4d1f5c30
+Maximum repeatable item count reached,Maximale Anzahl wiederholbarer Einträge erreicht,,site/modules/FieldtypeFlex/src/FlexClipboard.php,165d63f16b1b32b968a235b83d4adf67

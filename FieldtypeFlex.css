@@ -115,7 +115,7 @@
 .flex-table-actions > .flex-row-controls { display: flex; }
 :is(.flex-table-more, .flex-row-clipboard) { position: relative; margin: 0; }
 :is(.flex-table-more, .flex-row-clipboard) > summary::-webkit-details-marker { display: none; }
-.flex-table-secondary.flex-clipboard-actions {
+:is(.flex-table-more, .flex-collection-menu) > .flex-clipboard-actions {
     position: fixed;
     z-index: 3;
     inset: auto;
@@ -130,7 +130,7 @@
     white-space: normal;
     box-shadow: 0 0 0 1px var(--pw-border-color, rgba(0, 0, 0, .15));
 }
-.flex-table-more:not([open]) > .flex-table-secondary { display: none; }
+:is(.flex-table-more, .flex-collection-menu):not([open]) > .flex-clipboard-actions { display: none; }
 .flex-table-secondary > .flex-row-action { gap: .45rem; text-align: start; }
 .flex-table-grid .flex-table-actions:has(.flex-table-more[open]) {
     position: relative;
@@ -146,23 +146,24 @@
     overflow: visible;
     z-index: 3;
 }
-:is(.flex-row-clipboard, .flex-row-add-menu) > .flex-clipboard-actions {
+.flex-row-clipboard > .flex-clipboard-actions {
     position: absolute;
     z-index: 3;
     inset-block-start: 100%;
     inset-inline-end: 0;
     box-shadow: 0 0 0 1px var(--pw-border-color, rgba(0, 0, 0, .15));
 }
-.flex-row-add-menu > .flex-clipboard-actions { inset-inline: 0 auto; }
+
 .flex-row-controls .flex-clipboard-actions > button.flex-row-action,
-.flex-row-add-menu .flex-clipboard-actions > button.flex-row-action {
+.flex-collection-menu .flex-clipboard-actions > button.flex-row-action {
     justify-content: flex-start;
     padding-inline: .65rem;
 }
 .flex-clipboard-actions:not(.flex-table-secondary) > button:not(:disabled):hover,
 .flex-table-secondary > button:not(:disabled):hover .flex-row-action-label { text-decoration: underline; }
 .flex-row-remove-pending > .flex-row-header .flex-row-clipboard,
-.flex-rows > :is(.flex-row-add, .flex-row-add-menu)[hidden] { display: none; }
+.flex-collection-menu[hidden],
+.flex-selection-toolbar[hidden] { display: none; }
 .flex-table-grid > tbody > .flex-row { display: table-row; float: none; }
 .flex-table-grid > tbody > .flex-row-hidden > .flex-table-cell { opacity: .6; }
 .flex-table-grid > tbody > .flex-row-remove-pending { background: var(--pw-error-background-color, #fff0ef); }
@@ -231,7 +232,7 @@
 }
 .flex-row-bar > button,
 .flex-row-controls .flex-row-action,
-.flex-row-add-menu .flex-row-action,
+.flex-collection-menu .flex-row-action,
 :is(.flex-table-more, .flex-row-clipboard) > summary,
 .flex-table-sort > button {
     appearance: none;
@@ -254,7 +255,7 @@
 }
 .flex-row-bar > .flex-row-sort,
 .flex-row-controls .flex-row-action,
-.flex-row-add-menu .flex-row-action,
+.flex-collection-menu .flex-row-action,
 :is(.flex-table-more, .flex-row-clipboard) > summary,
 .flex-table-sort > button {
     min-width: 1.625rem;
@@ -307,9 +308,46 @@
     max-width: 100%;
     margin-block-end: .5rem;
 }
-.flex-row-add-menu { display: inline-block; position: relative; }
-.flex-row-add-menu > summary { list-style: none; cursor: pointer; }
-.flex-row-add-menu > summary::-webkit-details-marker { display: none; }
+.flex-collection-menu {
+    display: inline-block;
+    position: relative;
+    vertical-align: middle;
+}
+.InputfieldHeader > .flex-collection-menu {
+    float: inline-end;
+    margin-inline: .45rem;
+}
+.flex-collection-menu > summary { list-style: none; cursor: pointer; }
+.flex-collection-menu > summary::-webkit-details-marker { display: none; }
+.flex-selection-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .4rem;
+    align-items: center;
+}
+.flex-selection-toolbar .ui-button { margin: 0; }
+.flex-selection-count { margin-inline-end: .4rem; }
+.flex-selection-active > :is(.flex-row-type, .flex-row-add),
+.flex-selection-active > .flex-rows-items > .flex-row > .flex-row-header :is(.flex-row-controls, .flex-row-sort, .flex-row-chevron),
+.flex-selection-active > .flex-table-scroll > table > tbody > .flex-row > .flex-table-actions .flex-row-controls,
+.flex-selection-active > .flex-table-scroll > table > tbody > .flex-row > .flex-table-sort > .flex-row-sort { display: none; }
+.flex-selection-active > .flex-rows-items > .flex-row:not(.flex-row-remove-pending) > .flex-row-header,
+.flex-selection-active > .flex-table-scroll > table > tbody > .flex-row:not(.flex-row-remove-pending) { cursor: pointer; }
+/* Keep a native checkbox even when the admin theme styles checkboxes as switches. */
+.flex-rows .flex-row input.flex-row-select[type="checkbox"] {
+    appearance: auto;
+    display: inline-block;
+    inline-size: 1rem;
+    block-size: 1rem;
+    flex: none;
+    margin: 0 .3125rem;
+    accent-color: var(--pw-main-color, auto);
+    cursor: inherit;
+}
+.flex-rows .flex-row input.flex-row-select[hidden] { display: none; }
+.flex-rows .flex-row .flex-row-select:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.flex-table-sort > .flex-row-select { vertical-align: middle; }
+.flex-selection-active > .flex-table-scroll > table > tbody > .flex-row > .flex-table-sort { vertical-align: middle; }
 .flex-row-controls {
     display: inline-flex;
     flex: none;

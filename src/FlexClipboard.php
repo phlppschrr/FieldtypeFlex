@@ -3,6 +3,7 @@
 /** Portable row transport for the editor. Clipboard leaves never enter raw hydration. @internal */
 final class FlexClipboard extends Wire {
 	private const FORMAT = 'fieldtype-flex-row';
+	private const BATCH_FORMAT = 'fieldtype-flex-rows';
 	private const VERSION = 1;
 	private const MAX_BYTES = 8388608;
 	private const MAX_MEDIA_BYTES = 20971520;
@@ -26,41 +27,59 @@ final class FlexClipboard extends Wire {
 	private int $remainingBytes = self::MAX_MEDIA_BYTES;
 	private int $downloads = 0;
 
-	public function export(FlexRow $row): string {
-		$text = json_encode([
-			'format' => self::FORMAT,
+	/** @param list<FlexRow> $rows */
+	public function export(array $rows): string {
+		$source = $rows[0];
+		$batch = count($rows) > 1;
+		$data = [
+			'format' => $batch ? self::BATCH_FORMAT : self::FORMAT,
 			'version' => self::VERSION,
 			'site' => $this->site(),
-			'source' => $row->ownerPage()->httpUrl(),
-			'page' => (int) $row->ownerPage()->id,
-			'row' => $this->exportRow($row),
-		], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR, FlexPath::MAX_JSON_DEPTH);
+			'source' => $source->ownerPage()->httpUrl(),
+			'page' => (int) $source->ownerPage()->id,
+		];
+		if($batch) $data['rows'] = array_map(fn(FlexRow $row) => $this->exportRow($row), $rows);
+		else $data['row'] = $this->exportRow($source);
+		$text = json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR, FlexPath::MAX_JSON_DEPTH);
 		if(strlen($text) > self::MAX_BYTES) throw new WireException($this->_('The row is too large for the clipboard.'));
 		return $text;
 	}
 
-	public function paste(FlexRows $rows, array $definition, mixed $text, string $token): FlexRow {
+	/** Import in clipboard order. The editor registers the entire batch or abandons it. @return list<FlexRow> */
+	public function paste(FlexRows $rows, array $definition, mixed $text, string $token, int $existing = 0): array {
 		if(!is_string($text) || strlen($text) > self::MAX_BYTES) throw $this->invalid();
 		try {
 			$data = json_decode($text, true, FlexPath::MAX_JSON_DEPTH, JSON_THROW_ON_ERROR);
 		} catch(\JsonException) {
 			throw $this->invalid();
 		}
-		if(($data['format'] ?? null) !== self::FORMAT || ($data['version'] ?? null) !== self::VERSION
-			|| !$this->validRow($data['row'] ?? null) || !$this->httpUrl($data['source'] ?? null)) {
-			throw $this->invalid();
+		if(($data['version'] ?? null) !== self::VERSION || !$this->httpUrl($data['source'] ?? null)) throw $this->invalid();
+		$entries = match($data['format'] ?? null) {
+			self::FORMAT => [$data['row'] ?? null],
+			self::BATCH_FORMAT => $data['rows'] ?? null,
+			default => null,
+		};
+		if(!is_array($entries) || !$entries || !array_is_list($entries) || count($entries) > 2000) throw $this->invalid();
+		$max = (int) ($definition['settings']['maxItems'] ?? 0);
+		if($max && $existing + count($entries) > $max) throw new WireException(__('Maximum repeatable item count reached'));
+		foreach($entries as $entry) {
+			if(!$this->validRow($entry)) throw $this->invalid();
+			if(!isset($definition['types'][$entry['type']])) {
+				throw new WireException(sprintf($this->_('Row type %s is unavailable in this collection.'), $entry['type']));
+			}
 		}
 		$this->source = $data['source'];
 		$site = $this->site();
 		$this->sameSite = $site !== '' && is_string($data['site'] ?? null) && hash_equals($site, $data['site']);
 		$this->sourcePage = is_int($data['page'] ?? null) ? $data['page'] : 0;
 		$this->deadline = microtime(true) + 8;
-		if(!isset($definition['types'][$data['row']['type']])) {
-			throw new WireException(sprintf($this->_('Row type %s is unavailable in this collection.'), $data['row']['type']));
+		$imported = [];
+		foreach($entries as $index => $entry) {
+			$row = $rows->addRow($entry['type']);
+			$this->importRow($row, $entry, $token, count($entries) > 1 ? ($index + 1) . '. ' : '');
+			$imported[] = $row;
 		}
-		$row = $rows->addRow($data['row']['type']);
-		$this->importRow($row, $data['row'], $token, '');
-		return $row;
+		return $imported;
 	}
 
 	public function warningSummary(): string {

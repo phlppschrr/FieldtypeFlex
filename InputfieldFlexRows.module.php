@@ -204,9 +204,16 @@ class InputfieldFlexRows extends Inputfield implements BridgeComponent {
 			'<input type="hidden" class="flex-row-hidden-value" name="' . $entities(FlexPath::controlName($this->flexInputName ?: $this->name, $row->address(), 'hidden')) . '" value="' . ($row->isHidden() ? '1' : '0') . '">' .
 			'<div class="InputfieldHeader flex-row-header' . ($boldHeader ? ' flex-row-header-bold' : '') . ($removed ? ' ui-state-error' : '') . '"><div class="flex-row-bar' . ($konkat ? '' : ' uk-background-primary uk-light') . '">' .
 			'<button type="button" class="flex-row-sort" title="' . $sortLabel . '" aria-label="' . $sortLabel . '"><i class="fa fa-fw fa-arrows" aria-hidden="true"></i></button>' .
-			'<button type="button" class="flex-row-toggle" aria-controls="' . $entities($bodyId) . '" aria-expanded="' . ($collapsed ? 'false' : 'true') . '"><span class="flex-row-label"><span class="flex-row-title">' . $label . '</span></span><i class="fa fa-fw fa-angle-down flex-row-chevron" aria-hidden="true"></i></button>' .
+			$this->rowSelectionCheckbox($bodyId . '_title') .
+			'<button type="button" class="flex-row-toggle" aria-controls="' . $entities($bodyId) . '" aria-expanded="' . ($collapsed ? 'false' : 'true') . '"><span class="flex-row-label"><span class="flex-row-title" id="' . $entities($bodyId . '_title') . '">' . $label . '</span></span><i class="fa fa-fw fa-angle-down flex-row-chevron" aria-hidden="true"></i></button>' .
 			'<div class="flex-row-controls">' . $buttons . '</div></div></div>' .
 			'<div class="InputfieldContent flex-row-content" id="' . $entities($bodyId) . '">' . $body . '</div></li>';
+	}
+
+	private function rowSelectionCheckbox(string $titleId = ''): string {
+		$entities = fn($value) => $this->wire()->sanitizer->entities($value);
+		$description = $titleId === '' ? '' : ' aria-describedby="' . $entities($titleId) . '"';
+		return '<input type="checkbox" class="flex-row-select InputfieldIgnoreChanges" aria-label="' . $entities($this->_('Select row')) . '"' . $description . ' hidden>';
 	}
 
 	/** Shared actions for cards and table rows. */
@@ -316,7 +323,8 @@ class InputfieldFlexRows extends Inputfield implements BridgeComponent {
 			$transport .= '<input type="hidden" class="flex-row-' . $control . '-value" name="' . $entities(FlexPath::controlName($this->flexInputName ?: $this->name, $row->address(), $control)) . '" value="' . ($state ? '1' : '0') . '">';
 		}
 		return '<tr class="flex-row' . ($row->isHidden() ? ' flex-row-hidden' : '') . ($removed ? ' flex-row-remove-pending' : '') . '" data-flex-row="' . $id . '" data-flex-type="' . $entities($row->rowType()) . '">' .
-			'<td class="flex-table-sort"><button type="button" class="flex-row-sort" title="' . $sortLabel . '" aria-label="' . $sortLabel . '"><i class="fa fa-fw fa-arrows" aria-hidden="true"></i></button></td>' . $cells .
+			'<td class="flex-table-sort"><button type="button" class="flex-row-sort" title="' . $sortLabel . '" aria-label="' . $sortLabel . '"><i class="fa fa-fw fa-arrows" aria-hidden="true"></i></button>' .
+			$this->rowSelectionCheckbox() . '</td>' . $cells .
 			'<td class="flex-row-header flex-table-actions"><div class="flex-row-controls">' . $this->rowActions($row, $removed, true) . '</div><span class="flex-row-transport">' . $transport . '</span></td></tr>';
 	}
 
@@ -372,32 +380,36 @@ class InputfieldFlexRows extends Inputfield implements BridgeComponent {
 		$entities = fn($v) => $this->wire()->sanitizer->entities((string) $v);
 		$settings = $this->definition['settings'];
 		$addLabel = $entities($settings['addRowLabel'] ?? $this->_('Add item'));
-		$pasteLabel = $entities($this->_('Paste from Clipboard'));
 		$types = $this->definition['types'];
 		$attributes = '';
 		if(count($types) === 1) {
 			$attributes = ' data-flex-type="' . $entities((string) array_key_first($types)) . '"';
-			$empty = !count($rows);
-			$addText = '<i class="fa fa-plus-circle" aria-hidden="true"></i> ' . $addLabel;
-			$addControl = '<button type="button" class="ui-button flex-row-add"' . ($empty ? ' hidden' : '') . '>' . $addText . '</button>' .
-				'<details class="flex-row-add-menu"' . ($empty ? '' : ' hidden') . '>' .
-				'<summary class="ui-button">' . $addText . ' <i class="fa fa-angle-down" aria-hidden="true"></i></summary>' .
-				'<div class="flex-clipboard-actions"><button type="button" class="flex-row-action" data-flex-row-action="add">' . $addLabel . '</button>' .
-				'<button type="button" class="flex-row-action" data-flex-row-action="paste-end">' . $pasteLabel . '</button></div></details>';
+			$addControl = '<button type="button" class="ui-button flex-row-add"><i class="fa fa-plus-circle" aria-hidden="true"></i> ' . $addLabel . '</button>';
 		} else {
 			$options = '<option value="" selected disabled>' . $addLabel . '</option>';
 			foreach($types as $type => $typeDefinition) {
 				$options .= '<option value="' . $entities((string) $type) . '">' . $entities((string) ($typeDefinition['label'] ?? $type)) . '</option>';
 			}
-			$options .= '<option value="@clipboard">' . $pasteLabel . '</option>';
 			$addControl = '<select class="flex-row-type InputfieldSetWidth" aria-label="' . $entities($this->_('New item type')) . '">' . $options . '</select>';
 		}
+		$setId = $entities('flex_set_' . $this->name);
+		$menuLabel = $entities($this->_('Collection actions'));
+		$menu = '<details class="flex-collection-menu" data-flex-rows-for="' . $setId . '" hidden><summary class="InputfieldHeaderAction" title="' . $menuLabel . '">' .
+			'<i class="fa fa-fw fa-ellipsis-h" aria-hidden="true"></i><span class="flex-table-sr">' . $menuLabel . '</span></summary>' .
+			'<div class="flex-clipboard-actions">' .
+			'<button type="button" class="flex-row-action" data-flex-selection-action="start"><i class="fa fa-fw fa-check-square-o" aria-hidden="true"></i> ' . $entities($this->_('Select rows')) . '</button>' .
+			'<button type="button" class="flex-row-action" data-flex-row-action="paste-end"><i class="fa fa-fw fa-clipboard" aria-hidden="true"></i> ' . $entities($this->_('Paste from Clipboard')) . '</button></div></details>';
+		$toolbar = '<div class="flex-selection-toolbar" hidden><span class="flex-selection-count" role="status" data-flex-count="' . $entities($this->_('{count} selected')) . '"></span>' .
+			'<button type="button" class="ui-button" data-flex-selection-action="copy">' . $entities($this->_('Copy')) . '</button>' .
+			'<button type="button" class="ui-button" data-flex-selection-action="hide">' . $entities($this->_('Hide')) . '</button>' .
+			'<button type="button" class="ui-button" data-flex-selection-action="remove">' . $entities($this->_('Mark for removal')) . '</button>' .
+			'<button type="button" class="ui-button" data-flex-selection-action="done">' . $entities($this->_('Done')) . '</button></div>';
 		$table = isset($settings['_flexTable']);
 		$items = $table ? $this->renderTable($html) : '<ul class="Inputfields flex-rows-items">' . $html . '</ul>';
-		return '<div class="flex-rows' . ($table ? ' flex-table' : '') . '" data-flex-set="' . $entities($this->setName) . '" data-flex-draft="' . $entities($this->flexDraft) . '" data-flex-page-url="' . $entities($this->flexRoot->ownerPage()->editUrl()) . '" data-flex-field="' . $entities($this->flexRoot->ownerField()->name) . '" data-flex-min="' . (int) ($settings['minItems'] ?? 0) . '" data-flex-max="' . (int) ($settings['maxItems'] ?? 0) . '"' . $attributes . '>' .
+		return '<div class="flex-rows' . ($table ? ' flex-table' : '') . '" id="' . $setId . '" data-flex-set="' . $entities($this->setName) . '" data-flex-draft="' . $entities($this->flexDraft) . '" data-flex-page-url="' . $entities($this->flexRoot->ownerPage()->editUrl()) . '" data-flex-field="' . $entities($this->flexRoot->ownerField()->name) . '" data-flex-min="' . (int) ($settings['minItems'] ?? 0) . '" data-flex-max="' . (int) ($settings['maxItems'] ?? 0) . '"' . $attributes . '>' .
 			'<input type="hidden" name="' . $entities(FlexPath::controlName($this->flexInputName ?: $this->name, $this->setName, 'present')) . '" value="1">' .
 			'<input type="hidden" class="flex-rows-order" name="' . $entities(FlexPath::controlName($this->flexInputName ?: $this->name, $this->setName, 'order')) . '" value="' . implode(',', $ids) . '">' .
-			$items . $addControl .
+			$menu . $items . $addControl . $toolbar .
 			'<p class="flex-rows-status uk-hidden-visually" role="status" aria-live="polite"></p><p class="flex-rows-error" role="alert"></p></div>';
 	}
 
