@@ -28,7 +28,7 @@ jobs:
         processwire:
           - version: '3.0.259'
             ref_file: scripts/processwire-3.0.259-ref.txt
-          - version: '3.0.274 dev'
+          - version: '3.0.275 dev'
             ref_file: scripts/processwire-ref.txt
     services:
       database:

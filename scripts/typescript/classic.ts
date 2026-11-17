@@ -1,6 +1,6 @@
 // Admin integration: Bridge public APIs, with the classic ProcessWire stack as fallback.
 namespace FieldtypeFlex {
-    export interface Editor { save(): void; remove(): void; }
+    export interface Editor { initialized: boolean; save(): void; remove(): void; }
     interface LegacyEvent { target: HTMLElement; type: string; originalEvent?: Event; stopPropagation(): void; }
     export interface LegacyCollection {
         0: HTMLElement;
@@ -28,6 +28,15 @@ namespace FieldtypeFlex {
         start(event: LegacyEvent, ui: {item: LegacyCollection; placeholder: {height(value: number): void}}): void;
         stop(event: LegacyEvent, ui: {item: LegacyCollection}): void;
     }
+    interface SelectizeMenu {
+        $dropdown: LegacyCollection;
+        settings: {dropdownParent?: string | null};
+        isOpen: boolean;
+        on(event: 'dropdown_open' | 'dropdown_close', callback: () => void): void;
+        positionDropdown(): void;
+        close(): void;
+    }
+    const tableTagMenus = new WeakSet<SelectizeMenu>();
     export const classic = {
         async setup(scope: HTMLElement): Promise<void> {
             const theme = bridgeTheme();
@@ -97,6 +106,30 @@ namespace FieldtypeFlex {
         },
         saveReady(scope: HTMLElement): void {
             if(window.jQuery) all(scope, '.InputfieldTinyMCE').forEach(input => window.jQuery!(input).trigger('saveReady'));
+        },
+        tableTags(input: HTMLInputElement): void {
+            const wrapper = input.closest<HTMLElement>('.selectize-control');
+            const scroll = wrapper?.closest('.flex-table-scroll');
+            const source = wrapper?.previousElementSibling as (HTMLElement & {selectize?: SelectizeMenu}) | null | undefined;
+            const widget = source?.selectize;
+            if(!wrapper || !scroll || !widget || widget.settings.dropdownParent || tableTagMenus.has(widget)) return;
+            const menu = widget.$dropdown[0];
+            const close = () => widget.close();
+            const open = () => {
+                // The table must stay horizontally scrollable. Use Selectize's body positioning while its menu is open.
+                widget.settings.dropdownParent = 'body';
+                document.body.append(menu);
+                widget.positionDropdown();
+                scroll.addEventListener('scroll', close, {passive: true});
+            };
+            widget.on('dropdown_open', open);
+            widget.on('dropdown_close', () => {
+                scroll.removeEventListener('scroll', close);
+                widget.settings.dropdownParent = null;
+                wrapper.append(menu);
+            });
+            tableTagMenus.add(widget);
+            if(widget.isOpen) open();
         },
         destroyEditors(scope: HTMLElement): void {
             if(window.jQuery) window.InputfieldTinyMCE?.destroyEditorsIn(window.jQuery(scope));

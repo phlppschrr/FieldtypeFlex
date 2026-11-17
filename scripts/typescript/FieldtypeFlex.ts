@@ -271,13 +271,20 @@ namespace FieldtypeFlex {
         if(!active) return;
         const {button, editor, detail} = active;
         const richText = button.matches('[data-flex-preview="richtext"]');
-        if(richText) classic.saveReady(editor);
+        const iframes = richText ? all(editor, '.InputfieldTinyMCENormal') : [];
+        if(iframes.length) {
+            // Leaving a cell can happen before TinyMCE has initialized its iframe.
+            iframes.forEach(input => {
+                const tiny = window.tinymce?.get(input.id);
+                if(tiny?.initialized) tiny.save();
+            });
+        } else if(richText) classic.saveReady(editor);
         updateTablePreview(button, editor);
         editor.hidden = true;
-        if(richText && editor.querySelector('.InputfieldTinyMCENormal')) {
+        if(iframes.length) {
             // TinyMCE iframes are recreated after moving back into the detail row.
             classic.destroyEditors(editor);
-            all(editor, '.InputfieldTinyMCENormal').forEach(input => {
+            iframes.forEach(input => {
                 input.classList.remove('InputfieldTinyMCELoaded');
                 input.classList.add('InputfieldTinyMCELazy');
             });
@@ -561,13 +568,24 @@ namespace FieldtypeFlex {
         event.preventDefault();
         tableColumnResizer(handle)?.(event.key === 'ArrowRight' ? 16 : -16);
     });
-    delegate('click', '.flex-table-grid > tbody > tr > .flex-table-cell, .flex-table-grid > thead > tr > th', (event, cell) => {
+    const tableInputs = '.flex-table-grid > tbody > .flex-row > .flex-table-cell, .flex-table-grid > thead > tr > th';
+    const cellControl = 'input:not([type="hidden"]), textarea, select, button, [contenteditable]:not([contenteditable="false"])';
+    function visibleControl(control: HTMLElement): boolean {
+        return !control.matches(':disabled') && !!control.getClientRects().length && getComputedStyle(control).visibility === 'visible';
+    }
+    delegate('click', tableInputs, (event, cell) => {
         const target = event.target;
         if(event.defaultPrevented || !(target instanceof Element) || target.closest('td, th') !== cell) return;
-        if(target.closest('input, textarea, select, button, a, label, [contenteditable], [role="button"], [role="tab"]')) return;
+        if(target.closest('input, textarea, select, button, a, label, summary, [contenteditable], [role="button"], [role="tab"]')) return;
         if(window.getSelection()?.type === 'Range') return;
-        const control = all<HTMLElement>(cell, '.flex-table-input > .InputfieldContent :is(input:not([type="hidden"]), textarea, select):not(:disabled)')
-            .find(input => input.getClientRects().length && getComputedStyle(input).visibility === 'visible');
+        const preview = cell.querySelector<HTMLButtonElement>(':scope > .flex-table-preview');
+        if(preview && visibleControl(preview)) {
+            const active = tableEditors.get(closest(cell, '.flex-table'));
+            if(active?.button === preview) active.editor.focus({preventScroll: true});
+            else openTableEditor(preview);
+            return;
+        }
+        const control = all(cell, `:scope > .Inputfields > .flex-table-input > .InputfieldContent :is(${cellControl})`).find(visibleControl);
         control?.focus({preventScroll: true});
     });
     delegate('click', '.flex-row-retry', (event, button) => { event.preventDefault(); void loadRow(closest(button, '.flex-row')); });
@@ -586,7 +604,8 @@ namespace FieldtypeFlex {
             closeAfterPointer = undefined;
         }, true);
     }
-    delegate('focusin', tableCells, (_event, cell) => {
+    delegate('focusin', tableCells, (event, cell) => {
+        if(event.target instanceof HTMLInputElement) classic.tableTags(event.target);
         const set = closest(cell, '.flex-table');
         const active = tableEditors.get(set);
         if(!active || active.button.parentElement === cell) return;
