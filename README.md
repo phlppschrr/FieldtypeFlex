@@ -142,8 +142,10 @@ target collection's row types, settings and defaults. Save the page to commit
 the inserted rows and media.
 
 Clipboard access needs HTTPS and browser permission. When copying across
-installations, language values match by language name, Page references are
-skipped, and relative rich-text links retain their source URL. Media uses owned
+installations, language values match by language name. Page references resolve
+to existing pages with the same full path, parent path and template name. The
+destination field's local parent, template, selector and access rules still
+apply. Relative rich-text links retain their source URL. Media uses owned
 local originals when available. Remote media requires cURL and PHP's global IP
 range filter. Downloads use public IPv4 HTTPS URLs without redirects, with file
 type, size and time limits. Any skipped contents are reported in the editor.

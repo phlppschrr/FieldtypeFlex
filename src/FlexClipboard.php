@@ -112,7 +112,19 @@ final class FlexClipboard extends Wire {
 		$raw = $owner->rawArray();
 		foreach($owner->definitions()->properties() as $name => $definition) {
 			$value = $owner->getUnformatted($name);
-			if($value instanceof FlexValue) {
+			$references = [];
+			if($definition['kind'] === 'page') {
+				$pages = $value instanceof PageArray ? $value : [$value];
+				foreach($pages as $page) {
+					if(!$page instanceof Page || !$page->id || !$page->template || !$page->viewable(false)) continue;
+					$references[$page->id] = [
+						'path' => $page->path(),
+						'parent' => $page->parent_id ? $page->parent()->path() : '',
+						'template' => $page->template->name,
+					];
+				}
+				$value = $raw[$name];
+			} else if($value instanceof FlexValue) {
 				$value = (object) $this->exportValues($value);
 			} else if($value instanceof FlexRows) {
 				$items = [];
@@ -144,6 +156,7 @@ final class FlexClipboard extends Wire {
 				$value = $raw[$name];
 			}
 			$result[$name] = ['kind' => $this->kind($definition), 'value' => $value];
+			if($references) $result[$name]['references'] = (object) $references;
 		}
 		return $result;
 	}
@@ -197,6 +210,10 @@ final class FlexClipboard extends Wire {
 					if(!is_array($value) || !array_is_list($value)) $this->warnings[] = $path;
 					else foreach($value as $file) $this->importFile($owner->getUnformatted($name), $file, $token, $path);
 					break;
+				case 'page':
+					$references = is_array($entry['references'] ?? null) ? $entry['references'] : [];
+					$this->importPages($owner, $name, $definition, $value, $references, $path);
+					break;
 				default:
 					$this->importLeaf($owner, $name, $definition, $value, $path);
 			}
@@ -222,10 +239,6 @@ final class FlexClipboard extends Wire {
 				}
 				$current->setLanguageValue($language, $kind === 'html:languages' ? $this->safeHtml($translation, $languagePath) : $translation);
 			}
-			return;
-		}
-		if($kind === 'page') {
-			$this->importPages($owner, $name, $definition, $value, $path);
 			return;
 		}
 		$options = in_array($kind, ['select', 'array', 'toggle'], true) ? $owner->getOptions($name) : [];
@@ -297,31 +310,51 @@ final class FlexClipboard extends Wire {
 		return checkdate((int) $parts[2], (int) $parts[3], (int) $parts[1]);
 	}
 
-	private function importPages(FlexValue $owner, string $name, array $definition, mixed $value, string $path): void {
+	private function importPages(FlexValue $owner, string $name, array $definition, mixed $value, array $references, string $path): void {
 		$ids = $definition['multiple'] ? $value : [$value];
 		if(!is_array($ids) || !array_is_list($ids) || (!$definition['multiple'] && !is_int($value) && $value !== false)) {
-			$this->warnings[] = $path;
-			return;
-		}
-		if(!$this->sameSite && array_filter($ids)) {
 			$this->warnings[] = $path;
 			return;
 		}
 		$pages = $this->wire()->pages;
 		$items = $pages->newPageArray();
 		$input = $definition['input'];
+		$allowedTemplates = $input->getTemplateIDs();
+		$hasReferences = false;
 		foreach($ids as $id) {
 			if($id === 0 || $id === false) continue;
-			$page = is_int($id) && $id > 0 ? $pages->get($id) : null;
+			$hasReferences = true;
+			$page = null;
+			if(is_int($id) && $id > 0) {
+				// Across installations, the source ID only indexes the portable descriptor.
+				$page = $this->sameSite ? $pages->get($id) : $this->resolvePageReference($references[$id] ?? null);
+			}
 			if(!$page || !$page->id || !$page->viewable(false) || ($page->isUnpublished() && !$input->allowUnpub)
+				|| ($allowedTemplates && !in_array((int) $page->template?->id, $allowedTemplates, true))
 				|| $input->findPagesCode || !InputfieldPage::isValidPage($page, $input, $owner->ownerPage())) {
 				$this->warnings[] = $path;
 				continue;
 			}
 			$items->add($page);
 		}
-		if($ids && !$items->count() && array_filter($ids)) return;
+		if($hasReferences && !$items->count()) return;
 		$owner->set($name, $definition['multiple'] ? $items : ($items->first() ?: 0));
+	}
+
+	private function resolvePageReference(mixed $reference): ?Page {
+		if(!is_array($reference) || !is_string($reference['path'] ?? null) || strlen($reference['path']) > 2048
+			|| !preg_match('~^/(?:[^/\s?#]+/)*$~uD', $reference['path'])
+			|| !is_string($reference['parent'] ?? null) || !is_string($reference['template'] ?? null)) return null;
+		$page = $this->wire()->pages->getByPath($reference['path'], [
+			'allowPartial' => false,
+			'allowUrl' => false,
+			'allowUrlSegments' => false,
+			'useHistory' => false,
+			'useLanguages' => false,
+		]);
+		if(!$page->id || $page->path() !== $reference['path'] || $page->template?->name !== $reference['template']) return null;
+		$parentPath = $page->parent_id ? $page->parent()->path() : '';
+		return $parentPath === $reference['parent'] ? $page : null;
 	}
 
 	private function safeHtml(string $value, string $path): string {

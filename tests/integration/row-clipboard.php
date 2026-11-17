@@ -1,6 +1,21 @@
 <?php namespace ProcessWire;
 if(PHP_SAPI !== 'cli' || !isset($same, $createField)) { http_response_code(404); exit; }
 
+$referencePage = static function(Page $parent, Template $referenceTemplate, bool $unpublished = false) use ($wire, &$pages): Page {
+	$name = 'clipboard-reference-' . bin2hex(random_bytes(4));
+	$reference = $wire->pages->newPage(['template' => $referenceTemplate, 'parent' => $parent, 'name' => $name, 'title' => $name]);
+	if($unpublished) $reference->addStatus(Page::statusUnpublished);
+	$reference->save();
+	$pages[] = $reference;
+	return $reference;
+};
+$firstReference = $referencePage($page, $template);
+$secondReference = $referencePage($page, $template);
+$excludedReference = $referencePage($page, $template);
+$wrongParent = $referencePage($second, $template);
+$wrongTemplate = $referencePage($page, $wire->templates->get('basic-page'));
+$unpublished = $referencePage($page, $template, true);
+
 $notes = [
 	'note' => ['children' => ['text' => ['type' => 'text']]],
 	'other' => ['children' => ['text' => ['type' => 'text']]],
@@ -14,7 +29,8 @@ $sourceChildren = [
 		'first' => 'First', 'second' => 'Second',
 	]],
 	'translation' => ['type' => 'text', 'useLanguages' => true],
-	'link' => ['type' => 'page', 'derefAsPage' => 1, 'parent_id' => 1],
+	'link' => ['type' => 'page', 'derefAsPage' => 1, 'parent_id' => $page->id],
+	'links' => ['type' => 'page', 'inputfield' => 'InputfieldAsmSelect', 'parent_id' => $page->id],
 	'extra' => ['type' => 'text'],
 	'object' => ['type' => 'object', 'children' => ['caption' => ['type' => 'text']]],
 	'notes' => ['type' => 'rows', 'types' => $notes],
@@ -35,6 +51,9 @@ $targetChildren['layout'] = ['type' => 'select', 'options' => ['a' => 'A'], 'val
 $targetChildren['tags']['tagsList'] = ['first' => 'First'];
 $targetChildren['new_value'] = ['type' => 'text', 'value' => 'Target default'];
 $targetChildren['notes']['types'] = ['note' => $notes['note']];
+$targetChildren['link']['template_id'] = $template->id;
+$targetChildren['link']['findPagesSelector'] = 'name!=' . $excludedReference->name;
+$targetChildren['links']['template_id'] = $template->id;
 $targetCollection = ['type' => 'rows', 'types' => ['card' => ['children' => $targetChildren]], 'maxItems' => 1];
 $target = $createField('flex_clip_target', [
 	'parents' => ['type' => 'rows', 'types' => ['group' => ['children' => ['caption' => ['type' => 'text'], 'children' => $targetCollection]]]],
@@ -43,7 +62,7 @@ $target = $createField('flex_clip_target', [
 
 $value = $type->getBlankValue($page, $source);
 $card = $value->items->addRow('card', ['heading' => 'Saved source', 'amount' => 7, 'layout' => 'b', 'extra' => 'Source-only', 'future' => 'Retained unknown']);
-$card->link = $second;
+$card->link = $firstReference;
 $card->object->caption = 'Saved object';
 $note = $card->notes->addRow('note', ['text' => 'Saved note']);
 $other = $card->notes->addRow('other', ['text' => 'Other note']);
@@ -118,7 +137,8 @@ $post[$prefix . 'tags'] = 'first second';
 $post[$prefix . 'body'] = '<p><a href="/original-link/">Source</a></p>';
 $post[$prefix . 'translation'] = 'Original language';
 $post[$prefix . 'translation__' . $language->id] = 'Übersetzung';
-$post[$prefix . 'link'] = (string) $second->id;
+$post[$prefix . 'link'] = (string) $firstReference->id;
+$post[$prefix . 'links'] = [(string) $secondReference->id, (string) $firstReference->id];
 $post[FlexPath::inputPrefix($source->name, $card->address() . '.object') . 'caption'] = 'Unsaved object';
 $post[FlexPath::inputPrefix($source->name, $note->address()) . 'text'] = 'Unsaved note';
 $post[FlexPath::controlName($source->name, $card->address() . '.notes', 'order')] = $other->rowId() . ',' . $note->rowId();
@@ -137,6 +157,12 @@ $same(['other', 'note'], array_column($values['notes']['value'], 'type'), 'clipb
 $same('Unsaved note', $values['notes']['value'][1]['values']['text']['value'], 'clipboard includes unsaved nested input');
 $same('Übersetzung', $values['translation']['value'][$language->name], 'clipboard uses language names');
 $same(true, $payload['row']['hidden'], 'clipboard includes the submitted visibility');
+$portableReference = static fn(Page $reference) => [
+	'path' => $reference->path(), 'parent' => $reference->parent()->path(), 'template' => $reference->template->name,
+];
+$same($portableReference($firstReference), $values['link']['references'][$firstReference->id], 'single Page reference includes its path, parent path and template name');
+$same([$secondReference->id, $firstReference->id], $values['links']['value'], 'multiple Page references include the submitted order');
+$same($portableReference($secondReference), $values['links']['references'][$secondReference->id], 'multiple Page references include portable descriptors');
 $assert(!str_contains($text, $card->rowId()) && !str_contains($text, $file->assetId()), 'clipboard omits row identities and standalone asset IDs');
 $assert(!isset($values['future']), 'clipboard only exports declared properties');
 $same($beforeCopy, $type->admin()->draft($draft), 'copy leaves the source draft unchanged');
@@ -158,7 +184,7 @@ $empty = $ajax($page, $source, $draft, $paste('empty', 'paste-end', [], $text));
 $same(false, $empty['error'], 'paste appends to an empty single-type collection');
 $assert(count(array_unique([...$ids, $empty['id']])) === 5, 'every pasted row has a fresh identity');
 $new = $type->admin()->row($draft, 'items', $above['id'], $page->getUnformatted($source->name));
-$same($second->id, $new->link instanceof Page ? $new->link->id : $new->link, 'a valid Page reference survives within the installation');
+$same($firstReference->id, $new->link instanceof Page ? $new->link->id : $new->link, 'a valid Page reference survives within the installation');
 $same(['other', 'note'], array_map(static fn(FlexRow $row) => $row->rowType(), array_values($new->notes->getArray())), 'supported nested rows retain order');
 $assert($new->notes->last()->rowId() !== $note->rowId() && $new->notes->first()->rowId() !== $other->rowId(), 'nested rows receive fresh identities');
 $newFile = $new->images->first();
@@ -172,6 +198,18 @@ $same($baseline, $wire->pages->getFresh($id)->getUnformatted($source->name)->raw
 $crossSite = $payload;
 $crossSite['site'] = 'a-different-installation';
 $crossSite['source'] = 'https://example.test/source-page/';
+$foreignID = $excludedReference->id; // In the destination this ID belongs to another page.
+$crossSite['row']['values']['link'] = [
+	'kind' => 'page', 'value' => $foreignID, 'references' => [$foreignID => $portableReference($firstReference)],
+];
+$crossSite['row']['values']['links'] = [
+	'kind' => 'page', 'value' => [700001, 700002, 700003],
+	'references' => [
+		700001 => $portableReference($secondReference),
+		700002 => $portableReference($wrongParent),
+		700003 => $portableReference($firstReference),
+	],
+];
 $crossSite['row']['values']['translation']['value']['absent_language'] = 'Missing';
 $crossSite['row']['values']['images']['value'][0]['url'] = 'https://127.0.0.1/' . rawurlencode($file->basename());
 $crossSite['row']['values']['object.caption'] = ['kind' => 'text', 'value' => 'Reject dotted key'];
@@ -202,7 +240,9 @@ $same('Unsaved object', $actual->object->caption, 'compatible Object values stil
 $assert(!array_key_exists('extra', $actual->rawArray()) && !array_key_exists('object.caption', $actual->rawArray()), 'foreign properties cannot become retained unknown data');
 $same('Übersetzung', $actual->translation->getLanguageValue($language), 'known language names are mapped to destination IDs');
 $same(1, count($actual->notes), 'unsupported nested types are skipped');
-$same(false, $actual->link, 'cross-installation numeric Page references are skipped');
+$same($firstReference->id, $actual->link instanceof Page ? $actual->link->id : $actual->link, 'paste resolves the portable reference to the local Page despite a colliding source ID');
+$same([$secondReference->id, $firstReference->id], array_map('intval', $actual->links->explode('id')), 'valid multiple references retain their order around a rejected parent');
+$assert(str_contains($cross['warning'], 'links'), 'a partial Page selection reports the skipped reference');
 $same(0, count($actual->images), 'an unavailable original does not leave a media reference');
 $assert(str_contains($cross['warning'], 'amount') && str_contains($cross['warning'], $file->basename()), 'the result reports individual skipped properties and filenames: ' . $cross['warning']);
 $assert(str_contains($actual->body, 'https://example.test/original-link/') && !str_contains($actual->body, 'bad()'), 'HTML is purified and relative links retain their source site');
@@ -211,7 +251,10 @@ $same(true, $ajax($second, $target, $targetDraft, $paste($targetSet, 'paste-end'
 // Normal native PageEdit processing merges draft rows with pending target edits.
 $targetPost[FlexPath::controlName($target->name, $targetSet, 'order')] = $cross['id'];
 $targetPost[FlexPath::inputPrefix($target->name, $parent->address()) . 'caption'] = 'Unsaved target';
-$targetPost[FlexPath::inputPrefix($target->name, $actual->address()) . 'heading'] = 'Edited after paste';
+$actualPrefix = FlexPath::inputPrefix($target->name, $actual->address());
+$targetPost[$actualPrefix . 'heading'] = 'Edited after paste';
+$targetPost[$actualPrefix . 'link'] = (string) $firstReference->id;
+$targetPost[$actualPrefix . 'links'] = [(string) $secondReference->id, (string) $firstReference->id];
 $targetPost[FlexPath::controlName($target->name, $actual->address(), 'hidden')] = '1';
 $targetEditor->processInput($wire->wire(new WireInputData($targetPost)));
 $same([], $targetEditor->getErrors(), 'native input processing accepts the inserted nested row');
@@ -221,6 +264,42 @@ $saved = $wire->pages->getFresh($second->id)->getUnformatted($target->name)->par
 $same('Unsaved target', $saved->caption, 'page save retains the pre-existing pending target change');
 $same('Edited after paste', $saved->children->first()->heading, 'page save persists the pasted row and its later edits');
 $same($cross['id'], $saved->children->first()->rowId(), 'the saved row retains its new identity');
+$same($firstReference->id, $saved->children->first()->link->id, 'normal save persists the resolved destination Page ID');
+$same([$secondReference->id, $firstReference->id], array_map('intval', $saved->children->first()->links->explode('id')), 'normal save persists the ordered local Page selection');
+
+$probeReference = static function(array $entry, string $site) use ($wire, $type, $second, $target, $targetDraft, $payload): array {
+	$blank = $type->getBlankValue($second, $target);
+	$probeParent = $blank->parents->addRow('group');
+	$data = $payload;
+	$data['site'] = $site;
+	$data['row']['values'] = ['link' => $entry];
+	$clipboard = $wire->wire(new FlexClipboard());
+	$row = $clipboard->paste($probeParent->children, $probeParent->definitions()->property('children'), json_encode($data, JSON_THROW_ON_ERROR), $targetDraft);
+	return [$row->link instanceof Page ? $row->link->id : $row->link, $clipboard->warningSummary()];
+};
+$legacyEntry = ['kind' => 'page', 'value' => $firstReference->id];
+$same([$firstReference->id, ''], $probeReference($legacyEntry, $payload['site']), 'existing ID-only clipboard data still works within its installation');
+[$rejected, $warning] = $probeReference($legacyEntry, $crossSite['site']);
+$same(false, $rejected, 'ID-only clipboard data cannot resolve on another installation');
+$assert(str_contains($warning, 'link'), 'an old unresolved reference is reported');
+$locator = $portableReference($firstReference);
+$rejectedLocators = [
+	'partial path' => ['path' => '/missing-parent/' . $firstReference->name . '/'] + $locator,
+	'noncanonical path' => ['path' => rtrim($firstReference->path(), '/')] + $locator,
+	'mismatched exported parent' => ['parent' => '/another-parent/'] + $locator,
+	'mismatched exported template' => ['template' => 'another-template'] + $locator,
+	'parent excluded by the destination input' => $portableReference($wrongParent),
+	'template excluded by the destination input' => $portableReference($wrongTemplate),
+	'selector excluded by the destination input' => $portableReference($excludedReference),
+	'unpublished destination page' => $portableReference($unpublished),
+	'destination owner itself' => $portableReference($second),
+];
+foreach($rejectedLocators as $label => $reference) {
+	$entry = ['kind' => 'page', 'value' => $foreignID, 'references' => [$foreignID => $reference]];
+	[$rejected, $warning] = $probeReference($entry, $crossSite['site']);
+	$same(false, $rejected, 'paste rejects ' . $label);
+	$assert(str_contains($warning, 'link'), 'paste reports ' . $label);
+}
 
 // Compare against the concrete definition when the owner context changes after hydration.
 $dynamic = $createField('flex_clip_dynamic', []);
