@@ -541,12 +541,12 @@ class FlexFieldDefs extends Wire {
 		$table = ['columns' => array_keys($columns), 'widths' => $widths, 'rowLabels' => $settings['rowLabels'] ?? false];
 		if(array_key_exists('sortOnSave', $settings)) {
 			$sort = $settings['sortOnSave'];
-			if(!is_array($sort) || array_diff_key($sort, ['column' => true, 'direction' => true])
-				|| !is_string($sort['column'] ?? null) || !isset($columns[$sort['column']])
-				|| !in_array($sort['direction'] ?? 'asc', ['asc', 'desc'], true)) {
-				throw new WireException($this->_('Table sortOnSave requires a column and an optional asc or desc direction'));
+			$descending = is_string($sort) && str_starts_with($sort, '-');
+			$column = $descending ? substr($sort, 1) : $sort;
+			if(!is_string($column) || !isset($columns[$column])) {
+				throw new WireException($this->_('Table sortOnSave requires a column key with an optional leading minus sign'));
 			}
-			$table['sortOnSave'] = ['column' => $sort['column'], 'direction' => $sort['direction'] ?? 'asc'];
+			$table['sortOnSave'] = ['column' => $column, 'direction' => $descending ? 'desc' : 'asc'];
 		}
 		$rows = ['type' => 'rows', '_flexTable' => $table, 'rowCollapse' => FieldtypeFlex::ROW_EXPAND_ALL, 'types' => ['row' => ['children' => $columns]]];
 		foreach(['minItems', 'maxItems', 'addRowLabel'] as $key) {

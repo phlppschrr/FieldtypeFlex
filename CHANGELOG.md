@@ -2,6 +2,10 @@
 
 ## WIP
 
+### Changed
+
+- Configure automatic table sorting with a column key such as `'price'` or `'-price'`. Replace the beta.4 column and direction map with the corresponding string.
+
 ## 1.0.0-beta.4 - 2026-11-19
 
 ### Added

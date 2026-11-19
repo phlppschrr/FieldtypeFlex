@@ -376,7 +376,7 @@ Mark for removal,Marcar para eliminar,,site/modules/FieldtypeFlex/InputfieldFlex
 Rows copied to the clipboard.,Filas copiadas al portapapeles.,,site/modules/FieldtypeFlex/InputfieldFlex.module.php,6d950a02362c9627a0eb932648fdb3e5
 Rows pasted.,Filas pegadas.,,site/modules/FieldtypeFlex/InputfieldFlex.module.php,93f33c4c3874409ab6da73db4d1f5c30
 Maximum repeatable item count reached,Se alcanzó el número máximo de elementos repetibles,,site/modules/FieldtypeFlex/src/FlexClipboard.php,165d63f16b1b32b968a235b83d4adf67
-Table sortOnSave requires a column and an optional asc or desc direction,sortOnSave requiere una columna y admite la dirección asc o desc,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,bc339ea2cad5082896d9eaa0d0fc34ed
+Table sortOnSave requires a column key with an optional leading minus sign,sortOnSave requiere una clave de columna con un signo menos inicial opcional,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,824833cceab3db7f883c1f3f89b0f1ec
 "Table sortOnSave requires a Text, Integer or Float column","sortOnSave requiere una columna de texto, enteros o decimales",,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,309ee1ec682579d92508be1a238b8934
 Sort by %s in ascending order,Ordenar por %s de forma ascendente,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,0f5c1da2d3dfbb97ac3a642b1152a202
 Sort by %s in descending order,Ordenar por %s de forma descendente,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,2327567cf885c08ce662237a5d80c8a6
