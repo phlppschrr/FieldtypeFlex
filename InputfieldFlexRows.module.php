@@ -25,7 +25,7 @@ class InputfieldFlexRows extends Inputfield implements BridgeComponent {
 	public static function getModuleInfo() {
 		return [
 			'title'    => __('Flex rows'),
-			'version'  => '1.0.0-beta.3',
+			'version'  => '1.0.0-beta.4',
 			'summary'  => __('Repeatable native inputs inside Flex'),
 			'requires' => 'FieldtypeFlex',
 		];
@@ -310,20 +310,30 @@ class InputfieldFlexRows extends Inputfield implements BridgeComponent {
 		$inputs = $this->inputsFor($row);
 		$prefix = FlexPath::inputPrefix($this->flexInputName ?: $this->name, $row->address());
 		$table = $this->definition['settings']['_flexTable'];
+		$automatic = isset($table['sortOnSave']);
 		$cells = '';
 		foreach($table['columns'] as $name) {
 			$tag = $name === 'row_label' ? 'th' : 'td';
 			$input = $inputs->getChildByName($prefix . $name);
-			$cells .= '<' . $tag . ' class="flex-table-cell"' . ($tag === 'th' ? ' scope="row"' : '') . '>' . $this->tableCell($input, $readOnly) . '</' . $tag . '>';
+			$key = '';
+			if(!$readOnly && !$automatic && FlexTableSort::type($input)) {
+				$value = FlexTableSort::defaultValue($this->flexRoot->ownerPage(), $row->getUnformatted($name));
+				$key = ' data-flex-sort-input="' . $entities($input->name) . '" data-flex-sort-value="' . $entities($value) . '"';
+			}
+			$cells .= '<' . $tag . ' class="flex-table-cell"' . ($tag === 'th' ? ' scope="row"' : '') . $key . '>' . $this->tableCell($input, $readOnly) . '</' . $tag . '>';
 		}
 		if($readOnly) return '<tr>' . $cells . '</tr>';
-		$sortLabel = $entities($this->_('Drag to reorder; use Up and Down arrow keys when focused'));
+		$handle = '';
+		if(!$automatic) {
+			$sortLabel = $entities($this->_('Drag to reorder; use Up and Down arrow keys when focused'));
+			$handle = '<button type="button" class="flex-row-sort" title="' . $sortLabel . '" aria-label="' . $sortLabel . '"><i class="fa fa-fw fa-arrows" aria-hidden="true"></i></button>';
+		}
 		$transport = '';
 		foreach(['remove' => $removed, 'hidden' => $row->isHidden()] as $control => $state) {
 			$transport .= '<input type="hidden" class="flex-row-' . $control . '-value" name="' . $entities(FlexPath::controlName($this->flexInputName ?: $this->name, $row->address(), $control)) . '" value="' . ($state ? '1' : '0') . '">';
 		}
 		return '<tr class="flex-row' . ($row->isHidden() ? ' flex-row-hidden' : '') . ($removed ? ' flex-row-remove-pending' : '') . '" data-flex-row="' . $id . '" data-flex-type="' . $entities($row->rowType()) . '">' .
-			'<td class="flex-table-sort"><button type="button" class="flex-row-sort" title="' . $sortLabel . '" aria-label="' . $sortLabel . '"><i class="fa fa-fw fa-arrows" aria-hidden="true"></i></button>' .
+			'<td class="flex-table-sort">' . $handle .
 			$this->rowSelectionCheckbox() . '</td>' . $cells .
 			'<td class="flex-row-header flex-table-actions"><div class="flex-row-controls">' . $this->rowActions($row, $removed, true) . '</div><span class="flex-row-transport">' . $transport . '</span></td></tr>';
 	}
@@ -333,31 +343,48 @@ class InputfieldFlexRows extends Inputfield implements BridgeComponent {
 		$entities = fn($value) => $this->wire()->sanitizer->entities((string) $value);
 		$table = $this->definition['settings']['_flexTable'];
 		$headers = $this->flexTableHeaders;
+		$sort = $table['sortOnSave'] ?? null;
+		$language = $this->wire()->user->language;
 		$head = '';
 		$cols = '';
 		foreach($table['columns'] as $name) {
 			$width = $table['widths'][$name] ?? '';
 			$cols .= '<col' . ($width !== '' ? ' style="width:' . $entities($width) . '"' : '') . '>';
-			if($headers instanceof InputfieldWrapper) {
-				$input = $headers->getChildByName($headers->flexObjectPrefix . $name);
-				$text = $this->tableCell($input, $readOnly);
-			} else {
-				$input = $this->definition['types']['row']['schema']->getPropertyInputfield($name);
-				$language = $this->wire()->user->language;
-				$text = $entities(($language && !$language->isDefault() ? $input->get('label' . $language->id) : '') ?: $input->label);
-			}
+			$column = $this->definition['types']['row']['schema']->getPropertyInputfield($name);
+			$nameLabel = ($language && !$language->isDefault() ? $column->get('label' . $language->id) : '') ?: $column->label;
+			$text = $headers instanceof InputfieldWrapper
+				? $this->tableCell($headers->getChildByName($headers->flexObjectPrefix . $name), $readOnly)
+				: $entities($nameLabel);
 			if(!$readOnly) {
-				$label = $entities(sprintf($this->_('Resize column %s'), $input->label));
+				$sortType = FlexTableSort::type($column);
+				if($sort && $sort['column'] === $name) {
+					$ascending = $sort['direction'] === 'asc';
+					$hint = $entities(sprintf($ascending
+						? $this->_('Sorted by %s in ascending order on save')
+						: $this->_('Sorted by %s in descending order on save'), $nameLabel));
+					$text = '<div class="flex-table-heading">' . $text . '<span class="flex-table-sort-on-save" title="' . $hint . '"><span aria-hidden="true">' . ($ascending ? '↑' : '↓') . '</span><span class="flex-table-sr">' . $hint . '</span></span></div>';
+				} else if(!$sort && $sortType) {
+					$asc = $entities(sprintf($this->_('Sort by %s in ascending order'), $nameLabel));
+					$desc = $entities(sprintf($this->_('Sort by %s in descending order'), $nameLabel));
+					$text = '<div class="flex-table-heading">' . $text . '<button type="button" class="flex-table-column-sort" data-flex-sort-type="' . $sortType .
+						'" data-flex-sort-asc="' . $asc . '" data-flex-sort-desc="' . $desc . '" title="' . $asc . '" aria-label="' . $asc . '" hidden><span aria-hidden="true">↕</span></button></div>';
+				}
+				$label = $entities(sprintf($this->_('Resize column %s'), $nameLabel));
 				$text .= '<button type="button" class="flex-table-resize" title="' . $label . '" aria-label="' . $label . '" aria-keyshortcuts="ArrowLeft ArrowRight"></button>';
 			}
 			$head .= '<th scope="col"' . ($readOnly ? '' : ' class="flex-table-resizable"') . '>' . $text . '</th>';
 		}
+		$sortSettings = '';
 		if(!$readOnly) {
 			$cols = '<col>' . $cols . '<col>';
-			$head = '<th class="flex-table-sort" scope="col"><span class="flex-table-sr">' . $entities($this->_('Reorder rows')) . '</span></th>' . $head .
+			$rowControl = $sort
+				? $this->_('Select row')
+				: $this->_('Reorder rows');
+			$head = '<th class="flex-table-sort" scope="col"><span class="flex-table-sr">' . $entities($rowControl) . '</span></th>' . $head .
 				'<th class="flex-table-actions" scope="col"><span class="flex-table-sr">' . $entities($this->_('Row actions')) . '</span></th>';
+			$sortSettings = $sort ? '' : ' data-flex-sort-locale="' . $entities(FlexTableSort::locale($this->flexRoot->ownerPage())) . '" data-flex-sort-decimal="' . $entities(localeconv()['decimal_point']) . '"';
 		}
-		return '<div class="flex-table-scroll" role="region" aria-label="' . $entities($this->label ?: $this->_('Table')) . '" tabindex="0"><table class="flex-table-grid"><colgroup>' . $cols . '</colgroup><thead><tr>' . $head . '</tr></thead><tbody class="flex-rows-items">' . $rows . '</tbody></table></div>';
+		return '<div class="flex-table-scroll" role="region" aria-label="' . $entities($this->label ?: $this->_('Table')) . '" tabindex="0"><table class="flex-table-grid"' . $sortSettings . '><colgroup>' . $cols . '</colgroup><thead><tr>' . $head . '</tr></thead><tbody class="flex-rows-items">' . $rows . '</tbody></table></div>';
 	}
 
 	/**
@@ -405,7 +432,7 @@ class InputfieldFlexRows extends Inputfield implements BridgeComponent {
 			'<span class="flex-selection-count" role="status" data-flex-count="' . $entities($this->_('{count} selected')) . '" hidden></span></div>';
 		$table = isset($settings['_flexTable']);
 		$items = $table ? $this->renderTable($html) : '<ul class="Inputfields flex-rows-items">' . $html . '</ul>';
-		return '<div class="flex-rows' . ($table ? ' flex-table' : '') . '" id="' . $setId . '" data-flex-set="' . $entities($this->setName) . '" data-flex-draft="' . $entities($this->flexDraft) . '" data-flex-page-url="' . $entities($this->flexRoot->ownerPage()->editUrl()) . '" data-flex-field="' . $entities($this->flexRoot->ownerField()->name) . '" data-flex-min="' . (int) ($settings['minItems'] ?? 0) . '" data-flex-max="' . (int) ($settings['maxItems'] ?? 0) . '"' . $attributes . '>' .
+		return '<div class="flex-rows' . ($table ? ' flex-table' : '') . (isset($settings['_flexTable']['sortOnSave']) ? ' flex-table-auto' : '') . '" id="' . $setId . '" data-flex-set="' . $entities($this->setName) . '" data-flex-draft="' . $entities($this->flexDraft) . '" data-flex-page-url="' . $entities($this->flexRoot->ownerPage()->editUrl()) . '" data-flex-field="' . $entities($this->flexRoot->ownerField()->name) . '" data-flex-min="' . (int) ($settings['minItems'] ?? 0) . '" data-flex-max="' . (int) ($settings['maxItems'] ?? 0) . '"' . $attributes . '>' .
 			'<input type="hidden" name="' . $entities(FlexPath::controlName($this->flexInputName ?: $this->name, $this->setName, 'present')) . '" value="1">' .
 			'<input type="hidden" class="flex-rows-order" name="' . $entities(FlexPath::controlName($this->flexInputName ?: $this->name, $this->setName, 'order')) . '" value="' . implode(',', $ids) . '">' .
 			$items . $footer .

@@ -6,6 +6,7 @@ require_once __DIR__ . '/src/FlexPhpDoc.php';
 require_once __DIR__ . '/src/FlexValue.php';
 require_once __DIR__ . '/src/FlexMarkup.php';
 require_once __DIR__ . '/src/FlexRows.php';
+require_once __DIR__ . '/src/FlexTableSort.php';
 require_once __DIR__ . '/src/FlexPath.php';
 require_once __DIR__ . '/src/FlexDependencies.php';
 require_once __DIR__ . '/src/FlexLazy.php';
@@ -118,7 +119,7 @@ class FieldtypeFlex extends Fieldtype implements ConfigurableModule, FieldtypeHa
 	public static function getModuleInfo() {
 		return [
 			'title'    => __('Flex'),
-			'version'  => '1.0.0-beta.3',
+			'version'  => '1.0.0-beta.4',
 			'summary'  => __('PHP/JSON-defined compound fields with native inputs and selectors'),
 			'author'   => __('FieldtypeFlex contributors'),
 			'href'     => 'https://github.com/phlppschrr/FieldtypeFlex',
@@ -976,9 +977,9 @@ class FieldtypeFlex extends Fieldtype implements ConfigurableModule, FieldtypeHa
 		$value = $this->sanitizeValue($page, $field, $value);
 		// Re-evaluate at save time so removed properties/renames reflect the current schema.
 		$current = new FlexValue($page, $field, $this->getDefinitions($field, $page), $value->rawArray());
-		$raw = $current->rawArray();
 		$current->validateTree();
-		$raw = FlexMarkup::sleep($page, $field, $current->definitions(), $raw);
+		FlexTableSort::apply($current);
+		$raw = FlexMarkup::sleep($page, $field, $current->definitions(), $current->rawArray());
 		FlexPath::validate($raw, $field);
 		return [
 			'data'   => FlexStorage::encode($raw),
@@ -1086,6 +1087,7 @@ class FieldtypeFlex extends Fieldtype implements ConfigurableModule, FieldtypeHa
 			$value->expectedRevision(FlexStorage::revision($raw));
 			return true;
 		});
+		FlexTableSort::apply($value, $committed);
 		$this->media()->baselines($value, $committed);
 		if($own && !$page->get('_cloning')) {
 			$this->media()->sweep($page, $field);

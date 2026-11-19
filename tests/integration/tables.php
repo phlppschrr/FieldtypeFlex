@@ -178,4 +178,70 @@ try {
 $ni = $nested->getInputfield($page); $ni->value = $page->{$nested->name};
 $assert(str_contains($ni->render(), 'flex-table-grid'), 'table renderer works inside Object and Row ancestors');
 
+// Column sorting reuses canonical table rows and can also run for API writes.
+$sortColumns = [
+	'caption' => ['type' => 'text', 'useLanguages' => true],
+	'amount' => ['type' => 'integer'],
+	'price' => ['type' => 'float'],
+	'date' => ['type' => 'datetime'],
+];
+$manualTable = ['type' => 'table', 'editableHeaders' => true, 'columns' => $sortColumns];
+$sorting = $createField('flex_table_sorting', [
+	'manual' => $manualTable,
+	'prices' => $manualTable + ['sortOnSave' => ['column' => 'price', 'direction' => 'desc']],
+	'sections' => ['type' => 'rows', 'types' => ['section' => ['children' => [
+		'names' => $manualTable + ['sortOnSave' => ['column' => 'caption']],
+		'amounts' => $manualTable + ['sortOnSave' => ['column' => 'amount']],
+	]]]],
+]);
+$page = $wire->pages->getFresh($id);
+$page->of(false);
+$ordered = $page->{$sorting->name};
+$manualRows = $ordered->manual->rows;
+$manualRows->addRow('row', ['amount' => 10]);
+$manualRows->addRow('row', ['amount' => -1]);
+$prices = $ordered->prices->rows;
+$blank = $prices->addRow('row');
+$firstTie = $prices->addRow('row', ['price' => 2.25]);
+$zero = $prices->addRow('row', ['price' => 0]);
+$top = $prices->addRow('row', ['price' => 10.5]);
+$secondTie = $prices->addRow('row', ['price' => 2.25]);
+$firstTie->setHidden(true);
+$section = $ordered->sections->addRow('section');
+$section->names->rows->addRow('row', ['caption' => ['default' => 'Zulu', 'de' => 'Alpha'], 'amount' => 1]);
+$section->names->rows->addRow('row', ['caption' => ['default' => 'alpha', 'de' => 'Zulu'], 'amount' => 2]);
+foreach([10, '', 2, -1, 0] as $amount) $section->amounts->rows->addRow('row', ['amount' => $amount]);
+$ids = static fn(FlexRows $rows) => array_keys($rows->getArray());
+$same([$blank->rowId(), $firstTie->rowId(), $zero->rowId(), $top->rowId(), $secondTie->rowId()], $ids($prices), 'automatic sorting waits until save');
+$page->save($sorting->name);
+$expected = [$top->rowId(), $firstTie->rowId(), $secondTie->rowId(), $zero->rowId(), $blank->rowId()];
+$readback = $wire->pages->getFresh($id)->getUnformatted($sorting->name);
+$same($expected, $ids($readback->prices->rows), 'API save sorts decimals descending with stable ties and blanks last');
+$same($expected, $ids($prices), 'successful save updates the order of the existing runtime collection');
+$same($firstTie, $prices->getById($firstTie->rowId()), 'save keeps the original row objects');
+$assert($readback->prices->rows->getById($firstTie->rowId())->isHidden(), 'automatic sorting preserves row visibility');
+$same([10, -1], array_values($readback->manual->rows->explode('amount')), 'manual tables keep their submitted order');
+$same([2, 1], array_values($readback->sections->first()->names->rows->explode('amount')), 'nested multilingual Text sorts by the default-language value');
+$same([-1, 0, 2, 10, ''], array_values($readback->sections->first()->amounts->rows->explode('amount')), 'nested Integer sorts numerically ascending with zero distinct from blank');
+
+$renderSort = static function(string $name) use ($page, $createField, $manualTable): string {
+	$table = $name === 'auto' ? $manualTable + ['sortOnSave' => ['column' => 'price', 'direction' => 'desc']] : $manualTable;
+	$field = $createField('flex_sort_' . $name, ['grid' => $table]);
+	$editor = $field->getInputfield($page);
+	$value = $field->type->getBlankValue($page, $field);
+	$value->grid->rows->addRow('row', ['price' => 25]);
+	$editor->value = $value;
+	return $editor->render();
+};
+$manualHtml = $renderSort('manual');
+$autoHtml = $renderSort('auto');
+$same(3, substr_count($manualHtml, 'class="flex-table-column-sort"'), 'only Text, Integer and Float headings have a manual sort control');
+$assert(str_contains($manualHtml, 'class="flex-row-sort"'), 'manual tables still offer row drag handles');
+$assert(str_contains($autoHtml, 'Sorted by Price in descending order on save') && !str_contains($autoHtml, 'class="flex-table-column-sort"'), 'automatic table heading explains the fixed order and omits manual sorts');
+$assert(!str_contains($autoHtml, 'class="flex-row-sort"') && str_contains($autoHtml, 'class="flex-row-select '), 'automatic tables omit drag handles while retaining bulk selection');
+foreach([['column' => 'date'], ['column' => 'missing'], ['column' => 'price', 'direction' => 'sideways']] as $invalidSort) {
+	$bad->flexDefinition = json_encode(['grid' => $manualTable + ['sortOnSave' => $invalidSort]]);
+	$throws(fn() => $type->getDefinitions($bad, $page), 'unsupported automatic sort definition is rejected', FlexDefinitionException::class);
+}
+
 echo "\n$passed assertions passed on ProcessWire {$wire->config->version}, PHP " . PHP_VERSION . ".\n";

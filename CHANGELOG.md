@@ -2,6 +2,12 @@
 
 ## WIP
 
+## 1.0.0-beta.4 - 2026-11-19
+
+### Added
+
+- Sort table rows from Text, Integer and Float column headings, or configure a fixed order on save.
+
 ### Changed
 
 - Place the collection Actions menu beside the add control, reuse it for bulk actions, and align the selection count to the right.

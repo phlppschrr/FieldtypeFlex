@@ -10,6 +10,7 @@ namespace FieldtypeFlex {
     const overlayMenus = '.flex-table-more, .flex-collection-menu';
     const rowMenus = `${overlayMenus}, .flex-row-clipboard`;
     const selection = new WeakMap<HTMLElement, {rows: Set<HTMLElement>; expanded: HTMLElement[]; anchor?: HTMLElement}>();
+    const columnSort = ':scope > .flex-table-scroll > .flex-table-grid > thead .flex-table-column-sort';
     const tableEditors = new WeakMap<HTMLElement, {button: HTMLButtonElement; editor: HTMLElement; detail: HTMLTableRowElement}>();
     const initializedDetailEditors = new WeakSet<HTMLElement>();
     function rowState(row: HTMLElement): RowState {
@@ -100,6 +101,10 @@ namespace FieldtypeFlex {
             one<HTMLButtonElement>(menu, '[data-flex-row-action="paste-end"]').disabled = busy || selecting || atLimit;
         }
         all<HTMLButtonElement | HTMLSelectElement>(set, ':scope > .flex-rows-footer > :is(.flex-row-add, .flex-row-type)').forEach(control => control.disabled = busy || selecting || atLimit);
+        all<HTMLButtonElement>(set, columnSort).forEach(button => {
+            button.hidden = false;
+            button.disabled = busy || selecting || count < 2;
+        });
         rows(set).forEach(row => {
             const header = one(row, ':scope > .flex-row-header');
             const toggle = header.querySelector<HTMLButtonElement>('.flex-row-toggle');
@@ -110,12 +115,14 @@ namespace FieldtypeFlex {
                 button.disabled = busy || selecting || removed || attr(button, 'data-flex-row-action') !== 'clipboard-copy' && atLimit;
             });
             one<HTMLButtonElement>(header, '[data-flex-row-action="remove"]').disabled = busy || selecting || (!removed && count <= min);
-            one<HTMLButtonElement>(row, ':scope > .flex-row-header .flex-row-sort, :scope > .flex-table-sort > .flex-row-sort').disabled = busy || selecting || removed || count < 2;
+            const handle = row.querySelector<HTMLButtonElement>(':scope > .flex-row-header .flex-row-sort, :scope > .flex-table-sort > .flex-row-sort');
+            if(handle) handle.disabled = busy || selecting || removed || count < 2;
         });
         sortable.disabled(rowList(set), busy || selecting || count < 2);
         updateSelection(set);
     }
     function order(set: HTMLElement): void {
+        clearColumnSort(set);
         change(one<HTMLInputElement>(set, ':scope > .flex-rows-order'), rows(set).map(row => attr(row, 'data-flex-row')).join(','));
         closest(set, '.InputfieldFlex').classList.add('InputfieldStateChanged'); updateLabels(set); updateActions(set);
     }
@@ -357,7 +364,9 @@ namespace FieldtypeFlex {
                 syncToggle(row);
             });
             if(errorPreview && !tableEditors.has(set)) openTableEditor(errorPreview, false);
-            sortable.init(rowList(set), teardown, async row => { order(set); await classic.setup(row); moved(set, row); });
+            if(!set.matches('.flex-table-auto')) {
+                sortable.init(rowList(set), teardown, async row => { order(set); await classic.setup(row); moved(set, row); });
+            }
             updateLabels(set); updateActions(set);
         });
     }
@@ -555,6 +564,81 @@ namespace FieldtypeFlex {
         event.preventDefault();
         tableColumnResizer(handle)?.(event.key === 'ArrowRight' ? 16 : -16);
     });
+    function columnDirection(button: HTMLElement, direction?: 'ascending' | 'descending'): void {
+        const heading = closest(button, 'th');
+        if(direction) heading.setAttribute('aria-sort', direction);
+        else heading.removeAttribute('aria-sort');
+        one(button, 'span').textContent = direction === 'ascending' ? '↑' : direction === 'descending' ? '↓' : '↕';
+        const label = attr(button, direction === 'ascending' ? 'data-flex-sort-desc' : 'data-flex-sort-asc');
+        button.title = label;
+        button.setAttribute('aria-label', label);
+    }
+    function clearColumnSort(set: HTMLElement): void {
+        if(!set.matches('.flex-table')) return;
+        const button = all(set, columnSort).find(control => control.closest('th')?.hasAttribute('aria-sort'));
+        if(button) columnDirection(button);
+    }
+    function columnSortValue(cell: HTMLTableCellElement, type: string, decimal: string): string | number | bigint | null {
+        const inputName = attr(cell, 'data-flex-sort-input');
+        const input = all<HTMLInputElement>(cell, 'input[name]').find(candidate => candidate.name === inputName);
+        const raw = (input?.value ?? attr(cell, 'data-flex-sort-value')).trim();
+        if(!raw) return null;
+        if(type === 'text') return raw;
+        if(type === 'integer') {
+            const integer = input?.type === 'number' ? raw : raw.replace(/[\s,]/g, '');
+            return /^[+-]?\d+$/.test(integer) ? BigInt(integer) : null;
+        }
+        let normalized = raw;
+        if(input?.type === 'text') {
+            normalized = raw.replace(/\s/g, '');
+            if(decimal === '.' && /^[+-]?\d{1,3}(,\d{3})+(\.\d+)?$/.test(normalized)) {
+                normalized = normalized.replace(/,/g, '');
+            } else if(normalized.includes(',')) {
+                const comma = normalized.lastIndexOf(',');
+                const point = normalized.lastIndexOf('.');
+                normalized = comma > point ? normalized.replace(/\./g, '').replace(',', '.') : normalized.replace(/,/g, '');
+            }
+        }
+        const number = Number(normalized);
+        return Number.isFinite(number) ? number : null;
+    }
+    function textCollator(locale: string): Intl.Collator {
+        try { return new Intl.Collator(locale || 'en', {sensitivity: 'accent'}); }
+        catch { return new Intl.Collator('en', {sensitivity: 'accent'}); }
+    }
+    delegate('click', '.flex-table-column-sort', (event, element) => {
+        event.preventDefault(); event.stopPropagation();
+        const button = element as HTMLButtonElement;
+        const set = closest(button, '.flex-table');
+        if(button.disabled || treeBusy(set) || selection.has(set) || set.matches('.flex-table-auto')) return;
+        const heading = closest(button, 'th') as HTMLTableCellElement;
+        const table = closest(heading, '.flex-table-grid');
+        const direction = heading.getAttribute('aria-sort') === 'ascending' ? 'descending' : 'ascending';
+        const sign = direction === 'ascending' ? 1 : -1;
+        const type = attr(button, 'data-flex-sort-type');
+        const locale = attr(table, 'data-flex-sort-locale');
+        const decimal = attr(table, 'data-flex-sort-decimal') || '.';
+        const collator = type === 'text' ? textCollator(locale) : null;
+        closeTableEditor(set);
+        const ordered = activeRows(set).map(row => ({
+            row,
+            value: columnSortValue((row as HTMLTableRowElement).cells[heading.cellIndex], type, decimal)
+        }));
+        ordered.sort(({value: a}, {value: b}) => {
+            if(a === null || b === null) return Number(a === null) - Number(b === null);
+            if(collator) return sign * collator.compare(String(a), String(b));
+            return sign * (a < b ? -1 : a > b ? 1 : 0);
+        });
+        const list = rowList(set);
+        let index = 0;
+        // Keep rows marked for removal in their slots so undo remains predictable.
+        const next = rows(set).map(row => row.matches('.flex-row-remove-pending') ? row : ordered[index++].row);
+        next.forEach((row, i) => {
+            if(list.children[i] !== row) list.insertBefore(row, list.children[i] || null);
+        });
+        order(set);
+        columnDirection(button, direction);
+    });
     const tableInputs = '.flex-table-grid > tbody > .flex-row > .flex-table-cell, .flex-table-grid > thead > tr > th';
     const cellControl = 'input:not([type="hidden"]), textarea, select, button, [contenteditable]:not([contenteditable="false"])';
     function visibleControl(control: HTMLElement): boolean {
@@ -572,7 +656,7 @@ namespace FieldtypeFlex {
             else openTableEditor(preview);
             return;
         }
-        const control = all(cell, `:scope > .Inputfields > .flex-table-input > .InputfieldContent :is(${cellControl})`).find(visibleControl);
+        const control = all(cell, `:scope > .Inputfields > .flex-table-input > .InputfieldContent :is(${cellControl}), :scope > .flex-table-heading > .Inputfields > .flex-table-input > .InputfieldContent :is(${cellControl})`).find(visibleControl);
         control?.focus({preventScroll: true});
     });
     delegate('click', '.flex-row-retry', (event, button) => { event.preventDefault(); void loadRow(closest(button, '.flex-row')); });
@@ -688,7 +772,15 @@ namespace FieldtypeFlex {
         });
     }
     ['input', 'change'].forEach(name => document.addEventListener(name, event => {
-        if(event.target instanceof HTMLElement && event.target.matches('input:not(.flex-rows-order), select, textarea, .InputfieldTinyMCEEditor[contenteditable]')) titlesChanged(event.target);
+        const input = event.target;
+        if(!(input instanceof HTMLElement) || !input.matches('input:not(.flex-rows-order), select, textarea, .InputfieldTinyMCEEditor[contenteditable]')) return;
+        const cell = input.closest<HTMLTableCellElement>('[data-flex-sort-input]');
+        if(cell && attr(input, 'name') === attr(cell, 'data-flex-sort-input')) {
+            const heading = cell.closest('table')?.tHead?.rows[0]?.cells[cell.cellIndex];
+            const button = heading?.querySelector<HTMLElement>('.flex-table-column-sort');
+            if(button && heading?.hasAttribute('aria-sort')) columnDirection(button);
+        }
+        titlesChanged(input);
     }));
     let openingInvalidDetail = false;
     document.addEventListener('invalid', event => {

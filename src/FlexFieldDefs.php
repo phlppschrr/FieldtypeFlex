@@ -539,13 +539,22 @@ class FlexFieldDefs extends Wire {
 		}
 		unset($column);
 		$table = ['columns' => array_keys($columns), 'widths' => $widths, 'rowLabels' => $settings['rowLabels'] ?? false];
+		if(array_key_exists('sortOnSave', $settings)) {
+			$sort = $settings['sortOnSave'];
+			if(!is_array($sort) || array_diff_key($sort, ['column' => true, 'direction' => true])
+				|| !is_string($sort['column'] ?? null) || !isset($columns[$sort['column']])
+				|| !in_array($sort['direction'] ?? 'asc', ['asc', 'desc'], true)) {
+				throw new WireException($this->_('Table sortOnSave requires a column and an optional asc or desc direction'));
+			}
+			$table['sortOnSave'] = ['column' => $sort['column'], 'direction' => $sort['direction'] ?? 'asc'];
+		}
 		$rows = ['type' => 'rows', '_flexTable' => $table, 'rowCollapse' => FieldtypeFlex::ROW_EXPAND_ALL, 'types' => ['row' => ['children' => $columns]]];
 		foreach(['minItems', 'maxItems', 'addRowLabel'] as $key) {
 			if(array_key_exists($key, $settings)) { $rows[$key] = $settings[$key]; unset($settings[$key]); }
 		}
 		$children = ($settings['editableHeaders'] ?? false) ? ['headers' => ['type' => 'object', 'children' => $headers]] : [];
 		$children['rows'] = $rows;
-		unset($settings['columns'], $settings['editableHeaders'], $settings['rowLabels'], $settings['useLanguages']);
+		unset($settings['columns'], $settings['editableHeaders'], $settings['rowLabels'], $settings['useLanguages'], $settings['sortOnSave']);
 		return array_replace($settings, ['type' => 'object', 'children' => $children, '_flexTable' => $table]);
 	}
 
@@ -667,6 +676,10 @@ class FlexFieldDefs extends Wire {
 					if(in_array((int) $cell->collapsed, [Inputfield::collapsedBlankLocked, Inputfield::collapsedYesLocked], true)) $cell->collapsed = Inputfield::collapsedNoLocked;
 				}
 				if(array_keys($schema->properties()) !== $settings['_flexTable']['columns']) throw new WireException($this->_('Table columns must be value inputs, not wrappers or markup'));
+				$sort = $settings['_flexTable']['sortOnSave'] ?? null;
+				if($sort && !FlexTableSort::type($schema->getPropertyInputfield($sort['column']))) {
+					throw new WireException($this->_('Table sortOnSave requires a Text, Integer or Float column'));
+				}
 			}
 			$schema->rowTypeLabel = $typeSettings['label'] ?? ucwords(str_replace('_', ' ', $type));
 			$this->properties[$name]['types'][$type] = [
