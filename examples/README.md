@@ -96,6 +96,7 @@ Use the settings supported by the selected ProcessWire Inputfield, including:
 | `rowCollapse` | Initial collapsed/expanded state |
 | `rowLazyLoad` | Lazy-load eligible collapsed Rows |
 | `columns` | Named table columns in display order, each with its own Inputfield definition |
+| `sortOnSave` | Sort by a Text, Integer or Float column on save. Use `'price'` for ascending order or `'-price'` for descending order. |
 | `editableHeaders => true` | Let editors change the table headings, which start with the column labels |
 | `rowLabels => true` | Add an editable label at the start of each table row |
 | `width` | Optional column width in positive `rem` or `px`, e.g. `'7rem'` |
@@ -129,7 +130,7 @@ See the [Tables API](../API.md#tables) for supported Inputfields.
 | [Choices](05-choices.php) | Select, Radios, Checkboxes, TextTags | None |
 | [References and media](06-references-media.php) | Page references, files, images, custom metadata | Adapt Page selectors; TinyMCE |
 | [Typed and nested Rows](07-rows.php) | Mixed blocks, nesting, dependencies, Row titles | TinyMCE, LanguageSupport modules |
-| [Tables](08-tables.php) | Fixed and editable headings, row labels, column widths and a PDF field in a detail row | None |
+| [Tables](08-tables.php) | Automatic and manual sorting, fixed and editable headings, row labels, column widths and a PDF field in a detail row | None |
 | [Advanced settings](09-advanced.php) | Fieldsets, Objects, inheritance, renames | Adapt source Fields; TinyMCE, LanguageSupport modules |
 
 Some examples need existing Fields or installed modules. Check the comments in each file.

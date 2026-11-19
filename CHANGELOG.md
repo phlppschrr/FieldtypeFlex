@@ -2,6 +2,12 @@
 
 ## WIP
 
+## 1.0.0-beta.6 - 2026-11-19
+
+### Changed
+
+- Document the automatic sort syntax in the example guide and show automatic and manual sorting in the runnable table example.
+
 ## 1.0.0-beta.5 - 2026-11-19
 
 ### Changed

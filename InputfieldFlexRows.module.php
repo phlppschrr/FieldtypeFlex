@@ -25,7 +25,7 @@ class InputfieldFlexRows extends Inputfield implements BridgeComponent {
 	public static function getModuleInfo() {
 		return [
 			'title'    => __('Flex rows'),
-			'version'  => '1.0.0-beta.5',
+			'version'  => '1.0.0-beta.6',
 			'summary'  => __('Repeatable native inputs inside Flex'),
 			'requires' => 'FieldtypeFlex',
 		];

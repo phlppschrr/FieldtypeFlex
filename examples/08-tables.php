@@ -7,17 +7,18 @@
 // Detail row: File, Image, PageListSelect, PageListSelectMultiple and TinyMCE.
 
 return [
-    // Fixed headings use the column labels.
+    // Fixed headings use the column labels. Use 'price' for ascending order.
     'prices' => [
         'type' => 'table',
         'label' => 'Price list',
+        'sortOnSave' => '-price',
         'columns' => [
             'service' => ['type' => 'text', 'label' => 'Service'],
             'price' => ['type' => 'float', 'label' => 'Price', 'width' => '7rem'],
             'brochure' => ['type' => 'file', 'label' => 'Brochure', 'extensions' => 'pdf', 'maxFiles' => 1],
         ],
     ],
-    // Editors can rename the headings and label each row.
+    // Editors can rename the headings, label rows and sort them manually.
     'comparison' => [
         'type' => 'table',
         'label' => 'Product comparison',
