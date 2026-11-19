@@ -21,6 +21,31 @@
 .flex-table-grid > tbody > tr > :is(th, td) { padding: 0; }
 .flex-table-grid.flex-table-resized { table-layout: fixed; min-width: 0; }
 .flex-table-grid > thead > tr > .flex-table-resizable { position: relative; }
+.flex-table-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .25rem;
+    padding-inline-end: .3rem;
+}
+.flex-table-heading > .Inputfields { flex: 1; min-width: 0; }
+.flex-table-grid > thead > tr > th:has(> .flex-table-heading > .Inputfields) { padding: 0; }
+.flex-table-grid .flex-table-column-sort,
+.flex-table-grid .flex-table-sort-on-save {
+    flex: none;
+    min-width: 1.6rem;
+    min-height: 1.5rem;
+    padding: .125rem;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: center;
+}
+.flex-table-grid .flex-table-column-sort { cursor: pointer; }
+.flex-table-grid .flex-table-column-sort:disabled { opacity: .35; cursor: default; }
+.flex-table-grid .flex-table-column-sort:focus-visible { outline: 2px solid currentColor; }
+.flex-table-auto > .flex-table-scroll > table > thead > tr > .flex-table-sort { padding: 0; }
 .flex-table-grid .flex-table-resize {
     position: absolute;
     inset-block: 0;
@@ -35,7 +60,8 @@
     touch-action: none;
 }
 .flex-table-grid .flex-table-resize:focus-visible { outline: 2px solid currentColor; outline-offset: -2px; }
-.flex-table-grid :is(th, td) > .Inputfields { margin: 0; padding: 0; list-style: none; }
+.flex-table-grid :is(th, td) > .Inputfields,
+.flex-table-grid .flex-table-heading > .Inputfields { margin: 0; padding: 0; list-style: none; }
 .flex-table-grid .flex-table-input.Inputfield { float: none; width: 100%; margin: 0; border: 0; min-width: 0; }
 .flex-table-grid .flex-table-input.Inputfield:not(.InputfieldStateError, .ui-state-error) {
     background: transparent;

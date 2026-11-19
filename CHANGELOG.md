@@ -2,6 +2,10 @@
 
 ## WIP
 
+### Added
+
+- Sort table rows from Text, Integer and Float column headings, or configure a fixed order on save.
+
 ## 1.0.0-beta.3 - 2026-11-17
 
 ### Fixed

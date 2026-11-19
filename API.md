@@ -216,6 +216,22 @@ Edit Text, Email, URL, Integer, Float, plain Textarea, Checkbox, Toggle, Select,
 
 File, Image, PageListSelect, PageListSelectMultiple and TinyMCE (iframe or inline) open in a full-width detail row below the selected row. See the [table examples](examples/08-tables.php).
 
+Text, Integer and Float columns have sort buttons in their headings. Clicking a
+button sorts once using the current editor values. Click again to reverse the
+direction. The normal page save persists the resulting order.
+
+Add `'sortOnSave' => ['column' => 'price', 'direction' => 'desc']` to the table
+definition to apply one fixed order whenever the Flex field value is written,
+including API writes. Use the column key and either `asc` (the default) or
+`desc`. The editor marks the configured heading and omits manual sort buttons
+and row drag handles.
+
+Both modes put blank values last and keep the relative order of equal values.
+Multilingual Text sorts by its default-language value. Text uses the default
+language's configured collation locale, falling back to English when a locale
+is unavailable. Server saves use a case-insensitive byte comparison when PHP
+Intl is unavailable.
+
 ## Rows
 
 `rows` returns a `FlexRows` collection of typed `FlexRow` values, **not Repeater Pages**. A nonempty `types` map is required, even for one type:

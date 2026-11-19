@@ -514,6 +514,17 @@ class FlexRows extends WireArray implements \JsonSerializable {
 		return $this;
 	}
 
+	/** Reorder existing instances to match canonical order without tracking another edit. @internal */
+	public function applySavedOrder(array $ids): void {
+		$all = $this->backingRows();
+		if(count($ids) !== count($all) || $ids === array_keys($all)) return;
+		$order = array_fill_keys($ids, null);
+		if(count($order) !== count($all) || array_diff_key($order, $all)) return;
+		$ordered = array_replace($order, $all);
+		$this->data = array_intersect_key($ordered, $this->data);
+		if($this->allRows !== null) $this->allRows = $ordered;
+	}
+
 	/**
 	 * Get or change output formatting and return its previous state.
 	 *

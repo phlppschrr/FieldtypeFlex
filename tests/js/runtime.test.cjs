@@ -923,3 +923,46 @@ test('table selection uses the whole row and suspends cell editing without chang
     assert.equal(d.activeElement, input);
     h.close();
 });
+
+test('column sorting uses live scalar values, preserves ties and pending removal, and only runs on click', async () => {
+    const values = [
+        ['a', 'Bravo', '10', '2,5'],
+        ['b', '', '', ''],
+        ['c', 'alpha', '2', '-3,25'],
+        ['d', 'Alpha', '2', '0'],
+        ['e', 'Pending', '999', '99'],
+    ];
+    const kinds = ['text', 'integer', 'float'];
+    const content = values.map(([id, ...cells]) => tableRow(id).replace(/<td class="flex-table-cell">.*?<\/td>/,
+        cells.map((value, i) => `<td class="flex-table-cell" data-flex-sort-input="cell_${id}_${i}" data-flex-sort-value="${value}"><input name="cell_${id}_${i}" value="${value}"></td>`).join('')));
+    const headings = kinds.map(kind => `<th><button type="button" class="flex-table-column-sort" data-flex-sort-type="${kind}" data-flex-sort-asc="Ascending" data-flex-sort-desc="Descending" hidden><span>↕</span></button></th>`).join('');
+    const h = await harness(tableSet(content.join('')).replace('<table>', '<table class="flex-table-grid" data-flex-sort-locale="en" data-flex-sort-decimal=",">').replace('<th>Cell</th>', headings));
+    const d = h.document;
+    const buttons = d.querySelectorAll('.flex-table-column-sort');
+    const order = () => d.querySelector('.flex-rows-order').value;
+    const edit = d.querySelector('[name="cell_a_1"]');
+    d.querySelector('[data-flex-row="e"] [data-flex-row-action="remove"]').click();
+    assert.equal(order(), 'a,b,c,d,e');
+    assert(!buttons[1].hidden);
+    buttons[1].click();
+    assert.equal(order(), 'c,d,a,b,e');
+    assert.equal(buttons[1].closest('th').getAttribute('aria-sort'), 'ascending');
+    buttons[1].click();
+    assert.equal(order(), 'a,c,d,b,e');
+    assert.equal(buttons[1].closest('th').getAttribute('aria-sort'), 'descending');
+    edit.value = '-1';
+    edit.dispatchEvent(new h.window.Event('input', {bubbles: true}));
+    assert.equal(order(), 'a,c,d,b,e');
+    assert(!buttons[1].closest('th').hasAttribute('aria-sort'));
+    buttons[1].click();
+    assert.equal(order(), 'a,c,d,b,e');
+    buttons[2].click();
+    assert.equal(order(), 'c,d,a,b,e');
+    assert(!buttons[1].closest('th').hasAttribute('aria-sort'));
+    buttons[0].click();
+    assert.equal(order(), 'c,d,a,b,e');
+    assert.equal(d.querySelectorAll('th[aria-sort]').length, 1);
+    assert.equal(new h.window.FormData(d.querySelector('form')).get('cell_a_1'), '-1');
+    assert.equal(h.calls.length, 0);
+    h.close();
+});
