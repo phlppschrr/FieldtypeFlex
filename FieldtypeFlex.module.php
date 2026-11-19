@@ -119,7 +119,7 @@ class FieldtypeFlex extends Fieldtype implements ConfigurableModule, FieldtypeHa
 	public static function getModuleInfo() {
 		return [
 			'title'    => __('Flex'),
-			'version'  => '1.0.0-beta.4',
+			'version'  => '1.0.0-beta.5',
 			'summary'  => __('PHP/JSON-defined compound fields with native inputs and selectors'),
 			'author'   => __('FieldtypeFlex contributors'),
 			'href'     => 'https://github.com/phlppschrr/FieldtypeFlex',

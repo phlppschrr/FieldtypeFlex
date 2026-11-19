@@ -220,11 +220,14 @@ Text, Integer and Float columns have sort buttons in their headings. Clicking a
 button sorts once using the current editor values. Click again to reverse the
 direction. The normal page save persists the resulting order.
 
-Add `'sortOnSave' => ['column' => 'price', 'direction' => 'desc']` to the table
-definition to apply one fixed order whenever the Flex field value is written,
-including API writes. Use the column key and either `asc` (the default) or
-`desc`. The editor marks the configured heading and omits manual sort buttons
-and row drag handles.
+Set `'sortOnSave' => 'price'` on the table definition to sort by the
+`price` column in ascending order whenever the Flex field value is written,
+including API writes. Use `'sortOnSave' => '-price'` for descending order.
+The editor marks the configured heading and omits manual sort buttons and
+row drag handles.
+
+For schemas created with beta.4, replace the `column` and `direction` map with
+the column key. Prefix the key with `-` for the former `desc` direction.
 
 Both modes put blank values last and keep the relative order of equal values.
 Multilingual Text sorts by its default-language value. Text uses the default

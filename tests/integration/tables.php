@@ -188,10 +188,10 @@ $sortColumns = [
 $manualTable = ['type' => 'table', 'editableHeaders' => true, 'columns' => $sortColumns];
 $sorting = $createField('flex_table_sorting', [
 	'manual' => $manualTable,
-	'prices' => $manualTable + ['sortOnSave' => ['column' => 'price', 'direction' => 'desc']],
+	'prices' => $manualTable + ['sortOnSave' => '-price'],
 	'sections' => ['type' => 'rows', 'types' => ['section' => ['children' => [
-		'names' => $manualTable + ['sortOnSave' => ['column' => 'caption']],
-		'amounts' => $manualTable + ['sortOnSave' => ['column' => 'amount']],
+		'names' => $manualTable + ['sortOnSave' => 'caption'],
+		'amounts' => $manualTable + ['sortOnSave' => 'amount'],
 	]]]],
 ]);
 $page = $wire->pages->getFresh($id);
@@ -225,7 +225,7 @@ $same([2, 1], array_values($readback->sections->first()->names->rows->explode('a
 $same([-1, 0, 2, 10, ''], array_values($readback->sections->first()->amounts->rows->explode('amount')), 'nested Integer sorts numerically ascending with zero distinct from blank');
 
 $renderSort = static function(string $name) use ($page, $createField, $manualTable): string {
-	$table = $name === 'auto' ? $manualTable + ['sortOnSave' => ['column' => 'price', 'direction' => 'desc']] : $manualTable;
+	$table = $name === 'auto' ? $manualTable + ['sortOnSave' => '-price'] : $manualTable;
 	$field = $createField('flex_sort_' . $name, ['grid' => $table]);
 	$editor = $field->getInputfield($page);
 	$value = $field->type->getBlankValue($page, $field);
@@ -239,7 +239,7 @@ $same(3, substr_count($manualHtml, 'class="flex-table-column-sort"'), 'only Text
 $assert(str_contains($manualHtml, 'class="flex-row-sort"'), 'manual tables still offer row drag handles');
 $assert(str_contains($autoHtml, 'Sorted by Price in descending order on save') && !str_contains($autoHtml, 'class="flex-table-column-sort"'), 'automatic table heading explains the fixed order and omits manual sorts');
 $assert(!str_contains($autoHtml, 'class="flex-row-sort"') && str_contains($autoHtml, 'class="flex-row-select '), 'automatic tables omit drag handles while retaining bulk selection');
-foreach([['column' => 'date'], ['column' => 'missing'], ['column' => 'price', 'direction' => 'sideways']] as $invalidSort) {
+foreach(['date', '-date', 'missing', '--price', '+price', '-', '', ['column' => 'price', 'direction' => 'desc']] as $invalidSort) {
 	$bad->flexDefinition = json_encode(['grid' => $manualTable + ['sortOnSave' => $invalidSort]]);
 	$throws(fn() => $type->getDefinitions($bad, $page), 'unsupported automatic sort definition is rejected', FlexDefinitionException::class);
 }
