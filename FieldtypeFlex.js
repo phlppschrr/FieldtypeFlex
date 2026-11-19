@@ -572,7 +572,6 @@ var FieldtypeFlex;
     const busyTrees = new WeakSet();
     const overlayMenus = '.flex-table-more, .flex-collection-menu';
     const rowMenus = `${overlayMenus}, .flex-row-clipboard`;
-    const collectionMenus = new WeakMap();
     const selection = new WeakMap();
     const tableEditors = new WeakMap();
     const initializedDetailEditors = new WeakSet();
@@ -683,12 +682,12 @@ var FieldtypeFlex;
         const count = activeRows(set).length, min = Number(FieldtypeFlex.attr(set, 'data-flex-min')) || 0, max = Number(FieldtypeFlex.attr(set, 'data-flex-max')) || 0, busy = treeBusy(set);
         const atLimit = max > 0 && count >= max;
         const selecting = selection.has(set);
-        const menu = collectionMenus.get(set);
+        const menu = set.querySelector(':scope > .flex-rows-footer > .flex-collection-menu');
         if (menu) {
             FieldtypeFlex.one(menu, '[data-flex-selection-action="start"]').disabled = busy || selecting || count === 0;
             FieldtypeFlex.one(menu, '[data-flex-row-action="paste-end"]').disabled = busy || selecting || atLimit;
         }
-        FieldtypeFlex.all(set, ':scope > .flex-row-add, :scope > .flex-row-type').forEach(control => control.disabled = busy || selecting || atLimit);
+        FieldtypeFlex.all(set, ':scope > .flex-rows-footer > :is(.flex-row-add, .flex-row-type)').forEach(control => control.disabled = busy || selecting || atLimit);
         rows(set).forEach(row => {
             const header = FieldtypeFlex.one(row, ':scope > .flex-row-header');
             const toggle = header.querySelector('.flex-row-toggle');
@@ -986,7 +985,9 @@ var FieldtypeFlex;
         if (context instanceof HTMLElement && context.matches('.flex-rows'))
             sets.unshift(context);
         sets.forEach(set => {
-            mountCollectionMenu(set);
+            const menu = set.querySelector(':scope > .flex-rows-footer > .flex-collection-menu');
+            if (menu)
+                menu.hidden = false;
             let errorPreview;
             rows(set).forEach(row => {
                 FieldtypeFlex.all(row, ':scope > .flex-table-cell > .flex-table-preview[hidden]').forEach(button => {
@@ -1015,29 +1016,17 @@ var FieldtypeFlex;
             updateActions(set);
         });
     }
-    function mountCollectionMenu(set) {
-        const menu = set.querySelector(':scope > .flex-collection-menu');
-        if (!menu)
-            return;
-        const header = set.closest('.Inputfield')?.querySelector(':scope > .InputfieldHeader');
-        if (header && getComputedStyle(header).display !== 'none') {
-            // A native field reload replaces its content while keeping the header.
-            FieldtypeFlex.all(header, ':scope > .flex-collection-menu').filter(previous => FieldtypeFlex.attr(previous, 'data-flex-rows-for') === set.id).forEach(previous => previous.remove());
-            header.append(menu);
-        }
-        menu.hidden = false;
-        collectionMenus.set(set, menu);
-    }
-    function actionSet(control) {
-        const menu = control.closest('.flex-collection-menu');
-        return menu ? document.getElementById(FieldtypeFlex.attr(menu, 'data-flex-rows-for')) : control.closest('.flex-rows');
-    }
     function selectionControl(row) {
         return row.querySelector(':scope > .flex-row-header .flex-row-select, :scope > .flex-table-sort > .flex-row-select');
     }
     function setSelectionMode(set, active) {
         set.classList.toggle('flex-selection-active', active);
-        FieldtypeFlex.one(set, ':scope > .flex-selection-toolbar').hidden = !active;
+        const footer = FieldtypeFlex.one(set, ':scope > .flex-rows-footer');
+        const menu = FieldtypeFlex.one(footer, ':scope > .flex-collection-menu');
+        menu.open = false;
+        FieldtypeFlex.all(footer, '[data-flex-selection-action], [data-flex-row-action="paste-end"], .flex-selection-count').forEach(control => {
+            control.hidden = control.matches('[data-flex-selection-action="start"], [data-flex-row-action="paste-end"]') ? active : !active;
+        });
         for (const row of rows(set)) {
             const control = selectionControl(row);
             if (control) {
@@ -1062,7 +1051,7 @@ var FieldtypeFlex;
             control.checked = current.rows.has(row) && !removed;
             control.disabled = busy || removed;
         }
-        const bar = FieldtypeFlex.one(set, ':scope > .flex-selection-toolbar');
+        const bar = FieldtypeFlex.one(set, ':scope > .flex-rows-footer');
         const counter = FieldtypeFlex.one(bar, '.flex-selection-count');
         counter.textContent = FieldtypeFlex.attr(counter, 'data-flex-count').replace('{count}', String(chosen.length));
         FieldtypeFlex.one(bar, '[data-flex-selection-action="copy"]').disabled = busy || !chosen.length;
@@ -1117,17 +1106,16 @@ var FieldtypeFlex;
     FieldtypeFlex.delegate('click', '[data-flex-selection-action]', (event, control) => {
         event.preventDefault();
         event.stopPropagation();
-        const set = actionSet(control);
+        const set = control.closest('.flex-rows');
         if (!set || treeBusy(set) || control.disabled)
             return;
         const action = FieldtypeFlex.attr(control, 'data-flex-selection-action');
+        const footer = FieldtypeFlex.one(set, ':scope > .flex-rows-footer');
+        const menu = FieldtypeFlex.one(footer, ':scope > .flex-collection-menu');
         if (action === 'start') {
             if (!activeRows(set).length)
                 return;
             FieldtypeFlex.all(FieldtypeFlex.closest(set, '.InputfieldFlex'), '.flex-selection-active').forEach(finishSelection);
-            const owner = set.closest('.Inputfield');
-            if (owner?.matches('.InputfieldStateCollapsed'))
-                FieldtypeFlex.classic.toggle(owner, true);
             window.tinymce?.triggerSave();
             FieldtypeFlex.classic.saveReady(set);
             closeTableEditor(set);
@@ -1135,9 +1123,6 @@ var FieldtypeFlex;
             expanded.forEach(row => { closeRowEditors(row); openRow(row, false); });
             selection.set(set, { rows: new Set(), expanded });
             setSelectionMode(set, true);
-            const menu = collectionMenus.get(set);
-            if (menu)
-                menu.open = false;
             updateActions(set);
             selectionControl(activeRows(set)[0])?.focus();
             return;
@@ -1147,9 +1132,11 @@ var FieldtypeFlex;
             return;
         if (action === 'done') {
             finishSelection(set);
-            collectionMenus.get(set)?.querySelector('summary')?.focus();
+            FieldtypeFlex.one(menu, ':scope > summary').focus();
             return;
         }
+        menu.open = false;
+        FieldtypeFlex.one(menu, ':scope > summary').focus();
         const chosen = activeRows(set).filter(row => current.rows.has(row));
         if (action === 'copy' && chosen.length) {
             void writeClipboard(set, chosen);
@@ -1159,8 +1146,6 @@ var FieldtypeFlex;
             FieldtypeFlex.closest(set, '.InputfieldFlex').classList.add('InputfieldStateChanged');
             queueTitleRefresh(FieldtypeFlex.closest(set, '.InputfieldFlex'));
             updateActions(set);
-            if (control.disabled)
-                FieldtypeFlex.one(set, '[data-flex-selection-action="done"]').focus();
         }
         else if (action === 'remove' && activeRows(set).length - chosen.length >= Number(FieldtypeFlex.attr(set, 'data-flex-min'))) {
             window.tinymce?.triggerSave();
@@ -1169,7 +1154,6 @@ var FieldtypeFlex;
             current.anchor = undefined;
             order(set);
             queueTitleRefresh(FieldtypeFlex.closest(set, '.InputfieldFlex'));
-            FieldtypeFlex.one(set, '[data-flex-selection-action="done"]').focus();
         }
     });
     function formError(form, text, pending) {
@@ -1350,9 +1334,8 @@ var FieldtypeFlex;
         let left = rtl ? anchor.right : anchor.left - panel.offsetWidth;
         let top = anchor.top;
         if (menu.matches('.flex-collection-menu')) {
-            const header = menu.parentElement?.matches('.InputfieldHeader') ? menu.parentElement.getBoundingClientRect() : anchor;
-            left = rtl ? anchor.left : anchor.right - panel.offsetWidth;
-            top = header.bottom + panel.offsetHeight + margin <= height ? header.bottom : header.top - panel.offsetHeight;
+            left = rtl ? anchor.right - panel.offsetWidth : anchor.left;
+            top = anchor.bottom + panel.offsetHeight + margin <= height ? anchor.bottom : anchor.top - panel.offsetHeight;
         }
         panel.style.left = Math.max(margin, Math.min(left, width - panel.offsetWidth - margin)) + 'px';
         panel.style.top = Math.max(margin, Math.min(top, height - panel.offsetHeight - margin)) + 'px';
@@ -1489,7 +1472,7 @@ var FieldtypeFlex;
     async function rowAction(event, control) {
         event.preventDefault();
         event.stopPropagation();
-        const set = actionSet(control);
+        const set = control.closest('.flex-rows');
         if (!set)
             return;
         const ancestor = control.closest('.flex-row');

@@ -393,23 +393,22 @@ class InputfieldFlexRows extends Inputfield implements BridgeComponent {
 			$addControl = '<select class="flex-row-type InputfieldSetWidth" aria-label="' . $entities($this->_('New item type')) . '">' . $options . '</select>';
 		}
 		$setId = $entities('flex_set_' . $this->name);
-		$menuLabel = $entities($this->_('Collection actions'));
-		$menu = '<details class="flex-collection-menu" data-flex-rows-for="' . $setId . '" hidden><summary class="InputfieldHeaderAction" title="' . $menuLabel . '">' .
-			'<i class="fa fa-fw fa-ellipsis-h" aria-hidden="true"></i><span class="flex-table-sr">' . $menuLabel . '</span></summary>' .
+		$menu = '<details class="flex-collection-menu" hidden><summary>' . $entities($this->_('Actions')) . ' <i class="fa fa-angle-down" aria-hidden="true"></i></summary>' .
 			'<div class="flex-clipboard-actions">' .
-			'<button type="button" class="flex-row-action" data-flex-selection-action="start"><i class="fa fa-fw fa-check-square-o" aria-hidden="true"></i> ' . $entities($this->_('Select rows')) . '</button>' .
-			'<button type="button" class="flex-row-action" data-flex-row-action="paste-end"><i class="fa fa-fw fa-clipboard" aria-hidden="true"></i> ' . $entities($this->_('Paste from Clipboard')) . '</button></div></details>';
-		$toolbar = '<div class="flex-selection-toolbar" hidden><span class="flex-selection-count" role="status" data-flex-count="' . $entities($this->_('{count} selected')) . '"></span>' .
-			'<button type="button" class="ui-button" data-flex-selection-action="copy">' . $entities($this->_('Copy')) . '</button>' .
-			'<button type="button" class="ui-button" data-flex-selection-action="hide">' . $entities($this->_('Hide')) . '</button>' .
-			'<button type="button" class="ui-button" data-flex-selection-action="remove">' . $entities($this->_('Mark for removal')) . '</button>' .
-			'<button type="button" class="ui-button" data-flex-selection-action="done">' . $entities($this->_('Done')) . '</button></div>';
+			'<button type="button" class="flex-row-action" data-flex-selection-action="start">' . $entities($this->_('Select rows')) . '</button>' .
+			'<button type="button" class="flex-row-action" data-flex-row-action="paste-end">' . $entities($this->_('Paste from Clipboard')) . '</button>' .
+			'<button type="button" class="flex-row-action" data-flex-selection-action="copy" hidden>' . $entities($this->_('Copy')) . '</button>' .
+			'<button type="button" class="flex-row-action" data-flex-selection-action="hide" hidden>' . $entities($this->_('Hide')) . '</button>' .
+			'<button type="button" class="flex-row-action" data-flex-selection-action="remove" hidden>' . $entities($this->_('Mark for removal')) . '</button></div></details>';
+		$footer = '<div class="flex-rows-footer">' . $addControl . $menu .
+			'<button type="button" class="ui-button" data-flex-selection-action="done" hidden>' . $entities($this->_('Done')) . '</button>' .
+			'<span class="flex-selection-count" role="status" data-flex-count="' . $entities($this->_('{count} selected')) . '" hidden></span></div>';
 		$table = isset($settings['_flexTable']);
 		$items = $table ? $this->renderTable($html) : '<ul class="Inputfields flex-rows-items">' . $html . '</ul>';
 		return '<div class="flex-rows' . ($table ? ' flex-table' : '') . '" id="' . $setId . '" data-flex-set="' . $entities($this->setName) . '" data-flex-draft="' . $entities($this->flexDraft) . '" data-flex-page-url="' . $entities($this->flexRoot->ownerPage()->editUrl()) . '" data-flex-field="' . $entities($this->flexRoot->ownerField()->name) . '" data-flex-min="' . (int) ($settings['minItems'] ?? 0) . '" data-flex-max="' . (int) ($settings['maxItems'] ?? 0) . '"' . $attributes . '>' .
 			'<input type="hidden" name="' . $entities(FlexPath::controlName($this->flexInputName ?: $this->name, $this->setName, 'present')) . '" value="1">' .
 			'<input type="hidden" class="flex-rows-order" name="' . $entities(FlexPath::controlName($this->flexInputName ?: $this->name, $this->setName, 'order')) . '" value="' . implode(',', $ids) . '">' .
-			$menu . $items . $addControl . $toolbar .
+			$items . $footer .
 			'<p class="flex-rows-status uk-hidden-visually" role="status" aria-live="polite"></p><p class="flex-rows-error" role="alert"></p></div>';
 	}
 

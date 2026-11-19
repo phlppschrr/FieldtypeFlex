@@ -135,18 +135,19 @@ $withGalleries = $pages->find('content.blocks.gallery.count>1');
 ## Copy and paste rows
 
 Use a row's clipboard menu or a table row's **More row actions** menu to copy
-a row or paste above or below it. The collection header menu includes **Paste
-from Clipboard**, which appends copied rows even when the collection is empty.
+a row or paste above or below it. **Actions → Paste from Clipboard** below the
+rows appends copied rows even when the collection is empty.
 To add a new row, choose a type in **Add item**. Collections with one type
 show a direct **Add item** button.
 
-Choose **Select rows** in the collection header. Checkboxes show which rows are
+Choose **Actions → Select rows** below the rows. Checkboxes show which rows are
 selected. Click a card header or anywhere in a table row to toggle selection.
-Use Shift-click to extend the selection to a range. The toolbar below the
-collection copies, hides, or marks the selected rows for removal. **Done**
-restores previously expanded cards. Copies use current editor values and
-collection order. Paste uses the target collection's types, settings and
-defaults. Save the page to commit added rows, removed rows, visibility and media.
+Use Shift-click to extend the selection to a range. Open **Actions** again to
+copy, hide, or mark the selected rows for removal. The selection count appears
+on the right. **Done** restores previously expanded cards. Copies use current
+editor values and collection order. Paste uses the target collection's types,
+settings and defaults. Save the page to commit added rows, removed rows,
+visibility and media.
 
 Clipboard access needs HTTPS and browser permission. When copying across
 installations, language values match by language name. Page references resolve

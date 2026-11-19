@@ -19,7 +19,7 @@ function row(id, text = id, extra = '', title = {}) {
     <div class="flex-row-content"><div class="Inputfield"><input name="heading_${id}" value="${text}"></div>${extra}</div></li>`;
 }
 function set(content = row('a') + row('b'), attributes = '') {
-    return `<div class="flex-rows" data-flex-set="blocks" data-flex-draft="draft" data-flex-field="content" data-flex-page-url="/edit/?id=42" data-flex-type="text" ${attributes}><ul class="flex-rows-items">${content}</ul><input class="flex-rows-order" name="order"><button type="button" class="flex-row-add">Add</button><p class="flex-rows-error"></p><p class="flex-rows-status"></p></div>`;
+    return `<div class="flex-rows" data-flex-set="blocks" data-flex-draft="draft" data-flex-field="content" data-flex-page-url="/edit/?id=42" data-flex-type="text" ${attributes}><ul class="flex-rows-items">${content}</ul><input class="flex-rows-order" name="order"><div class="flex-rows-footer"><button type="button" class="flex-row-add">Add</button></div><p class="flex-rows-error"></p><p class="flex-rows-status"></p></div>`;
 }
 function tableRow(id, text = id) {
     return `<tr class="flex-row" data-flex-row="${id}" data-flex-type="row"><td class="flex-table-sort"><button type="button" class="flex-row-sort">Sort</button>${rowCheckbox}</td><td class="flex-table-cell"><ul class="Inputfields"><li class="Inputfield"><input name="cell_${id}" value="${text}" required></li></ul></td><td class="flex-row-header flex-table-actions"><details class="flex-table-more"><summary>More</summary><div class="flex-table-secondary flex-clipboard-actions"><button type="button" data-flex-row-action="duplicate" class="flex-row-action"><i class="fa-copy"></i><span class="flex-row-action-label">Duplicate</span></button><button type="button" data-flex-row-action="visibility" class="flex-row-action" data-flex-hide-label="Hide" data-flex-show-label="Show"><i class="fa-eye"></i><span class="flex-row-action-label">Hide</span></button></div></details><button type="button" data-flex-row-action="remove" class="flex-row-action" data-flex-remove-label="Remove" data-flex-undo-label="Undo">Remove</button><span class="flex-row-transport"><input class="flex-row-remove-value" value="0"><input class="flex-row-hidden-value" value="0"></span></td></tr>`;
@@ -674,14 +674,14 @@ function pickerSet(content, attributes = '') {
         '<select class="flex-row-type"><option value="" selected disabled>Add item</option><option value="text">Text</option><option value="image">Image</option></select>');
 }
 function collectionSet(key, markup) {
-    const id = 'collection-' + key;
-    const menu = `<details class="flex-collection-menu" data-flex-rows-for="${id}" hidden><summary>Collection actions</summary>
+    const menu = `<details class="flex-collection-menu" hidden><summary>Actions</summary>
         <div class="flex-clipboard-actions"><button type="button" data-flex-selection-action="start">Select rows</button>
-        <button type="button" class="flex-row-action" data-flex-row-action="paste-end">Paste from Clipboard</button></div></details>`;
-    const toolbar = `<div class="flex-selection-toolbar" hidden><span class="flex-selection-count" data-flex-count="{count} selected"></span>
-        ${['copy', 'hide', 'remove', 'done'].map(action => `<button type="button" data-flex-selection-action="${action}">${action}</button>`).join('')}</div>`;
-    const setMarkup = markup.replace('data-flex-set="blocks"', `id="${id}" data-flex-set="${key}"`)
-        .replace(/<p class="flex-rows-error"><\/p><p class="flex-rows-status"><\/p><\/div>$/, toolbar + '<p class="flex-rows-error"></p><p class="flex-rows-status"></p>' + menu + '</div>');
+        <button type="button" class="flex-row-action" data-flex-row-action="paste-end">Paste from Clipboard</button>
+        ${['copy', 'hide', 'remove'].map(action => `<button type="button" data-flex-selection-action="${action}" hidden>${action}</button>`).join('')}</div></details>`;
+    const selection = `<button type="button" data-flex-selection-action="done" hidden>Done</button>
+        <span class="flex-selection-count" data-flex-count="{count} selected" hidden></span>`;
+    const setMarkup = markup.replace('data-flex-set="blocks"', `data-flex-set="${key}"`)
+        .replace('</div><p class="flex-rows-error">', menu + selection + '</div><p class="flex-rows-error">');
     return `<div class="Inputfield"><div class="InputfieldHeader">${key}</div><div class="InputfieldContent">${setMarkup}</div></div>`;
 }
 test('clipboard write begins in the click before collecting live form values via AJAX', async () => {
@@ -756,7 +756,7 @@ test('clipboard read places a fresh row above or below an anchor and preserves u
     assert.match(d.querySelector('.flex-rows-status').textContent, /Row pasted.*image\.png/);
     h.close();
 });
-test('a nested collection header pastes a batch into an empty set and supports retry', async () => {
+test('a nested collection footer pastes a batch into an empty set and supports retry', async () => {
     const nested = collectionSet('blocks.a.children', set(''));
     let deny = true;
     const h = await harness(set(row('a', 'Parent', nested)), {
@@ -768,7 +768,7 @@ test('a nested collection header pastes a batch into an empty set and supports r
         response: async () => ({ok: true, json: async () => ({rows: [{html: row('child-a')}, {html: row('child-b')}]})}),
     });
     const d = h.document, childSet = d.querySelector('[data-flex-set="blocks.a.children"]');
-    const menu = d.querySelector('.InputfieldHeader > .flex-collection-menu');
+    const menu = d.querySelector('.flex-rows-footer > .flex-collection-menu');
     assert(menu);
     const paste = menu.querySelector('[data-flex-row-action="paste-end"]');
     assert.equal(childSet.querySelector('.flex-row-add').hidden, false);
@@ -790,9 +790,9 @@ test('a nested collection header pastes a batch into an empty set and supports r
     h.close();
 });
 
-test('the collection menu opens below the field header or above near the viewport edge', async () => {
+test('the collection menu opens below its trigger or above near the viewport edge', async () => {
     const h = await harness(collectionSet('blocks', set(row('a'))));
-    const menu = h.document.querySelector('.InputfieldHeader > .flex-collection-menu');
+    const menu = h.document.querySelector('.flex-rows-footer > .flex-collection-menu');
     const trigger = menu.querySelector('summary');
     const panel = menu.querySelector('.flex-clipboard-actions');
     const matches = panel.matches.bind(panel);
@@ -802,36 +802,38 @@ test('the collection menu opens below the field header or above near the viewpor
     panel.hidePopover = () => { inTopLayer = false; };
     let anchor = {left: 400, right: 430, top: 300, bottom: 320};
     trigger.getBoundingClientRect = () => anchor;
-    menu.parentElement.getBoundingClientRect = () => ({top: anchor.top - 10, bottom: anchor.bottom + 20});
     Object.defineProperties(panel, {offsetWidth: {value: 200}, offsetHeight: {value: 160}});
     trigger.click();
     menu.dispatchEvent(new h.window.Event('toggle'));
     assert.equal(panel.getAttribute('popover'), 'manual');
     assert(inTopLayer);
-    assert.equal(panel.style.left, '230px');
-    assert.equal(panel.style.top, '340px');
+    assert.equal(panel.style.left, '400px');
+    assert.equal(panel.style.top, '320px');
     anchor = {left: 64, right: 94, top: h.window.innerHeight - 50, bottom: h.window.innerHeight - 30};
     h.window.dispatchEvent(new h.window.Event('resize'));
-    assert.equal(panel.style.left, '8px');
-    assert.equal(panel.style.top, h.window.innerHeight - 220 + 'px');
+    assert.equal(panel.style.left, '64px');
+    assert.equal(panel.style.top, h.window.innerHeight - 210 + 'px');
     menu.open = false;
     menu.dispatchEvent(new h.window.Event('toggle'));
     assert(!inTopLayer);
     h.close();
 });
 
-test('a native collection reload replaces its mounted header menu', async () => {
+test('a native collection reload replaces the footer menu and enables paste into an empty set', async () => {
     const h = await harness(collectionSet('blocks', set(row('a'))));
     const d = h.document;
-    const oldMenu = d.querySelector('.InputfieldHeader > .flex-collection-menu');
+    const oldMenu = d.querySelector('.flex-rows-footer > .flex-collection-menu');
     const owner = oldMenu.closest('.Inputfield');
     const refreshed = d.createElement('div');
     refreshed.innerHTML = collectionSet('blocks', set(''));
     owner.querySelector(':scope > .InputfieldContent').replaceWith(refreshed.querySelector('.InputfieldContent'));
     owner.dispatchEvent(new d.defaultView.CustomEvent('reloaded', {bubbles: true}));
-    const menus = owner.querySelectorAll(':scope > .InputfieldHeader > .flex-collection-menu');
+    const menus = owner.querySelectorAll('.flex-rows-footer > .flex-collection-menu');
     assert.equal(menus.length, 1);
     assert.equal(oldMenu.isConnected, false);
+    assert.equal(owner.querySelector('.InputfieldHeader .flex-collection-menu'), null);
+    assert.equal(menus[0].previousElementSibling.className, 'flex-row-add');
+    assert(!menus[0].hidden);
     assert(menus[0].querySelector('[data-flex-selection-action="start"]').disabled);
     assert(!menus[0].querySelector('[data-flex-row-action="paste-end"]').disabled);
     h.close();
@@ -846,14 +848,27 @@ test('collection selection collapses cards, adds a shift range, copies live valu
     });
     const d = h.document;
     const menu = d.querySelector('.flex-collection-menu');
-    const bar = d.querySelector('.flex-selection-toolbar');
+    const bar = d.querySelector('.flex-rows-footer');
     const card = id => d.querySelector(`[data-flex-row="${id}"]`);
     const checkbox = id => card(id).querySelector('.flex-row-select');
     const button = action => bar.querySelector(`[data-flex-selection-action="${action}"]`);
     const click = (id, options) => card(id).querySelector('.flex-row-header').dispatchEvent(new h.window.MouseEvent('click', {bubbles: true, ...options}));
-    menu.querySelector('summary').click();
-    menu.querySelector('[data-flex-selection-action="start"]').click();
-    assert(!bar.hidden);
+    const summary = menu.querySelector('summary');
+    const counter = bar.querySelector('.flex-selection-count');
+    const start = menu.querySelector('[data-flex-selection-action="start"]');
+    assert(button('copy').hidden);
+    assert(button('done').hidden);
+    summary.click();
+    start.click();
+    assert(!menu.open);
+    assert(start.hidden);
+    assert(menu.querySelector('[data-flex-row-action="paste-end"]').hidden);
+    assert(!button('copy').hidden);
+    assert(button('copy').disabled);
+    assert.equal(button('copy').closest('details'), menu);
+    assert(!button('done').hidden);
+    assert.equal(button('done').nextElementSibling, counter);
+    assert(!counter.hidden);
     assert.equal(d.querySelectorAll('.flex-row.InputfieldStateCollapsed').length, 4);
     assert.equal(d.activeElement, checkbox('a'));
     assert(!checkbox('a').hidden);
@@ -862,7 +877,7 @@ test('collection selection collapses cards, adds a shift range, copies live valu
     assert(checkbox('c').checked);
     click('a', {shiftKey: true});
     click('b', {ctrlKey: true});
-    assert.equal(bar.querySelector('.flex-selection-count').textContent, '2 selected');
+    assert.equal(counter.textContent, '2 selected');
     assert(checkbox('a').checked);
     assert(!checkbox('b').checked);
     click('d', {metaKey: true});
@@ -870,16 +885,25 @@ test('collection selection collapses cards, adds a shift range, copies live valu
     click('d', {metaKey: true});
     assert(!button('remove').disabled);
     d.querySelector('[name="heading_a"]').value = 'Live value';
+    summary.click();
     button('copy').click();
+    assert(!menu.open);
+    assert.equal(d.activeElement, summary);
     await tick();
     assert.equal(h.calls[0].body.get('flex_sources'), 'a,c');
     assert.equal(h.calls[0].body.get('heading_a'), 'Live value');
+    summary.click();
     button('hide').click();
     assert.equal(d.querySelectorAll('.flex-row-hidden').length, 2);
+    summary.click();
     button('remove').click();
     assert.equal(d.querySelectorAll('.flex-row-remove-pending').length, 2);
     button('done').click();
-    assert(bar.hidden);
+    assert(counter.hidden);
+    assert(button('done').hidden);
+    assert(button('copy').hidden);
+    assert(!start.hidden);
+    assert.equal(d.activeElement, summary);
     assert(d.querySelector('[data-flex-row="b"]').matches('.InputfieldStateCollapsed'));
     assert(!d.querySelector('[data-flex-row="d"]').matches('.InputfieldStateCollapsed'));
     assert(checkbox('d').hidden);

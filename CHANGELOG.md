@@ -2,6 +2,10 @@
 
 ## WIP
 
+### Changed
+
+- Place the collection Actions menu beside the add control, reuse it for bulk actions, and align the selection count to the right.
+
 ## 1.0.0-beta.3 - 2026-11-17
 
 ### Fixed

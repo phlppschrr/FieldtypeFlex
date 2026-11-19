@@ -110,9 +110,9 @@ $render = static function(Page $owner, Field $field): array {
 [$targetEditor, $targetHtml, $targetPost, $targetDraft] = $render($second, $target);
 $assert(str_contains($html, 'fa-copy') && str_contains($html, 'fa-clipboard'), 'clipboard and Duplicate use separate action icons');
 $assert(str_contains($html, '<select class="flex-row-type InputfieldSetWidth" aria-label="New item type"><option value="" selected disabled>Add item</option>'), 'multiple types show a standalone picker with a neutral option');
-$assert(str_contains($html, 'data-flex-selection-action="start"') && str_contains($html, 'class="flex-selection-toolbar" hidden'), 'editable collections render scoped selection controls');
+$assert(str_contains($html, '</select><details class="flex-collection-menu" hidden><summary>Actions') && str_contains($html, 'data-flex-selection-action="done" hidden>Done</button><span class="flex-selection-count"'), 'editable collections place the menu beside the type picker and the count after Done');
 $assert(!str_contains($html, 'value="@clipboard"'), 'the add picker lists only row types');
-$assert(str_contains($targetHtml, 'data-flex-rows-for="flex_set_') && str_contains($targetHtml, 'data-flex-row-action="paste-end"'), 'empty nested collections retain a scoped paste action');
+$assert(str_contains($targetHtml, '</button><details class="flex-collection-menu" hidden><summary>Actions') && str_contains($targetHtml, 'data-flex-row-action="paste-end"'), 'empty nested collections retain a scoped paste action');
 $assert(!str_contains($targetHtml, '<select class="flex-row-type'), 'single-type collections omit the type picker');
 
 $ajax = static function(Page $owner, Field $field, string $token, array $data, bool $csrf = true) use ($wire, $type): array {
