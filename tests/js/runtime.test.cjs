@@ -4,8 +4,17 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const {JSDOM, VirtualConsole} = require('jsdom');
-const source = fs.readFileSync(path.join(__dirname, '../../FieldtypeFlex.js'), 'utf8');
-const maintenance = fs.readFileSync(path.join(__dirname, '../../FlexMaintenance.js'), 'utf8');
+const esbuild = require('esbuild');
+const root = path.join(__dirname, '../..');
+const source = fs.readFileSync(path.join(root, 'FieldtypeFlex.js'), 'utf8');
+const maintenance = fs.readFileSync(path.join(root, 'FlexMaintenance.js'), 'utf8');
+const testSource = esbuild.buildSync({
+    entryPoints: [path.join(root, 'scripts/typescript/FieldtypeFlex.ts')],
+    bundle: true,
+    format: 'cjs',
+    target: 'es2020',
+    write: false,
+}).outputFiles[0].text;
 const tick = () => new Promise(resolve => setImmediate(resolve));
 const action = name => `<button type="button" class="flex-row-action" data-flex-row-action="${name}" data-flex-remove-label="Remove" data-flex-undo-label="Undo" data-flex-show-label="Show" data-flex-hide-label="Hide"><i></i></button>`;
 const rowCheckbox = '<input type="checkbox" class="flex-row-select InputfieldIgnoreChanges" aria-label="Select row" hidden>';
@@ -35,10 +44,18 @@ async function harness(content = set(), options = {}) {
     const calls = [];
     window.fetch = async (url, init) => { calls.push({url, ...init}); return options.response ? options.response(url, init) : {ok: true, json: async () => ({html: row('new')})}; };
     if(options.before) options.before(window);
-    const end = source.lastIndexOf('})(FieldtypeFlex || (FieldtypeFlex = {}));');
-    window.eval(source.slice(0, end) + 'window.__flex = FieldtypeFlex; FieldtypeFlex.test = {initRows, rowState, removalState, mediaMetadata, restoreMediaMetadata, upload, refreshMedia, loadRow, treeBusy, setTreeBusy, teardown};\n' + source.slice(end));
+    let exported;
+    if(options.internals) {
+        const mod = {exports: {}};
+        window.Function('module', 'exports', testSource)(mod, mod.exports);
+        exported = mod.exports;
+    } else {
+        window.eval(source);
+        assert.equal(window.FieldtypeFlex, undefined, 'production bundle does not leak a global namespace');
+    }
     await tick();
-    return {dom, window, document: window.document, flex: window.__flex, calls, errors, close() { assert.deepEqual(errors, [], 'no uncaught runtime errors'); window.close(); }};
+    const flex = exported ? {classic: exported.classic, sortable: exported.sortable, serialize: exported.serialize, test: exported} : undefined;
+    return {dom, window, document: window.document, flex, calls, errors, close() { assert.deepEqual(errors, [], 'no uncaught runtime errors'); window.close(); }};
 }
 test('native initialization, live labels, safe text and keyboard order without jQuery', async () => {
     const h = await harness(); const {document: d, window: w} = h;
@@ -163,7 +180,7 @@ test('iframe table editors keep pending text and clear the native loaded marker 
         <div class="flex-table-editor"><div class="InputfieldTinyMCE"><div class="InputfieldTinyMCEPlaceholder"></div>
         <textarea id="rich_a" class="InputfieldTinyMCEEditor InputfieldTinyMCENormal" name="rich_a">&lt;p&gt;Initial&lt;/p&gt;</textarea></div>
         <button class="flex-table-editor-close" type="button" hidden>Done</button><ul class="Inputfields">`).replace('</li></ul></td>', '</li></ul></div></td>');
-    const h = await harness(tableSet(content));
+    const h = await harness(tableSet(content), {internals: true});
     const {document: d, flex} = h;
     const preview = d.querySelector('.flex-table-preview');
     const input = d.querySelector('[name="rich_a"]');
@@ -416,7 +433,7 @@ test('hook title previews debounce edits, retain local indexes and discard stale
     h.close();
 });
 test('successful controls match AJAX serialization, empty selections and disabled fieldsets', async () => {
-    const h = await harness(); const {document: d, flex} = h;
+    const h = await harness(set(), {internals: true}); const {document: d, flex} = h;
     const scope = d.createElement('div'); scope.innerHTML = `<input name="zero" value="0"><textarea name="body">one\ntwo</textarea><input type="checkbox" name="no" value="1"><input type="checkbox" name="yes" value="1" checked><select name="many" multiple><option value="a" selected>A</option><option value="b" selected>B</option><option disabled value="c" selected>C</option></select><select name="empty" multiple><option>X</option></select><fieldset disabled><legend><input name="legend" value="ok"></legend><input name="disabled" value="no"></fieldset><button name="button">No</button><input type="file" name="file">`;
     d.body.append(scope);
     assert.deepEqual(Array.from(flex.serialize(scope), pair => Array.from(pair)), [['zero','0'], ['body','one\r\ntwo'], ['yes','1'], ['many','a'], ['many','b'], ['legend','ok']]); h.close();
@@ -460,7 +477,7 @@ test('failed AJAX add restores controls and shows text safely', async () => {
 test('lazy loading shares in-flight request, blocks submit after failure, permits Retry', async () => {
     let resolve, count = 0;
     const lazy = row('lazy').replace('data-flex-row="lazy"', 'data-flex-loaded="0" data-flex-row="lazy"').replace('<div class="flex-row-content">', '<div class="flex-row-content"><p class="flex-row-load-status"></p><button class="flex-row-retry" type="button">Retry</button>');
-    const h = await harness(set(lazy), {response: () => { count++; return new Promise(done => resolve = done); }});
+    const h = await harness(set(lazy), {internals: true, response: () => { count++; return new Promise(done => resolve = done); }});
     const rowElement = h.document.querySelector('.flex-row'), first = h.flex.test.loadRow(rowElement);
     assert.equal(first, h.flex.test.loadRow(rowElement)); assert.equal(count, 1);
     resolve({ok:false,json:async () => ({message:'Failed'})}); assert.equal(await first, false);
@@ -472,7 +489,7 @@ test('lazy loading shares in-flight request, blocks submit after failure, permit
     assert.equal(form.dispatchEvent(new h.window.Event('submit', {cancelable:true})), true); h.close();
 });
 test('max_input_vars and pending transport guards use native FormData', async () => {
-    const h = await harness(), form = h.document.querySelector('form'); form.setAttribute('data-flex-max-input-vars', '1');
+    const h = await harness(set(), {internals: true}), form = h.document.querySelector('form'); form.setAttribute('data-flex-max-input-vars', '1');
     assert.equal(form.dispatchEvent(new h.window.Event('submit',{cancelable:true})),false); assert.match(h.document.querySelector('[role="alert"]').textContent, /max_input_vars=1/);
     form.setAttribute('data-flex-max-input-vars', '1000'); h.flex.test.setTreeBusy(h.document.querySelector('.flex-rows'),true);
     assert.equal(form.dispatchEvent(new h.window.Event('submit',{cancelable:true})),false); assert.match(h.document.querySelector('[role="alert"]').textContent,/Wait for/); h.close();
@@ -481,7 +498,7 @@ function metadata(asset = 'old') {
     return `<div data-flex-metadata="1"><div id="caption_${asset}" data-flex-metadata-property="caption" class="InputfieldStateError"><div class="InputfieldContent"><p class="InputfieldError">Required</p><input name="caption__${asset}__text" value="Pending"></div></div><div data-flex-metadata-property="enabled"><input type="checkbox" name="flag__${asset}__enabled" value="1"></div><div data-flex-metadata-property="choices"><select name="choices__${asset}__options" multiple><option value="a">Alpha</option></select></div><input name="description_${asset}" value="Description"><input name="tags_${asset}" value="tag"><div data-flex-metadata-property="rich"><div class="InputfieldTinyMCEEditor InputfieldTinyMCEInline InputfieldTinyMCELoaded" id="rich__${asset}__editor"><p>Pending inline</p></div></div></div>`;
 }
 test('media snapshots preserve unchecked, empty multiselect, inline markup and validation through replacement', async () => {
-    const h = await harness(metadata()); const scope = h.document.querySelector('[data-flex-metadata]');
+    const h = await harness(metadata(), {internals: true}); const scope = h.document.querySelector('[data-flex-metadata]');
     const snapshot = h.flex.test.mediaMetadata(scope); scope.outerHTML = metadata('new'); const fresh = h.document.querySelector('[data-flex-metadata]');
     fresh.querySelector('input').value = ''; fresh.querySelector('[type="checkbox"]').checked = true; fresh.querySelector('select').value = 'a'; fresh.querySelector('.InputfieldError').remove();
     h.flex.test.restoreMediaMetadata(fresh,snapshot,true);
@@ -490,7 +507,7 @@ test('media snapshots preserve unchecked, empty multiselect, inline markup and v
 });
 test('upload replaces maxFiles=1 item and retains pending metadata', async () => {
     const field = `<div class="Inputfield InputfieldImage"><div class="InputfieldContent"><input class="InputfieldImageMaxFiles" value="1"><ul class="InputfieldImageList"><li>${metadata()}</li></ul><div data-flex-upload="1" data-fieldname="content" data-flex-draft="draft" data-flex-path="images" data-posturl="/upload"><input type="file"></div></div></div>`;
-    const h = await harness(field, {response:async () => ({ok:true,json:async () => [{markup:`<li>${metadata('new')}</li>`}]})});
+    const h = await harness(field, {internals: true, response:async () => ({ok:true,json:async () => [{markup:`<li>${metadata('new')}</li>`}]})});
     await h.flex.test.upload(h.document.querySelector('[type="file"]'), [new h.window.File(['x'],'new.png')]);
     assert.equal(h.calls[0].headers['X-FILENAME'],'new.png'); assert.equal(h.calls[0].headers['X-TOKEN'],'secret'); assert.equal(h.document.querySelectorAll('.InputfieldImageList > li').length,1);
     assert.equal(h.document.querySelector('[name="caption__new__text"]').value,'Pending'); assert.equal(h.document.querySelector('.flex-upload-status'),null); assert(h.document.querySelector('.InputfieldImage').matches('.InputfieldStateChanged')); h.close();
@@ -503,14 +520,14 @@ test('media refresh preserves pending controls and native CustomEvent transport'
 });
 test('TinyMCE move lifecycle saves/removes editors and retains unrelated inline editors', async () => {
     const calls = [];
-    const h = await harness(set(row('a','A','<textarea id="editor" class="InputfieldTinyMCEEditor InputfieldTinyMCELoaded"></textarea><div class="InputfieldTinyMCEInline">Inline</div>')), {before(w) {w.tinymce = {get:id => ({save:()=>calls.push('save:'+id),remove:()=>calls.push('remove:'+id)})};}});
+    const h = await harness(set(row('a','A','<textarea id="editor" class="InputfieldTinyMCEEditor InputfieldTinyMCELoaded"></textarea><div class="InputfieldTinyMCEInline">Inline</div>')), {internals: true, before(w) {w.tinymce = {get:id => ({save:()=>calls.push('save:'+id),remove:()=>calls.push('remove:'+id)})};}});
     h.flex.test.teardown(h.document.querySelector('.flex-row'));
     assert.deepEqual(calls,['save:editor','remove:editor']); assert(!h.document.querySelector('textarea').matches('.InputfieldTinyMCELoaded')); h.close();
 });
 test('classic sortable adapter passes native Elements and does not initialize twice', async () => {
     let options, initCount = 0, disabled;
     const collections = new WeakMap();
-    const h = await harness(set(), {before(w) {
+    const h = await harness(set(), {internals: true, before(w) {
         function $(element) {
             if(!collections.has(element)) collections.set(element, {0:element,on(){return this;},trigger(){return this;},hasClass:name=>element.classList.contains(name),sortable(...args){if(typeof args[0]==='object'){options=args[0];initCount++;element.classList.add('ui-sortable');}else disabled=args[2];return this;}});
             return collections.get(element);
@@ -542,7 +559,7 @@ test('maintenance rename works without an orphan path-selection element', async 
 });
 test('classic lifecycle translates jQuery collections into Elements and handles nested toggles once', async () => {
     const handlers = [];
-    const h=await harness(set(row('parent','Parent',set(row('child','Child')))),{before(w){
+    const h=await harness(set(row('parent','Parent',set(row('child','Child')))),{internals:true,before(w){
         function $(element){return {0:element,on(events,selector,handler){handlers.push({events,selector,handler:handler||selector});return this;},trigger(){return this;}};}
         $.fn={}; w.jQuery=$;
     }});
@@ -593,6 +610,7 @@ function nativeAdmin(w, calls) {
 test('classic Uikit global does not activate Bridge paths during table AJAX or native setup', async()=>{
     const calls=[];
     const h=await harness(tableSet(tableRow('a')),{
+        internals:true,
         before(w){
             w.ProcessWireAdminTheme={init(){},setupWireTabs(){}};
             w.ProcessWire={config:{},confirm(message,ok){calls.push('confirm');ok();}};
@@ -608,7 +626,7 @@ test('classic Uikit global does not activate Bridge paths during table AJAX or n
 });
 test('Bridge uses native sortable and toggle APIs without the proposed files API', async()=>{
     const calls=[];
-    const h=await harness(set()+`<div class="Inputfield" data-bridge-component="InputfieldFlexImage" data-bridge-widget="InputfieldImage"></div>`,{before(w){nativeAdmin(w,calls);}});
+    const h=await harness(set()+`<div class="Inputfield" data-bridge-component="InputfieldFlexImage" data-bridge-widget="InputfieldImage"></div>`,{internals:true,before(w){nativeAdmin(w,calls);}});
     assert.equal(h.window.jQuery,undefined); assert.equal(calls.filter(x=>x[0]==='sort').length,1);
     const sort=calls.find(x=>x[0]==='sort'); assert.equal(sort[2].enabled(),true);
     h.flex.test.setTreeBusy(h.document.querySelector('.flex-rows'),true);assert.equal(sort[2].enabled(),false);
@@ -626,7 +644,7 @@ test('Bridge fragment insertion uses the existing Trusted Types policy and respo
 });
 test('Bridge loads legacy only for a rendered legacy child and binds its later custom events', async()=>{
     const calls=[], handlers=[];
-    const h=await harness(set(),{before(w){nativeAdmin(w,calls);}});
+    const h=await harness(set(),{internals:true,before(w){nativeAdmin(w,calls);}});
     const scope=h.document.createElement('div');scope.innerHTML='<div class="Inputfield" data-bridge-legacy="InputfieldTinyMCE"></div>';h.document.querySelector('.InputfieldFlex').append(scope);
     h.window.jQuery=Object.assign(element=>({0:element,on(events,selector,handler){handlers.push({events,handler:handler||selector});return this;}}),{fn:{}});
     h.document.dispatchEvent(new h.window.Event('pw-legacy-loaded'));
@@ -635,7 +653,7 @@ test('Bridge loads legacy only for a rendered legacy child and binds its later c
 });
 test('Bridge media subclasses use the declarative Inputfields lifecycle without a files API', async()=>{
     const calls=[];
-    const h=await harness(set(),{before(w){nativeAdmin(w,calls);}});
+    const h=await harness(set(),{internals:true,before(w){nativeAdmin(w,calls);}});
     const field=h.document.createElement('div');field.className='Inputfield';
     field.setAttribute('data-bridge-component','InputfieldFlexFile');field.setAttribute('data-bridge-widget','InputfieldFile');
     h.document.querySelector('.InputfieldFlex').append(field);
@@ -648,7 +666,7 @@ test('Bridge media subclasses use the declarative Inputfields lifecycle without 
 });
 test('Bridge with a legacy child closes the upstream image dialog instead of the native one', async()=>{
     const calls=[];
-    const h=await harness(set(),{before(w){nativeAdmin(w,calls);}});
+    const h=await harness(set(),{internals:true,before(w){nativeAdmin(w,calls);}});
     h.window.ProcessWireAdminTheme.upstream=()=>true;
     h.window.jQuery=selector=>({dialog:action=>calls.push(['legacyDialog',selector,action])});
     h.flex.classic.closeDialog();

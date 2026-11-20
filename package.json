@@ -2,12 +2,13 @@
   "name": "fieldtype-flex",
   "private": true,
   "scripts": {
-    "build": "tsc -p tsconfig.json && tsc -p tsconfig.maintenance.json",
-    "check": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.maintenance.json --noEmit",
-    "test": "npm run build && node tests/js/row-title-parts.cjs && node --test tests/js/*.test.cjs"
+    "build": "npm run check && esbuild scripts/typescript/FieldtypeFlex.ts --bundle --format=iife --target=es2020 --outfile=FieldtypeFlex.js && esbuild scripts/typescript/FlexMaintenance.ts --bundle --format=iife --target=es2020 --outfile=FlexMaintenance.js",
+    "check": "tsc --noEmit",
+    "test": "npm run build && node --check FieldtypeFlex.js && node --check FlexMaintenance.js && node tests/js/row-title-parts.cjs && node --test tests/js/*.test.cjs"
   },
   "devDependencies": {
-    "typescript": "5.9.3",
-    "jsdom": "26.1.0"
+    "esbuild": "0.28.2",
+    "jsdom": "26.1.0",
+    "typescript": "5.9.3"
   }
 }
