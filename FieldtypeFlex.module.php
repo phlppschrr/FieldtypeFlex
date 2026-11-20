@@ -38,6 +38,7 @@ class FieldtypeFlex extends Fieldtype implements ConfigurableModule, FieldtypeHa
 	/** Existing and newly added rows start open. */
 	public const ROW_EXPAND_ALL = 3;
 
+	private ?FlexAdmin $adminService = null;
 	private ?FlexMedia $mediaService = null;
 	private array $adminDefinitionErrors = [];
 	private array $adminInputErrors = [];
@@ -328,7 +329,7 @@ class FieldtypeFlex extends Fieldtype implements ConfigurableModule, FieldtypeHa
 	 * @internal
 	 */
 	public function admin(): FlexAdmin {
-		return new FlexAdmin($this);
+		return $this->adminService ??= new FlexAdmin($this);
 	}
 
 	/**

@@ -64,9 +64,11 @@ $asset = $hooked->image->first();
 $asset->description = 'Stored image';
 $page->save($name);
 $before = $type->storage()->persisted($page, $titleField);
-$valuesHook = $wire->addHookAfter('InputfieldFlexRows::rowTitleValues', static function(HookEvent $event) use ($name) {
+$previewStates = [];
+$valuesHook = $wire->addHookAfter('InputfieldFlexRows::rowTitleValues', static function(HookEvent $event) use ($name, $type, &$previewStates) {
 	[$row, $root, $parent] = $event->arguments();
 	if($row->ownerField()->name !== $name || $row->rowType() !== 'hooked') return;
+	$previewStates[] = $type->admin()->previewingRowTitles();
 	$child = $row->children->first();
 	$event->return = ['@details' => $root->heading . ' / ' . $row->details->caption . ' / ' . ($child ? $child->heading : ''), '@index' => 'invalid', '@asset' => $row->image->count() ? $row->image->first()->description() : 'No image'];
 });
@@ -132,9 +134,14 @@ try {
 	$same(true, $ajax($request + $post, false)['error'], 'title previews require CSRF');
 	$same(true, $ajax($request + array_diff_key($post, [$name . '__0complete' => true]))['error'], 'incomplete title snapshots are rejected');
 	$same(true, $ajax(array_replace($request, ['flex_title_rows' => json_encode([['items', str_repeat('f', 32)]])]) + $post)['error'], 'title previews reject unknown row identities');
+	$same($type->admin(), $type->admin(), 'request-local admin service is reused across callers');
+	$same([false], $previewStates, 'initial render runs outside title preview mode');
+	$previewStates = [];
 	$draftBefore = $type->admin()->draft($draft);
 	$result = $ajax($request + $post);
 	$same(false, $result['error'], 'authenticated title preview accepts unsaved form values: ' . ($result['message'] ?? ''));
+	$same([true], $previewStates, 'row-titles AJAX runs with previewingRowTitles active across shared admin service');
+	$same(false, $type->admin()->previewingRowTitles(), 'previewingRowTitles resets after row-titles AJAX');
 	$same(['@details' => 'Pending root / Pending detail / Stored child', '@asset' => 'Pending image description'], $result['titles'][$hooked->address()]['custom'], 'preview uses detached root, object and unloaded descendant values');
 	$same([
 		['children' => [['text' => '#'], ['text' => '3', 'index' => true]], 'classes' => ['flex-muted']],
