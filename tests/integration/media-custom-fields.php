@@ -62,6 +62,51 @@ $same('A &amp; B', $out->copyright, 'repeated metadata formatting is stable');
 $same('A & B', $out->getFieldValue('copyright', false), 'native bridge explicitly reads raw values');
 $throws(fn() => $out->copyright = 'forbidden', 'formatted metadata is read only');
 $page->of(false);
+
+// Formatted custom metadata reads avoid stale caches across held mutable references and detach formatted PageArrays.
+$refMetaField = $createField('flex_media_ref_cache', [
+	'gallery' => ['type' => 'image', 'customFields' => [
+		'refs' => ['type' => 'page', 'derefAsPage' => 0, 'inputfield' => 'InputfieldAsmSelect'],
+		'caption' => ['type' => 'text', 'textformatters' => ['TextformatterEntities']],
+	]],
+]);
+$page = $wire->pages->getFresh($id); $page->of(false);
+$refGallery = $page->get($refMetaField->name)->gallery;
+$refGallery->add($fixture);
+$refFile = $refGallery->first();
+$refFile->refs = [$wire->pages->get(1)];
+$refFile->caption = 'A & B';
+$page->save($refMetaField->name);
+$page = $wire->pages->getFresh($id); $page->of(false);
+$liveGallery = $page->getUnformatted($refMetaField->name)->gallery;
+$liveFile = $liveGallery->first();
+$heldRefs = $liveFile->refs;
+$liveGallery->formatted(true);
+$same([1], $liveFile->refs->explode('id'), 'formatted custom PageArray reads current references');
+$liveGallery->formatted(false);
+$heldRefs->removeAll();
+$liveGallery->formatted(true);
+$same([], $liveFile->refs->explode('id'), 'mutating a held unformatted PageArray is immediately reflected on subsequent formatted reads');
+$liveGallery->formatted(false);
+$page = $wire->pages->getFresh($id); $page->of(true);
+$formattedRefFile = $page->get($refMetaField->name)->gallery->first();
+$same('A &amp; B', $formattedRefFile->caption, 'formatted custom caption resolves without cloning FlexValue');
+$firstRefs = $formattedRefFile->refs;
+$same([1], $firstRefs->explode('id'), 'formatted custom PageArray returns referenced page');
+$firstRefs->removeAll();
+$same([1], $formattedRefFile->refs->explode('id'), 'mutating returned formatted PageArray leaves subsequent metadata reads intact');
+$formatHook = $wire->addHookBefore('FieldtypePage::formatValue', static function(HookEvent $event) use ($refMetaField) {
+	if($event->arguments(1)->name === $refMetaField->name . '_refs' && $event->arguments(2) instanceof PageArray) {
+		$event->arguments(2)->removeAll();
+	}
+});
+try {
+	$same([], $formattedRefFile->refs->explode('id'), 'FieldtypePage::formatValue hook can filter the formatted PageArray copy');
+	$same([1], $formattedRefFile->getFieldValue('refs', false)->explode('id'), 'mutating PageArray in FieldtypePage::formatValue hook leaves unformatted metadata intact');
+} finally {
+	$wire->removeHook($formatHook);
+}
+$page->of(false);
 foreach(['rows', 'image'] as $typeName) {
 	$bad = $defs; $bad['gallery']['customFields'] = ['candidate' => ['type' => $typeName]];
 	$throws(fn() => new FlexFieldDefs($f, $page, $bad), "unsupported metadata $typeName rejected", FlexDefinitionException::class);

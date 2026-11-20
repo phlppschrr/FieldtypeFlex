@@ -2,15 +2,20 @@
 
 ## WIP
 
+### Changed
+
+- Evaluate Flex definitions once per selector predicate and sort expression in `FlexQuery`, deduplicating nested object path traversal.
+- Skip transient `Field` allocation in `FlexMediaCollection::formatDescription()` when no textformatters are configured, read formatted custom metadata without cloning the whole `FlexValue`, target known native POST keys in `InputfieldFlexMedia`, and avoid describing unchanged files during metadata processing.
+
 ### Fixed
 
 - Reuse the request-local admin service so live row-title previews run in preview mode across row, field-definition and media inputs.
 - Include nested `object` and `table` children in `flex schema` inspection output.
 - Reserve native `Pagefile`/`Pageimage` magic properties with an explicit list instead of reading runtime PHPDoc comments, preserving validation when `opcache.save_comments` is disabled.
-
-### Changed
-
-- Evaluate Flex definitions once per selector predicate and sort expression in `FlexQuery`, deduplicating nested object path traversal.
+- Allow read-only `slice()` calls on formatted `FlexRows`, `FlexFiles` and `FlexImages` views without triggering write guards, and stop formatted `FlexRows` operations from marking the owning page changed.
+- Preserve file collection order during staged file replacement (`replaceOwned`) and deferred copy finalization (`preparePending`).
+- Align `FlexMedia::collect()` lock order with `sync()` (locking the field row before the asset row once), invalidate cached manifest entries on `abandon()` and variation cleanup, and skip redundant `WireCache` writes when the cleanup cursor is unchanged.
+- Treat empty retained unknown `object:1`, `files:1` and `images:1` envelopes as empty in `FieldtypeFlex::isEmptyValue()` and `FlexValue::hasValue()`.
 
 ## 1.0.0-beta.6 - 2026-11-19
 

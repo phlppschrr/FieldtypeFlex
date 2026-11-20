@@ -125,3 +125,15 @@ $post[FlexPath::inputPrefix($contentField->name, $value->items->first()->address
 $requiredEditor->processInput($wire->wire(new WireInputData($post)));
 $assert(count($requiredEditor->getErrors()) > 0, 'unknown descendant content does not satisfy a declared required caption');
 $same(FlexStorage::revision($fresh), FlexStorage::revision($wire->pages->getFresh($id)->getUnformatted($contentField->name)->rawArray()), 'failed native validation leaves saved known and unknown values unchanged');
+
+// Empty retained unknown object/media envelopes must still evaluate as empty.
+$emptyUnknown = new FlexValue($page, $contentField, $type->getDefinitions($contentField, $page), [
+	'legacy_object' => ['_flex' => FlexStorage::OBJECT_FORMAT, 'values' => []],
+	'legacy_files' => ['_flex' => FlexStorage::FILES_FORMAT, 'items' => []],
+	'legacy_images' => ['_flex' => FlexStorage::IMAGES_FORMAT, 'items' => []],
+]);
+$same(true, $type->isEmptyValue($contentField, $emptyUnknown), 'empty retained unknown object and media envelopes count as empty');
+$nonEmptyUnknown = new FlexValue($page, $contentField, $type->getDefinitions($contentField, $page), [
+	'legacy_files' => ['_flex' => FlexStorage::FILES_FORMAT, 'items' => [['id' => bin2hex(random_bytes(16)), 'basename' => 'old.pdf']]],
+]);
+$same(false, $type->isEmptyValue($contentField, $nonEmptyUnknown), 'populated retained unknown media envelope counts as non-empty');
