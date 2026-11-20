@@ -70,6 +70,21 @@ foreach(['basename', 'url', 'width', 'assetId', 'description123', 'pagefiles', '
 	$bad = $defs; $bad['gallery']['customFields'] = [$name => ['type' => 'text']];
 	$throws(fn() => new FlexFieldDefs($f, $page, $bad), "reserved metadata $name rejected", FlexDefinitionException::class);
 }
+$missingMagic = [];
+foreach([FlexPagefile::class, FlexPageimage::class] as $mediaClass) {
+	for($reflect = new \ReflectionClass($mediaClass); $reflect; $reflect = $reflect->getParentClass()) {
+		preg_match_all('/@property(?:-read|-write)?\s+\S+\s+\$(\w+)/', $reflect->getDocComment() ?: '', $matches);
+		foreach($matches[1] as $magic) {
+			if(!FlexMedia::reservedName($magic)) $missingMagic[$magic] = true;
+		}
+	}
+}
+$same([], array_keys($missingMagic), 'explicit native magic property list covers all core Pagefile/Pageimage @property annotations');
+$assert(FlexMedia::reservedName('install') && FlexMedia::reservedName('filedata') && FlexMedia::reservedName('httpUrl') && FlexMedia::reservedName('webp'), 'protected methods, properties and magic names remain reserved');
+// Verify pure @property-only names explicitly so this check still protects opcache.save_comments=0 runs.
+foreach(['focusStr', 'mtimeStr', 'createdStr', 'modifiedStr', 'tagsArray'] as $pureMagic) {
+	$assert(FlexMedia::reservedName($pureMagic), "pure magic property $pureMagic remains reserved without docblocks");
+}
 
 // Independent metadata objects on collection copies and file duplication.
 $page = $wire->pages->getFresh($id); $page->of(false);

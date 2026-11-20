@@ -17,6 +17,28 @@ $same('integer', $schema['properties']['blocks']['types']['text']['children']['t
 $assert(isset($schema['selectors']['blocks.text.children.item.number'], $schema['selectors']['blocks.text.count']) && !isset($schema['selectors']['blocks.text.id']), 'schema uses genuine typed selector paths');
 $assert(!str_contains(json_encode($schema), 'absolutePath'), 'schema omits absolute source paths');
 
+$objectSchemaField = $createField('flex_schema_objects', [
+	'meta' => [
+		'type' => 'object',
+		'children' => [
+			'author' => ['type' => 'text', 'renamedFrom' => 'writer'],
+			'nested' => ['type' => 'object', 'children' => ['code' => ['type' => 'integer']]],
+		],
+	],
+	'prices' => [
+		'type' => 'table',
+		'columns' => ['service' => ['type' => 'text'], 'amount' => ['type' => 'float']],
+	],
+]);
+[$code, $out] = $invoke(['schema', $objectSchemaField->name, '--json']);
+$same(0, $code, 'CLI schema command succeeds for objects and tables');
+$objectSchema = $decode($out);
+$same(true, $objectSchema['success'], 'schema discovery succeeds for objects and tables');
+$same('text', $objectSchema['properties']['meta']['children']['author']['kind'], 'schema recurses into object children');
+$same(['writer'], $objectSchema['properties']['meta']['children']['author']['renamedFrom'], 'schema retains object child rename mappings');
+$same('integer', $objectSchema['properties']['meta']['children']['nested']['children']['code']['kind'], 'schema recurses into nested objects');
+$same('float', $objectSchema['properties']['prices']['children']['rows']['types']['row']['amount']['kind'], 'schema exposes table columns through object and rows children');
+
 file_put_contents($definitionPath, '<?php namespace ProcessWire; return ["heading" => ["type" => "text"]] + ($page && $page->id === ' . (int) $page->id . ' ? ["page_only" => ["type" => "integer"]] : []);');
 $maintenance->flexDefinition = ''; $maintenance->flexDefinitionFile = basename($definitionPath);
 $inspect = new FlexInspection($type);

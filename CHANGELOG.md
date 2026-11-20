@@ -2,6 +2,16 @@
 
 ## WIP
 
+### Fixed
+
+- Reuse the request-local admin service so live row-title previews run in preview mode across row, field-definition and media inputs.
+- Include nested `object` and `table` children in `flex schema` inspection output.
+- Reserve native `Pagefile`/`Pageimage` magic properties with an explicit list instead of reading runtime PHPDoc comments, preserving validation when `opcache.save_comments` is disabled.
+
+### Changed
+
+- Evaluate Flex definitions once per selector predicate and sort expression in `FlexQuery`, deduplicating nested object path traversal.
+
 ## 1.0.0-beta.6 - 2026-11-19
 
 ### Changed

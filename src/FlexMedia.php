@@ -956,21 +956,30 @@ class FlexMedia extends Wire {
 		$this->type = $type;
 	}
 
+	/** Documented native magic properties on Wire/WireData/Pagefile/Pageimage; independent of opcache.save_comments. */
+	private const NATIVE_MAGIC_PROPERTIES = [
+		'admintheme', 'alt', 'basename', 'cache', 'classname', 'config', 'created', 'created_users_id',
+		'createdstr', 'createduser', 'database', 'datetime', 'db', 'debuginfo', 'description', 'error',
+		'ext', 'field', 'fieldgroups', 'fields', 'fieldtypes', 'fieldvalues', 'filedata', 'filename',
+		'files', 'filesize', 'filesizestr', 'focus', 'focusstr', 'formatted', 'fuel', 'hasfocus',
+		'hash', 'height', 'hidpiheight', 'hidpiwidth', 'hooks', 'httpurl', 'input', 'languages', 'log',
+		'mail', 'modified', 'modified_users_id', 'modifiedstr', 'modifieduser', 'modules', 'mtime',
+		'mtimestr', 'name', 'notices', 'original', 'page', 'pagefiles', 'pages', 'permissions',
+		'process', 'profiler', 'ratio', 'roles', 'sanitizer', 'session', 'src', 'suffix', 'suffixstr',
+		'tags', 'tagsarray', 'templates', 'uploadname', 'url', 'urls', 'user', 'users', 'webp',
+		'width', 'wire',
+	];
+
 	/** Reserve native methods, documented properties and technical state. @internal */
 	public static function reservedName(string $name): bool {
 		if(preg_match('/^(?:description[0-9]+|_.*|flex.*)$/iD', $name) || in_array(strtolower($name), ['id', 'sort', 'values', 'customfields'], true)) return true;
 		static $reserved = null;
 		if($reserved === null) {
-			$reserved = [];
+			$reserved = array_fill_keys(self::NATIVE_MAGIC_PROPERTIES, true);
 			foreach([FlexPagefile::class, FlexPageimage::class] as $class) {
 				$reflect = new \ReflectionClass($class);
 				foreach($reflect->getMethods() as $method) $reserved[strtolower(ltrim($method->name, '_'))] = true;
 				foreach($reflect->getProperties() as $property) $reserved[strtolower($property->name)] = true;
-				// Native magic properties are part of the public contract too.
-				for($r = $reflect; $r; $r = $r->getParentClass()) {
-					preg_match_all('/@property(?:-read|-write)?\s+\S+\s+\$(\w+)/', $r->getDocComment() ?: '', $matches);
-					foreach($matches[1] as $property) $reserved[strtolower($property)] = true;
-				}
 			}
 		}
 		return isset($reserved[strtolower($name)]);

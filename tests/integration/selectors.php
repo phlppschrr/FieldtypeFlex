@@ -64,3 +64,39 @@ $selectorInput->name = 'flex_selector';
 $selectorInput->value = 'flex_test.category=2, flex_test.age>0';
 $selectorHtml = $selectorInput->render();
 $assert(str_contains($selectorHtml, 'category') && str_contains($selectorHtml, 'age'), 'real InputfieldSelector renders logical Page and numeric properties');
+
+// Each query predicate and sort expression evaluates definitions once instead of repeatedly.
+$defFile = $wire->config->paths->templates . 'flex-query-count-' . bin2hex(random_bytes(4)) . '.php';
+$trackFile($defFile);
+file_put_contents($defFile, '<?php namespace ProcessWire;
+$GLOBALS["__flex_query_def_loads"] = ($GLOBALS["__flex_query_def_loads"] ?? 0) + 1;
+return [
+	"name" => ["type" => "text"],
+	"meta" => ["type" => "object", "children" => ["note" => ["type" => "text"]]],
+	"photo" => ["type" => "image"],
+	"blocks" => ["type" => "rows", "types" => ["text" => ["children" => ["heading" => ["type" => "text"]]]]],
+];');
+$countedField = $createField('flex_qcount', []);
+$countedField->flexDefinition = '';
+$countedField->flexDefinitionFile = basename($defFile);
+$countedField->save();
+try {
+	foreach([
+		[$countedField->name . '.name=Alpha', 1, 'scalar equality evaluates definitions once'],
+		[$countedField->name . '.name!=Alpha', 1, 'scalar inequality with inner recursion evaluates definitions once'],
+		[$countedField->name . '.name=', 1, 'scalar blank check with inner recursion evaluates definitions once'],
+		// Multi-dot selectors also trigger one PageFinder::isPageField() getBlankValue() probe outside FlexQuery.
+		[$countedField->name . '.meta.note!=Alpha', 2, 'nested object inequality evaluates definitions once in FlexQuery'],
+		[$countedField->name . '.photo.count>0', 2, 'media count evaluates definitions once in FlexQuery'],
+		[$countedField->name . '.blocks.text.heading=Alpha', 2, 'rows predicate evaluates definitions once in FlexQuery'],
+		// PageFinder::getQuerySort() also calls getBlankValue() once before getMatchQuerySort().
+		['sort=' . $countedField->name . '.name', 2, 'scalar sort evaluates definitions once in FlexQuery'],
+		['sort=' . $countedField->name . '.meta.note', 3, 'nested object sort evaluates once in path validation and once in FlexQuery::sort'],
+	] as [$expr, $expected, $label]) {
+		$GLOBALS['__flex_query_def_loads'] = 0;
+		$wire->pages->findIDs("id=$id, $expr");
+		$same($expected, $GLOBALS['__flex_query_def_loads'], $label);
+	}
+} finally {
+	unset($GLOBALS['__flex_query_def_loads']);
+}
