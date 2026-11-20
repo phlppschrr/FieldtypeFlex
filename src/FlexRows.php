@@ -574,7 +574,9 @@ class FlexRows extends WireArray implements \JsonSerializable {
 	public function slice($start, $limit = 0) {
 		$slice = $limit ? array_slice($this->data, $start, $limit, true) : array_slice($this->data, $start, null, true);
 		$items = $this->makeNew();
-		$items->data = $slice;
+		foreach($slice as $key => $row) {
+			$items->data[$key] = clone $row;
+		}
 		$items->formatted = $this->formatted;
 		if($items->formatted) $items->allRows = $items->data;
 		return $items;

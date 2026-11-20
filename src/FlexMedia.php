@@ -5,7 +5,6 @@ trait FlexOwnedFile {
 	private string $flexAssetId = '';
 	private array $flexBaseline = [];
 	private ?FlexValue $flexValues = null;
-	private ?FlexValue $flexFormattedValues = null;
 	private bool $flexHasValues = false;
 
 	/** Read canonical descriptions for cloning, revision checks and persistence. @internal */
@@ -151,7 +150,6 @@ trait FlexOwnedFile {
 	/** Hydrate once through Flex's existing scalar/date/language pipeline. @internal */
 	public function hydrateCustomValues(array $values, bool $present = true): void {
 		$this->flexHasValues = $present;
-		$this->flexFormattedValues = null;
 		$this->flexValues = new FlexValue($this->page, $this->field, $this->metadataSchema(), $values, $this->pagefiles->address() . '.' . $this->assetId());
 	}
 
@@ -176,25 +174,11 @@ trait FlexOwnedFile {
 		if($name === 'description') return $formatted ? $this->pagefiles->formatDescription($this->rawDescription(), true) : $this->rawDescription();
 		if($name === 'tags') return (string) $this->tags;
 		if(!$this->flexValues) $this->hydrateCustomValues([], false);
-		if(!$formatted) {
-			$value = $this->flexValues->getUnformatted($name);
-			// Unformatted language and PageArray objects stay live only on writable originals.
-			if(!$this->formatted() && !$this->page->of()) {
-				$this->flexFormattedValues = null;
-				return $value;
-			}
-			return $value instanceof PageArray || $value instanceof LanguagesPageFieldValue ? clone $value : $value;
-		}
-		if($this->formatted()) {
-			if(!$this->flexFormattedValues) {
-				$this->flexFormattedValues = clone $this->flexValues;
-				$this->flexFormattedValues->of(true);
-			}
-			return $this->flexFormattedValues->get($name);
-		}
-		$view = clone $this->flexValues;
-		$view->of(true);
-		return $view->get($name);
+		if($formatted) return $this->flexValues->readFormatted((string) $name);
+		$value = $this->flexValues->getUnformatted((string) $name);
+		// Unformatted language and PageArray objects stay live only on writable originals.
+		if(!$this->pagefiles->formatted() && !$this->formatted() && !$this->page->of()) return $value;
+		return $value instanceof PageArray || $value instanceof LanguagesPageFieldValue ? clone $value : $value;
 	}
 
 	/** Set declared fields; unknown names match native setFieldValue() (false). */
@@ -207,7 +191,6 @@ trait FlexOwnedFile {
 		} else if($name === 'tags') $this->tags = is_array($value) ? implode(' ', $value) : $value;
 		else {
 			if(!$this->flexValues) $this->hydrateCustomValues([], false);
-			$this->flexFormattedValues = null;
 			$this->flexValues->set($name, $value);
 			$this->trackChange($name);
 			$this->pagefiles->trackChange('item');
@@ -249,14 +232,12 @@ trait FlexOwnedFile {
 	}
 
 	public function resetTrackChanges($trackChanges = true) {
-		$this->flexFormattedValues = null;
 		if($this->flexValues) $this->flexValues->resetTrackChanges($trackChanges);
 		return parent::resetTrackChanges($trackChanges);
 	}
 
 	public function __clone() {
 		parent::__clone();
-		$this->flexFormattedValues = null;
 		if($this->flexValues) $this->flexValues = clone $this->flexValues;
 	}
 
@@ -888,7 +869,10 @@ trait FlexMediaCollection {
 		$items = $this->makeNew();
 		$items->flexHydrating = true;
 		$items->rawDescriptions = $this->rawDescriptions;
-		$items->data = $slice;
+		foreach($slice as $file) {
+			$hydrated = $items->hydrateFile(FlexMedia::describe($file, $file->assetId()));
+			$items->data[$hydrated->basename()] = $hydrated;
+		}
 		$items->formatted($this->formatted());
 		$items->flexHydrating = false;
 		return $items;

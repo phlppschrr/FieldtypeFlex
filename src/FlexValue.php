@@ -295,6 +295,28 @@ class FlexValue extends WireData implements \JsonSerializable {
 	}
 
 	/**
+	 * Read one leaf property formatted without cloning the whole value container.
+	 *
+	 * @param string $name Property name.
+	 * @return mixed
+	 * #pw-internal
+	 * @internal
+	 */
+	public function readFormatted(string $name) {
+		$formatted = $this->formatted;
+		$rawRead = $this->rawRead;
+		$this->formatted = true;
+		$this->rawRead = false;
+		try {
+			$value = $this->get($name);
+		} finally {
+			$this->formatted = $formatted;
+			$this->rawRead = $rawRead;
+		}
+		return $value instanceof PageArray || $value instanceof LanguagesPageFieldValue ? clone $value : $value;
+	}
+
+	/**
 	 * Read a native typed property without applying output formatting.
 	 *
 	 * @param string $name Property name.
@@ -532,7 +554,7 @@ class FlexValue extends WireData implements \JsonSerializable {
 		$def = $this->definitions->property((string) $key);
 		if($def && $def['kind'] === 'page') {
 			return $this->formatted
-				? $this->wire()->modules->get('FieldtypePage')->formatValue($this->flexPage, $this->pageReferenceField((string) $key), $value)
+				? $this->wire()->modules->get('FieldtypePage')->formatValue($this->flexPage, $this->pageReferenceField((string) $key), $value instanceof PageArray ? clone $value : $value)
 				: $value;
 		}
 		if($def && $def['kind'] === 'date') {

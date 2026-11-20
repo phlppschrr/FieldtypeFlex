@@ -196,16 +196,10 @@ $same(0, (int) $q->fetchColumn(), 'native Page deletion removes row projections 
 
 // Idle global cleanup must not rewrite the WireCache cursor when nothing is queued.
 $wire->cache->delete('FlexMedia.collectCursor');
-$cacheWrites = 0;
-$cacheHook = $wire->addHookBefore('WireCache::save', static function(HookEvent $event) use (&$cacheWrites) {
-	if($event->arguments(0) === 'FlexMedia.collectCursor') ++$cacheWrites;
-});
-try {
-	$type->media()->collect();
-	$same(0, $cacheWrites, 'idle global collect skips WireCache cursor writes when queue is empty');
-} finally {
-	$wire->removeHook($cacheHook);
-}
+$type->media()->collect();
+$cursorRows = $db->prepare("SELECT COUNT(*) FROM caches WHERE name='FlexMedia.collectCursor'");
+$cursorRows->execute();
+$same(0, (int) $cursorRows->fetchColumn(), 'idle global collect skips creating a WireCache cursor row when queue is empty');
 
 // Abandoning a staged asset invalidates the in-memory manifest cache immediately.
 $page = $reload();

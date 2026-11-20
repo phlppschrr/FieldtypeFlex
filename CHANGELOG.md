@@ -11,7 +11,7 @@
 
 ### Changed
 
-- Skip transient `Field` allocation in `FlexMediaCollection::formatDescription()` when no textformatters are configured, reuse a formatted custom-metadata view on formatted files, target known native POST keys in `InputfieldFlexMedia`, and avoid describing unchanged files during metadata processing.
+- Skip transient `Field` allocation in `FlexMediaCollection::formatDescription()` when no textformatters are configured, read formatted custom metadata without cloning the whole `FlexValue`, target known native POST keys in `InputfieldFlexMedia`, and avoid describing unchanged files during metadata processing.
 
 ## 1.0.0-beta.6 - 2026-11-19
 
