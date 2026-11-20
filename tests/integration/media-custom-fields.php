@@ -81,6 +81,10 @@ foreach([FlexPagefile::class, FlexPageimage::class] as $mediaClass) {
 }
 $same([], array_keys($missingMagic), 'explicit native magic property list covers all core Pagefile/Pageimage @property annotations');
 $assert(FlexMedia::reservedName('install') && FlexMedia::reservedName('filedata') && FlexMedia::reservedName('httpUrl') && FlexMedia::reservedName('webp'), 'protected methods, properties and magic names remain reserved');
+// Verify pure @property-only names explicitly so this check still protects opcache.save_comments=0 runs.
+foreach(['focusStr', 'mtimeStr', 'createdStr', 'modifiedStr', 'tagsArray'] as $pureMagic) {
+	$assert(FlexMedia::reservedName($pureMagic), "pure magic property $pureMagic remains reserved without docblocks");
+}
 
 // Independent metadata objects on collection copies and file duplication.
 $page = $wire->pages->getFresh($id); $page->of(false);

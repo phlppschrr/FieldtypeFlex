@@ -35,11 +35,10 @@ class FlexQuery extends Wire {
 		$this->type = $type;
 	}
 
-	private function property(Field $field, string $name, ?FlexFieldDefs $defs = null): array {
+	private function property(Field $field, string $name, FlexFieldDefs $defs): array {
 		if(!preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*$/D', $name)) {
 			throw new PageFinderSyntaxException($this->_('Invalid Flex selector property'));
 		}
-		$defs = $defs ?? $this->type->getDefinitions($field);
 		$def = $defs->property($name);
 		if(!$def) {
 			throw new PageFinderSyntaxException(sprintf($this->_('Unknown Flex selector property: %1$s.%2$s. Page-dependent schemas must expose queryable properties without a page context.'), $field->name, $name));
@@ -106,6 +105,7 @@ class FlexQuery extends Wire {
 	 * @param string $operator
 	 * @param mixed $value
 	 * @param bool $inner
+	 * @param FlexFieldDefs|null $defs Already-evaluated definitions reused across recursive predicates.
 	 * @return DatabaseQuerySelect
 	 */
 	public function match($query, string $table, string $subfield, string $operator, $value, bool $inner = false, ?FlexFieldDefs $defs = null) {
@@ -373,17 +373,16 @@ class FlexQuery extends Wire {
 		return $this->scalarPredicate($query, $json, $text, $typed, $def, $operator, $value);
 	}
 
-	private function mediaCount(Field $field, string $name, ?FlexFieldDefs $defs = null): string {
+	private function mediaCount(Field $field, string $name, FlexFieldDefs $defs): string {
 		$table = $this->wire()->database->escapeTable($field->table);
-		$path = $this->wire()->database->quote('$."' . str_replace('.', '"."', $this->objectPath($defs ?? $this->type->getDefinitions($field), $name)) . '"."items"');
+		$path = $this->wire()->database->quote('$."' . str_replace('.', '"."', $this->objectPath($defs, $name)) . '"."items"');
 		return "COALESCE((SELECT JSON_LENGTH(JSON_EXTRACT(flex_media.data,$path)) FROM `$table` AS flex_media WHERE flex_media.pages_id=pages.id),0)";
 	}
 
-	private function matchRows($query, string $path, string $operator, $value, ?FlexFieldDefs $defs = null) {
+	private function matchRows($query, string $path, string $operator, $value, FlexFieldDefs $defs) {
 		if($query->group !== null) throw new PageFinderSyntaxException('Flex @ group was not normalized by PageFinder');
 		$this->type->storage()->requireRowSchema();
 		$query->set('joinType', 'leftjoin');
-		$defs = $defs ?? $this->type->getDefinitions($query->field);
 		$query->where($this->rowsPredicate($query, $path, $operator, $value, $defs));
 		return $query;
 	}

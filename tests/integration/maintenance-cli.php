@@ -30,7 +30,9 @@ $objectSchemaField = $createField('flex_schema_objects', [
 		'columns' => ['service' => ['type' => 'text'], 'amount' => ['type' => 'float']],
 	],
 ]);
-$objectSchema = (new FlexInspection($type))->schema($objectSchemaField, null);
+[$code, $out] = $invoke(['schema', $objectSchemaField->name, '--json']);
+$same(0, $code, 'CLI schema command succeeds for objects and tables');
+$objectSchema = $decode($out);
 $same(true, $objectSchema['success'], 'schema discovery succeeds for objects and tables');
 $same('text', $objectSchema['properties']['meta']['children']['author']['kind'], 'schema recurses into object children');
 $same(['writer'], $objectSchema['properties']['meta']['children']['author']['renamedFrom'], 'schema retains object child rename mappings');
