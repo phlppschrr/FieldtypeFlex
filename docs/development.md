@@ -45,9 +45,9 @@ The admin suite executes the PHP Row title compiler and both production evaluato
 against `tests/fixtures/row-titles.json`, including final renderer/fallback cases.
 Node.js must be available on PATH (already present in DDEV and used by CI's JS
 syntax checks). Run the JS cases alone with `node tests/js/row-title-parts.cjs`;
-no package install is needed for these parser cases. The test executes the compiled
-production parser, including renderer/fallback behavior, without a copied parser
-or production test exports.
+no package install is needed for these parser cases. The test imports the shared
+`scripts/typescript/row-title-parts.mjs` evaluator bundled into `FieldtypeFlex.js`,
+including renderer/fallback behavior, without a copied parser or production test exports.
 
 The admin context regression loads a Flex value before assigning its owner's
 concrete type, then exercises preload, rendering and authenticated processing.
@@ -112,12 +112,12 @@ npm test
 ```
 
 `npm run check` type-checks without writing assets. TypeScript strict mode and the
-DOM types cover both entry points. The compiler joins namespace scripts into the
-existing `FieldtypeFlex.js` and `FlexMaintenance.js`; no bundler, runtime loader or
-production npm dependency is needed. Commit the generated assets with their sources.
-Installation ZIPs include these ready-to-use assets and omit build/test tooling.
+DOM types cover both entry points and the shared ES modules under `scripts/typescript/`.
+`npm run build` runs `tsc --noEmit` and then bundles `FieldtypeFlex.js` and
+`FlexMaintenance.js` as classic IIFEs via `esbuild` (a dev-only dependency; no runtime
+loader or production npm dependency is needed). Commit the generated assets with their
+sources. Installation ZIPs include these ready-to-use assets and omit build/test tooling.
 CI rebuilds both assets, runs regressions and rejects stale generated files.
-See TypeScript's [outFile reference](https://www.typescriptlang.org/tsconfig/outFile.html).
 
 `FieldtypeFlex.ts` owns native DOM events, Row state, AJAX, uploads and metadata.
 `dom.ts` contains the small shared DOM/form helpers. `FlexMaintenance.ts` retains

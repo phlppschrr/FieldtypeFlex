@@ -6,6 +6,7 @@
 
 - Evaluate Flex definitions once per selector predicate and sort expression in `FlexQuery`, deduplicating nested object path traversal.
 - Skip transient `Field` allocation in `FlexMediaCollection::formatDescription()` when no textformatters are configured, read formatted custom metadata without cloning the whole `FlexValue`, target known native POST keys in `InputfieldFlexMedia`, and avoid describing unchanged files during metadata processing.
+- Migrate TypeScript admin sources from legacy `outFile` namespaces to standard ES modules bundled with `esbuild` (`tsc --noEmit` for strict type checking, IIFE output without a global `FieldtypeFlex` namespace leak, shared DOM helpers in `FlexMaintenance.js`, and slice-free JS tests).
 
 ### Fixed
 
