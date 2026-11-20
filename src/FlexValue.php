@@ -438,6 +438,11 @@ class FlexValue extends WireData implements \JsonSerializable {
 		return $labels[$option];
 	}
 
+	/** Whether this value or its retained unknown data contains logical user content. @internal */
+	public function hasContent(): bool {
+		return $this->containsContent($this);
+	}
+
 	private function containsContent($value): bool {
 		if($value === null || $value === '' || $value === false) {
 			return false;
@@ -492,8 +497,10 @@ class FlexValue extends WireData implements \JsonSerializable {
 		if(is_array($value)) {
 			// Retained containers count content, never structural metadata.
 			if(($value['_flex'] ?? '') === FlexStorage::OBJECT_FORMAT) $value = $value['values'];
-			if(($value['_flex'] ?? '') === FlexStorage::ROWS_FORMAT) {
+			else if(($value['_flex'] ?? '') === FlexStorage::ROWS_FORMAT) {
 				$value = array_column($value['items'], 'values');
+			} else if(in_array($value['_flex'] ?? '', [FlexStorage::FILES_FORMAT, FlexStorage::IMAGES_FORMAT], true)) {
+				return !empty($value['items']);
 			}
 			foreach($value as $item) {
 				if($this->containsContent($item)) {

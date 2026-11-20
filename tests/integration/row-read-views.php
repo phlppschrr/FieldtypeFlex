@@ -109,3 +109,14 @@ $toggle->of(false);
 $same(2, count($toggle), 'explicit unformatting restores complete clone membership');
 $same('A & <B>', $toggle->first()->heading, 'explicit unformatting returns native leaves');
 $same(2, count($rows), 'changing cloned read mode preserves prior raw read membership');
+
+// Formatted slice() and read-only sorting work under output formatting without dirtying the owning page.
+$page->of(true);
+$page->resetTrackChanges();
+$formattedView = $page->get($name);
+$slicedRows = $formattedView->items->slice(0, 1);
+$same([$a->rowId()], array_keys($slicedRows->getArray()), 'formatted FlexRows::slice() succeeds under page output formatting');
+$same([$a->rowId()], array_keys($slicedRows->unformattedCollection()->getArray()), 'formatted FlexRows::slice() keeps bounded membership when unformatted');
+$formattedView->items->sort('heading');
+$same(false, $page->isChanged($name), 'formatted FlexRows operations do not mark owning page changed');
+$page->of(false);

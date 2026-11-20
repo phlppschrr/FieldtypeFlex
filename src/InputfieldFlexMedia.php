@@ -159,12 +159,19 @@ trait FlexMediaInput {
 
 	/** Core must not also process the replaced native POST controls. */
 	private function nativeMetadataPost(WireInputData $input, Pagefile $file): WireInputData {
+		$schema = $this->value->metadataSchema();
+		$replaceDescription = (bool) $schema->property('description');
+		$replaceTags = (bool) $schema->property('tags');
+		if(!$replaceDescription && !$replaceTags) return $input;
 		$data = $input->getArray();
 		$id = $this->name . '_' . $file->hash;
-		foreach(['description', 'tags'] as $name) {
-			if(!$this->value->metadataSchema()->property($name)) continue;
-			foreach(array_keys($data) as $key) {
-				if(preg_match('/^' . $name . '(?:[0-9]+)?_' . preg_quote($id, '/') . '$/D', $key)) unset($data[$key]);
+		if($replaceTags) unset($data['tags_' . $id]);
+		if($replaceDescription) {
+			unset($data['description_' . $id]);
+			if($this->wire()->languages) {
+				foreach($this->wire()->languages as $language) {
+					if(!$language->isDefault()) unset($data['description' . $language->id . '_' . $id]);
+				}
 			}
 		}
 		return $this->wire(new WireInputData($data));
@@ -182,17 +189,20 @@ trait FlexMediaInput {
 			$this->error($this->_('Incomplete Flex metadata submission; reload and check the PHP input limits'));
 			return false;
 		}
-		$before = FlexMedia::describe($file, $file->assetId());
 		$form = FlexDependencies::processInput($inputs, $file->page, $input);
 		$value = $file->metadataInputValue();
 		$prefix = FlexPath::inputPrefix($this->flexInputName ?: $this->name, $value->address());
 		InputfieldFlex::applyInputs($value, $form, $prefix);
 		foreach($form->getErrors() as $error) $this->error($file->basename() . ': ' . $error);
+		$before = null;
 		foreach($value->definitions()->properties() as $name => $definition) {
 			$child = $form->getChildByName($prefix . $name);
-			if($child && $child->isChanged() && !$child->getErrors()) $file->setFieldValue($name, $value->getUnformatted($name));
+			if($child && $child->isChanged() && !$child->getErrors()) {
+				$before ??= FlexMedia::describe($file, $file->assetId());
+				$file->setFieldValue($name, $value->getUnformatted($name));
+			}
 		}
-		return $before !== FlexMedia::describe($file, $file->assetId());
+		return $before !== null && $before !== FlexMedia::describe($file, $file->assetId());
 	}
 
 	protected function ___processInputAddFile($filename) {

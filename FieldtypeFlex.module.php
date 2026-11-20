@@ -1171,36 +1171,7 @@ class FieldtypeFlex extends Fieldtype implements ConfigurableModule, FieldtypeHa
 			return false;
 		}
 		if($value instanceof FlexValue) {
-			$hasRawValue = static function($v) use (&$hasRawValue): bool {
-				if(is_array($v) && ($v['_flex'] ?? '') === FlexStorage::ROWS_FORMAT) {
-					foreach($v['items'] as $row) {
-						if($hasRawValue($row['values'])) {
-							return true;
-						}
-					}
-					return false;
-				}
-				if(is_array($v)) {
-					foreach($v as $item) {
-						if($hasRawValue($item)) {
-							return true;
-						}
-					}
-					return false;
-				}
-				return $v !== '' && $v !== null && $v !== false;
-			};
-			foreach($value->rawArray() as $name => $v) {
-				$def = $value->definitions()->property($name);
-				if($def) {
-					if($value->hasValue($name)) {
-						return false;
-					}
-				} else if($hasRawValue($v)) {
-					return false;
-				}
-			}
-			return true;
+			return !$value->hasContent();
 		}
 		return $value === '' || $value === null;
 	}

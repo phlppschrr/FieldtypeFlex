@@ -565,6 +565,22 @@ class FlexRows extends WireArray implements \JsonSerializable {
 	}
 
 	/**
+	 * Return a read-safe slice retaining formatting state and row identities.
+	 *
+	 * @param int $start
+	 * @param int $limit
+	 * @return FlexRows
+	 */
+	public function slice($start, $limit = 0) {
+		$slice = $limit ? array_slice($this->data, $start, $limit, true) : array_slice($this->data, $start, null, true);
+		$items = $this->makeNew();
+		$items->data = $slice;
+		$items->formatted = $this->formatted;
+		if($items->formatted) $items->allRows = $items->data;
+		return $items;
+	}
+
+	/**
 	 * Track a nested change on the owning Flex field as well as this collection.
 	 *
 	 * @param string $what
@@ -573,7 +589,7 @@ class FlexRows extends WireArray implements \JsonSerializable {
 	 * @return $this
 	 */
 	public function trackChange($what, $old = null, $new = null) {
-		if(!$this->hydrating && isset($this->flexPage)) {
+		if(!$this->hydrating && !$this->formatted && isset($this->flexPage)) {
 			$this->flexPage->trackChange($this->flexField->name);
 		}
 		return parent::trackChange($what, $old, $new);

@@ -193,3 +193,25 @@ $wire->pages->delete($copy, true);
 $q = $db->prepare('SELECT COUNT(*) FROM fieldtype_flex_rows WHERE fields_id=:field AND pages_id=:page');
 $q->execute(['field' => $media->id, 'page' => $copyId]);
 $same(0, (int) $q->fetchColumn(), 'native Page deletion removes row projections automatically');
+
+// Idle global cleanup must not rewrite the WireCache cursor when nothing is queued.
+$wire->cache->delete('FlexMedia.collectCursor');
+$cacheWrites = 0;
+$cacheHook = $wire->addHookBefore('WireCache::save', static function(HookEvent $event) use (&$cacheWrites) {
+	if($event->arguments(0) === 'FlexMedia.collectCursor') ++$cacheWrites;
+});
+try {
+	$type->media()->collect();
+	$same(0, $cacheWrites, 'idle global collect skips WireCache cursor writes when queue is empty');
+} finally {
+	$wire->removeHook($cacheHook);
+}
+
+// Abandoning a staged asset invalidates the in-memory manifest cache immediately.
+$page = $reload();
+$page->$name->files->add($source);
+$abandoned = $page->$name->files->first();
+$abandonedId = $abandoned->assetId();
+$same('staged', $type->media()->asset($abandonedId)['state'] ?? null, 'staged asset is cached in manifest before abandon');
+$type->media()->abandon($abandonedId, $page, $media, '');
+$same(null, $type->media()->asset($abandonedId), 'abandon invalidates cached manifest entry');

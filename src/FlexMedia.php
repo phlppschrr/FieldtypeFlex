@@ -5,6 +5,7 @@ trait FlexOwnedFile {
 	private string $flexAssetId = '';
 	private array $flexBaseline = [];
 	private ?FlexValue $flexValues = null;
+	private ?FlexValue $flexFormattedValues = null;
 	private bool $flexHasValues = false;
 
 	/** Read canonical descriptions for cloning, revision checks and persistence. @internal */
@@ -150,6 +151,7 @@ trait FlexOwnedFile {
 	/** Hydrate once through Flex's existing scalar/date/language pipeline. @internal */
 	public function hydrateCustomValues(array $values, bool $present = true): void {
 		$this->flexHasValues = $present;
+		$this->flexFormattedValues = null;
 		$this->flexValues = new FlexValue($this->page, $this->field, $this->metadataSchema(), $values, $this->pagefiles->address() . '.' . $this->assetId());
 	}
 
@@ -174,10 +176,24 @@ trait FlexOwnedFile {
 		if($name === 'description') return $formatted ? $this->pagefiles->formatDescription($this->rawDescription(), true) : $this->rawDescription();
 		if($name === 'tags') return (string) $this->tags;
 		if(!$this->flexValues) $this->hydrateCustomValues([], false);
-		// Unformatted language and PageArray objects stay live only on writable originals.
-		if(!$formatted && !$this->formatted() && !$this->page->of()) return $this->flexValues->getUnformatted($name);
+		if(!$formatted) {
+			$value = $this->flexValues->getUnformatted($name);
+			// Unformatted language and PageArray objects stay live only on writable originals.
+			if(!$this->formatted() && !$this->page->of()) {
+				$this->flexFormattedValues = null;
+				return $value;
+			}
+			return $value instanceof PageArray || $value instanceof LanguagesPageFieldValue ? clone $value : $value;
+		}
+		if($this->formatted()) {
+			if(!$this->flexFormattedValues) {
+				$this->flexFormattedValues = clone $this->flexValues;
+				$this->flexFormattedValues->of(true);
+			}
+			return $this->flexFormattedValues->get($name);
+		}
 		$view = clone $this->flexValues;
-		$view->of((bool) $formatted);
+		$view->of(true);
 		return $view->get($name);
 	}
 
@@ -191,6 +207,7 @@ trait FlexOwnedFile {
 		} else if($name === 'tags') $this->tags = is_array($value) ? implode(' ', $value) : $value;
 		else {
 			if(!$this->flexValues) $this->hydrateCustomValues([], false);
+			$this->flexFormattedValues = null;
 			$this->flexValues->set($name, $value);
 			$this->trackChange($name);
 			$this->pagefiles->trackChange('item');
@@ -232,12 +249,14 @@ trait FlexOwnedFile {
 	}
 
 	public function resetTrackChanges($trackChanges = true) {
+		$this->flexFormattedValues = null;
 		if($this->flexValues) $this->flexValues->resetTrackChanges($trackChanges);
 		return parent::resetTrackChanges($trackChanges);
 	}
 
 	public function __clone() {
 		parent::__clone();
+		$this->flexFormattedValues = null;
 		if($this->flexValues) $this->flexValues = clone $this->flexValues;
 	}
 
@@ -264,6 +283,9 @@ trait FlexMediaCollection {
 	/** Run native description formatters against a transient property Field. @internal */
 	public function formatDescription(string $description, bool $force = false): string {
 		if(!$force && (!$this->formatted() || $this->rawDescriptions)) return $description;
+		$names = $this->metadataSchema()->property('description')['settings']['textformatters']
+			?? ($this->flexDefinition['settings']['textformatters'] ?? []);
+		if(!$names) return $description;
 		$field = $this->wire(new Field());
 		$field->type = $this->wire()->modules->get($this instanceof Pageimages ? 'FieldtypeImage' : 'FieldtypeFile');
 		$leaf = substr(strrchr('.' . $this->flexAddress, '.'), 1);
@@ -271,7 +293,6 @@ trait FlexMediaCollection {
 		foreach($this->flexDefinition['settings'] ?? [] as $key => $value) {
 			if(!in_array($key, ['id', 'name', 'type', 'value', 'inheritField'], true)) $field->set($key, $value);
 		}
-		$names = $this->metadataSchema()->property('description')['settings']['textformatters'] ?? $field->textformatters ?? [];
 		foreach($names as $name) {
 			$formatter = $this->wire()->modules->get($name);
 			if($formatter instanceof Textformatter) $formatter->formatValue($this->page, $field, $description);
@@ -619,13 +640,19 @@ trait FlexMediaCollection {
 		} finally {
 			$this->flexHydrating = false;
 		}
-		$data = [];
-		foreach($this->data as $key => $item) {
-			$data[$key === $oldKey ? $file->basename() : $key] = $item;
-		}
-		$this->data = $data;
+		$this->rekeyFile($oldKey, $file);
 		$this->trackChange('file');
 		return $file->basename();
+	}
+
+	/** Replace one basename key in place without shifting item order. */
+	private function rekeyFile(string $oldKey, Pagefile $file): void {
+		$newKey = $file->basename();
+		$data = [];
+		foreach($this->data as $key => $item) {
+			$data[$key === $oldKey ? $newKey : $key] = $item;
+		}
+		$this->data = $data;
 	}
 
 	/**
@@ -645,7 +672,6 @@ trait FlexMediaCollection {
 		$meta = FlexMedia::describe($file, bin2hex(random_bytes(16)));
 		$record = $this->field->type->media()->copy($this, $source, $meta['id'], $basename ?: basename($source));
 		$meta['basename'] = $record['basename'];
-		WireArray::remove($oldKey);
 		$this->flexHydrating = true;
 		try {
 			$file->setFilename($meta['basename']);
@@ -653,7 +679,7 @@ trait FlexMediaCollection {
 		} finally {
 			$this->flexHydrating = false;
 		}
-		WireArray::add($file);
+		$this->rekeyFile($oldKey, $file);
 		$this->trackChange('file');
 		return $file->basename();
 	}
@@ -690,8 +716,7 @@ trait FlexMediaCollection {
 				} finally {
 					$this->flexHydrating = false;
 				}
-				unset($this->data[$old]);
-				$this->data[$file->basename()] = $file;
+				$this->rekeyFile($old, $file);
 			}
 			unset($this->pendingCopies[$id]);
 		}
@@ -849,6 +874,24 @@ trait FlexMediaCollection {
 		$view = clone $this;
 		$view->rawDescriptions = true;
 		return $view;
+	}
+
+	/**
+	 * Return a read-safe slice without triggering owned-file mutations or write guards.
+	 *
+	 * @param int $start
+	 * @param int $limit
+	 * @return static
+	 */
+	public function slice($start, $limit = 0) {
+		$slice = $limit ? array_slice($this->data, $start, $limit, true) : array_slice($this->data, $start, null, true);
+		$items = $this->makeNew();
+		$items->flexHydrating = true;
+		$items->rawDescriptions = $this->rawDescriptions;
+		$items->data = $slice;
+		$items->formatted($this->formatted());
+		$items->flexHydrating = false;
+		return $items;
 	}
 
 	/**
@@ -1391,6 +1434,7 @@ class FlexMedia extends Wire {
 		}
 		$q = $this->journal()->pdo('writer')->prepare("UPDATE fieldtype_flex_assets SET state='pending_delete' WHERE asset_id=:id");
 		$q->execute(['id' => $id]);
+		unset($this->manifest[$id]);
 		if(!$this->wire()->database->inTransaction()) {
 			$this->sweep($page, $field);
 		}
@@ -1846,7 +1890,10 @@ class FlexMedia extends Wire {
 			$ids = $q->fetchAll(\PDO::FETCH_COLUMN);
 		}
 		if($global) {
-			$this->wire()->cache->save('FlexMedia.collectCursor', $ids ? end($ids) : '', WireCache::expireNever);
+			$nextCursor = $ids ? end($ids) : '';
+			if($nextCursor !== $cursor) {
+				$this->wire()->cache->save('FlexMedia.collectCursor', $nextCursor, WireCache::expireNever);
+			}
 		}
 		$result = [
 			'removed'    => 0,
@@ -1856,22 +1903,23 @@ class FlexMedia extends Wire {
 		foreach($ids as $id) {
 			try {
 				$outcome = $this->type->storage()->atomic(function() use ($id, $db) {
-					$record = $this->asset($id, true);
-					if(!$record) {
+					// Lock the field row before the asset row to match sync() lock order.
+					$probe = $db->prepare('SELECT pages_id, fields_id FROM fieldtype_flex_assets WHERE asset_id=:id');
+					$probe->execute(['id' => $id]);
+					$owner = $probe->fetch(\PDO::FETCH_ASSOC);
+					if(!$owner) {
 						return '';
 					}
-					$page = $this->wire()->pages->get((int) $record['pages_id']);
-					$field = $this->wire()->fields->get((int) $record['fields_id']);
+					$page = $this->wire()->pages->get((int) $owner['pages_id']);
+					$field = $this->wire()->fields->get((int) $owner['fields_id']);
 					$raw = [];
 					if($page->id && $field && $field->type instanceof FieldtypeFlex) {
 						if($db->tableExists($field->table)) {
 							$raw = $this->type->storage()->persisted($page, $field, true);
 						}
 					}
-					$lock = $db->prepare('SELECT * FROM fieldtype_flex_assets WHERE asset_id=:id FOR UPDATE');
-					$lock->execute(['id' => $id]);
-					$record = $lock->fetch(\PDO::FETCH_ASSOC);
-					if(!$record) {
+					$record = $this->asset($id, true);
+					if(!$record || (int) $record['pages_id'] !== (int) $owner['pages_id'] || (int) $record['fields_id'] !== (int) $owner['fields_id']) {
 						return '';
 					}
 					$referenced = false;
@@ -1906,6 +1954,7 @@ class FlexMedia extends Wire {
 							'data' => json_encode($data, JSON_THROW_ON_ERROR),
 							'id'   => $id,
 						]);
+						unset($this->manifest[$id]);
 						return 'variations';
 					}
 					if(

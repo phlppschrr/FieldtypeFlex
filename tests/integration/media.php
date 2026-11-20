@@ -514,5 +514,28 @@ try {
 	$wire->database->exec("RENAME TABLE `$orphanSnapshot` TO `$orphanTable`");
 }
 
+// Replacing an owned file preserves collection order, and formatted slice() works without write errors.
+$orderField = $createField('flex_media_order', ['docs' => ['type' => 'file', 'extensions' => 'txt', 'maxFiles' => 0]]);
+$page = $wire->pages->getFresh($id);
+$page->of(false);
+$orderDocs = $page->getUnformatted($orderField->name)->docs;
+$orderDocs->add($fixtureFile);
+$orderDocs->add($fixtureFile);
+$orderDocs->add($fixtureFile);
+$page->save($orderField->name);
+$page = $wire->pages->getFresh($id);
+$page->of(false);
+$orderDocs = $page->getUnformatted($orderField->name)->docs;
+$beforeOrder = array_values(array_map(static fn($f) => $f->basename(), $orderDocs->getArray()));
+$replacedName = $orderDocs->replaceOwned($orderDocs->first(), $fixtureFile, 'replaced-first.txt');
+$afterOrder = array_values(array_map(static fn($f) => $f->basename(), $orderDocs->getArray()));
+$same([$replacedName, $beforeOrder[1], $beforeOrder[2]], $afterOrder, 'replaceOwned preserves file position instead of moving item to end');
+$page->save($orderField->name);
+$page->of(true);
+$slicedMedia = $page->get($orderField->name)->docs->slice(0, 2);
+$same(2, count($slicedMedia), 'formatted FlexFiles::slice() returns requested items without triggering write guards');
+$same([$replacedName, $beforeOrder[1]], array_values(array_map(static fn($f) => $f->basename(), $slicedMedia->getArray())), 'formatted FlexFiles::slice() preserves order');
+$page->of(false);
+
 unlink($imageFixture);
 unlink($fixtureFile);
