@@ -296,6 +296,16 @@ class FlexStorage extends Wire {
 		return json_encode((object) array_map($convert, $raw), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR, FlexPath::JSON_DEPTH);
 	}
 
+	/** Sort decoded JSON object keys recursively while preserving list order and value types. */
+	public static function sortJson(mixed $value): mixed {
+		if($value instanceof \stdClass) {
+			$properties = get_object_vars($value);
+			ksort($properties, SORT_STRING);
+			return (object) array_map([self::class, 'sortJson'], $properties);
+		}
+		return is_array($value) ? array_map([self::class, 'sortJson'], $value) : $value;
+	}
+
 	/**
 	 * Object key order is insignificant; collection order and JSON value types are not.
 	 *
@@ -303,19 +313,8 @@ class FlexStorage extends Wire {
 	 * @return string
 	 */
 	public static function revision(array $raw): string {
-		$sort = static function($value) use (&$sort) {
-			if($value instanceof \stdClass) {
-				$properties = get_object_vars($value);
-				ksort($properties, SORT_STRING);
-				return (object) array_map($sort, $properties);
-			}
-			if(is_array($value)) {
-				return array_map($sort, $value);
-			}
-			return $value;
-		};
 		$document = json_decode(self::encode($raw), false, FlexPath::JSON_DEPTH, JSON_THROW_ON_ERROR);
-		return hash('sha256', json_encode($sort($document), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
+		return hash('sha256', json_encode(self::sortJson($document), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
 	}
 
 	/**

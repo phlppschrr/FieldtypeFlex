@@ -221,14 +221,7 @@ final class FlexMaintenance extends Wire {
 
 	/** Fingerprint JSON values without losing object/list distinctions in unknown subtrees. */
 	private function documentRevision(mixed $document): string {
-		$sort = static function($value) use (&$sort) {
-			if($value instanceof \stdClass) {
-				$map = get_object_vars($value); ksort($map, SORT_STRING);
-				return (object) array_map($sort, $map);
-			}
-			return is_array($value) ? array_map($sort, $value) : $value;
-		};
-		return hash('sha256', json_encode($sort($document), JSON_THROW_ON_ERROR, FlexPath::JSON_DEPTH));
+		return hash('sha256', json_encode(FlexStorage::sortJson($document), JSON_THROW_ON_ERROR, FlexPath::JSON_DEPTH));
 	}
 
 	/** Patch only checked keys in the original JSON document, without reserializing runtime values. */
