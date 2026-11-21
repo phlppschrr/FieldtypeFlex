@@ -159,7 +159,6 @@ class FlexRows extends WireArray implements \JsonSerializable {
 			}
 			parent::add($row);
 		}
-		$this->checkLimit();
 		$this->hydrating = false;
 		$this->resetTrackChanges();
 		if(isset($copy)) {
@@ -228,6 +227,7 @@ class FlexRows extends WireArray implements \JsonSerializable {
 			throw new WireException($this->_('Maximum repeatable item count reached'));
 		}
 		$row = new FlexRow($this->flexPage, $this->flexField, $this->rowSchema($type), $this->set, bin2hex(random_bytes(16)), $type, $values);
+		$row->checkMaxLimits();
 		$this->add($row);
 		return $row;
 	}
@@ -255,6 +255,29 @@ class FlexRows extends WireArray implements \JsonSerializable {
 			if($max && count($this) >= $max) {
 				throw new WireException($this->_('Maximum repeatable item count reached'));
 			}
+		}
+		return parent::add($item);
+	}
+
+	/**
+	 * Re-attach an already-stored row during editor submission without blocking on a lowered maxItems.
+	 *
+	 * @param FlexRow $item
+	 * @return $this
+	 * #pw-internal
+	 * @internal
+	 */
+	public function addExisting(FlexRow $item): self {
+		$this->writable();
+		if(!$item->belongsTo($this->flexPage, $this->flexField) || $item->address() !== "$this->set.{$item->rowId()}") {
+			throw new WireException($this->_('Use addRow() to create a row in this collection'));
+		}
+		if($item->definitions() !== $this->rowSchema($item->rowType())) {
+			throw new WireException($this->_('Row schema does not belong to this repeatable type'));
+		}
+		$existing = $this->data[$item->rowId()] ?? null;
+		if($existing && $existing !== $item) {
+			throw new WireException($this->_('Duplicate Flex row identity'));
 		}
 		return parent::add($item);
 	}
@@ -339,82 +362,36 @@ class FlexRows extends WireArray implements \JsonSerializable {
 	}
 
 	/**
-	 * Search the loaded view using native in-memory selectors and raw leaf values.
-	 * Results share row objects, but have independent membership and order.
-	 * `_type` selects metadata; `type` remains an ordinary content property.
+	 * Filter rows in memory using native WireArray selectors, including _type, .count and object paths.
+	 * Results share row objects, with independent membership and order.
 	 *
 	 * @param string|array|Selectors $selector
 	 * @return FlexRows
 	 */
 	public function find($selector) {
-		$selectors = $selector instanceof Selectors ? clone $selector : $this->wire(new Selectors($selector));
-		$types = array_keys($this->definition['types']);
-		foreach($selectors as $condition) {
-			if($condition->field !== '_type') continue;
-			$this->validateFindSelector($condition, $types);
-			$types = array_filter($types, static fn($type) => $condition->matches($type));
-		}
-		foreach($selectors as $condition) {
-			$this->validateFindSelector($condition, $types ?: array_keys($this->definition['types']));
-		}
 		$result = $this->makeNew();
-		foreach($this->data as $key => $row) {
-			foreach($selectors as $condition) {
-				$value = $this->findValue($row, $condition->field);
-				$value = is_array($value) ? $this->wire()->sanitizer->flatArray($value) : (string) $value;
-				if(!$condition->matches($value)) continue 2;
-			}
-			$result->data[$key] = $row;
-		}
 		$result->formatted = $this->formatted;
-		if($result->formatted) $result->allRows = $result->data;
+		$tracking = $result->trackChanges();
+		$result->setTrackChanges(false);
+		$result->hydrating = true;
+		try {
+			$result->data = $this->data;
+			if($selector !== '' && $selector !== null && $selector !== []) {
+				$result->filter($selector);
+			}
+			if($result->formatted) $result->allRows = $result->data;
+		} finally {
+			$result->hydrating = false;
+			$result->setTrackChanges($tracking);
+		}
 		return $result;
 	}
 
-	/** Validate even empty collections; never fall through to WireData internals. */
-	private function validateFindSelector(Selector $selector, array $types): void {
-		if(count($selector->fields()) !== 1 || $selector->group !== null || in_array($selector->quote, ['[', '(', '{'], true) || $selector->altOperators) {
-			throw new WireException('FlexRows::find() requires one direct property or count path per condition');
-		}
-		$name = $selector->field;
-		foreach($selector->values(true) as $value) {
-			if(!is_scalar($value)) throw new WireException('FlexRows::find() requires scalar selector values');
-		}
-		$operators = ['=', '!='];
-		if($name !== '_type') {
-			if(!preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*$/D', $name)) {
-				throw new WireException('Invalid FlexRows::find() property path');
-			}
-			$count = str_ends_with($name, '.count');
-			$path = $count ? substr($name, 0, -6) : $name;
-			$definitions = [];
-			foreach($types as $type) {
-				$schema = $this->definition['types'][$type]['schema'];
-				$steps = explode('.', $path);
-				while(count($steps) > 1 && ($schema->property($steps[0])['kind'] ?? '') === 'object') $schema = $schema->property(array_shift($steps))['schema'];
-				$def = count($steps) === 1 ? $schema->property($steps[0]) : null;
-				if($def) $definitions[] = $def;
-			}
-			if(!$definitions) throw new WireException('Unknown FlexRows::find() property: ' . $name);
-			foreach($definitions as $def) {
-				if($def['kind'] === 'object') throw new WireException('Select an object leaf');
-				$countable = in_array($def['kind'], ['file', 'image', 'rows'], true);
-				if($count && !$countable) throw new WireException('Use .count only on Flex media or rows');
-				$allowed = $countable || $def['multiple'] ? ['=', '!='] : ['=', '!=', '*=', '%=', '^=', '$=', '%^=', '%$=', '~=', '~|='];
-				if($count || in_array($def['kind'], ['integer', 'float', 'date', 'page'], true) && !$def['multiple']) {
-					$allowed = ['=', '!=', '>', '>=', '<', '<='];
-				}
-				if(!in_array($selector->operator, $allowed, true)) throw new WireException('Unsupported FlexRows::find() operator');
-				foreach($selector->values(true) as $value) {
-					if(!$count && $countable && $value !== '') throw new WireException('Use a FlexRows media/rows count or blank selector');
-					if(($count || in_array($def['kind'], ['integer', 'float', 'date', 'page'], true) && $value !== '') && !is_numeric($value)) {
-						throw new WireException('Numeric FlexRows selectors require a number');
-					}
-				}
-				$operators = $allowed;
-			}
-		}
-		if(!in_array($selector->operator, $operators, true)) throw new WireException('Unsupported FlexRows::find() operator');
+	/** Resolve _type, .count and nested object paths for WireArray::find()/filter()/not()/sort(). */
+	protected function getItemPropertyValue(Wire $item, $property) {
+		if(!$item instanceof FlexRow) return parent::getItemPropertyValue($item, $property);
+		$value = $this->findValue($item, (string) $property);
+		return is_array($value) ? $this->wire()->sanitizer->flatArray($value) : $value;
 	}
 
 	/** Native PageArray also compares unformatted values, independently of output. */
@@ -424,28 +401,28 @@ class FlexRows extends WireArray implements \JsonSerializable {
 		while(count($parts) > 1 && ($item->definitions()->property($parts[0])['kind'] ?? '') === 'object') {
 			$item = $item->getUnformatted(array_shift($parts));
 		}
-		if(!$item->definitions()->property($parts[0])) return str_ends_with($property, '.count') ? 0 : '';
+		if(!$item->definitions()->property($parts[0])) return '';
 		// Row counts/blank checks describe the current view; scalar comparisons use raw leaves.
 		$value = $item->definitions()->property($parts[0])['kind'] === 'rows'
 			? $item->get($parts[0]) : $item->getUnformatted($parts[0]);
-		if(count($parts) > 1) return count($value);
+		if(count($parts) > 1) {
+			if($parts[1] === 'count' && count($parts) === 2 && ($value instanceof Pagefiles || $value instanceof self)) {
+				return count($value);
+			}
+			return $value instanceof Wire ? WireData::_getDot(implode('.', array_slice($parts, 1)), $value) : '';
+		}
 		if($value instanceof Pagefiles || $value instanceof self) return count($value) ? '1' : '';
 		return $value;
 	}
 
 	/**
 	 * Get direct rows of a type in collection order, retaining object identity.
-	 * Unknown types return an empty list. Validate explicitly to avoid PHP scalar
-	 * coercion for callers that do not enable strict_types.
+	 * Unknown types return an empty list.
 	 *
 	 * @param string $type Stable row type name.
 	 * @return FlexRow[] Numerically indexed existing rows, not a new collection.
-	 * @throws \TypeError When the type is not a string.
 	 */
-	public function rowsOfType($type): array {
-		if(!is_string($type)) {
-			throw new \TypeError('FlexRows::rowsOfType(): $type must be a string');
-		}
+	public function rowsOfType(string $type): array {
 		$rows = [];
 		foreach($this as $row) {
 			if($row->rowType() === $type) {
@@ -460,9 +437,8 @@ class FlexRows extends WireArray implements \JsonSerializable {
 	 *
 	 * @param string $type Stable row type name; unknown types return zero.
 	 * @return int
-	 * @throws \TypeError When the type is not a string.
 	 */
-	public function countOfType($type): int {
+	public function countOfType(string $type): int {
 		return count($this->rowsOfType($type));
 	}
 
@@ -667,17 +643,33 @@ class FlexRows extends WireArray implements \JsonSerializable {
 	 * Check the maximum row count and optionally enforce the minimum.
 	 *
 	 * @param bool $minimum Also enforce the minimum row count.
+	 * @param array<string, bool>|null $existingIds Stored row IDs allowed to remain above a lowered maxItems.
 	 * @return void
 	 * @throws WireException
 	 * #pw-internal
 	 * @internal
 	 */
-	public function checkLimit(bool $minimum = false): void {
+	public function checkLimit(bool $minimum = false, ?array $existingIds = null): void {
 		$min = (int) ($this->definition['settings']['minItems'] ?? 0);
 		$max = (int) ($this->definition['settings']['maxItems'] ?? 0);
-		$count = count($this->backingRows());
-		if(($minimum && $count < $min) || ($max && $count > $max)) {
+		$rows = $this->backingRows();
+		$count = count($rows);
+		if($minimum && $count < $min) {
 			throw new WireException(sprintf($this->_("Repeatable '%s' item count is outside its limits"), $this->set));
+		}
+		if($max && $count > $max) {
+			$hasNew = $existingIds === null;
+			if(!$hasNew) {
+				foreach($rows as $id => $_) {
+					if(!isset($existingIds[(string) $id])) {
+						$hasNew = true;
+						break;
+					}
+				}
+			}
+			if($hasNew) {
+				throw new WireException(sprintf($this->_("Repeatable '%s' item count is outside its limits"), $this->set));
+			}
 		}
 	}
 

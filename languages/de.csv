@@ -1,7 +1,6 @@
 text,de,description,file,hash
 "The page form is incomplete. No changes were saved. Check PHP max_input_vars and post_max_size, then reload the editor.",Das Seitenformular ist unvollständig. Es wurden keine Änderungen gespeichert. Prüfen Sie PHP max_input_vars und post_max_size und laden Sie den Editor neu.,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,10227b2d8c00570f52db828d3813bcfd
 "Save an unformatted, owned Flex file on a live page","Speichern Sie eine unformatierte, zugeordnete Flex-Datei auf einer aktuellen Seite",,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,8d080dcaba7f2c0a75505680ce56d7a6
-Unsupported Flex file metadata column,Nicht unterstützte Metadatenspalte für Flex-Dateien,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,f248e80612ad816d7d63bb3f6369eac6
 Flex file changed; reload before saving metadata,Die Flex-Datei wurde geändert; laden Sie vor dem Speichern der Metadaten neu,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,527e6ef8d5d2559f460fa29397cab0e5
 Save new or replaced files with the containing Flex field,Speichern Sie neue oder ersetzte Dateien mit dem zugehörigen Flex-Feld,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,c68dde7f91e5df6942c446570fc71d72
 Sort only a Flex collection count; repeated leaf sorting is ambiguous,Sortieren Sie nur nach der Anzahl einer Flex-Sammlung; die Sortierung nach wiederholten Eigenschaften ist mehrdeutig,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,02b308508b3096e4ffab9da33e72b886
@@ -75,7 +74,6 @@ Duplicate Flex property name: %s,Doppelter Flex-Eigenschaftsname: %s,,site/modul
 Unknown Flex input type: %s,Unbekannter Flex-Eingabetyp: %s,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,c3943f7759301e1a0b4b4830b4e8e69f
 %s is not a supported Flex definition input,%s ist keine unterstützte Eingabe für Flex-Definitionen,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,625d98eb20d930d755e7114600520125
 "useLanguages must be true, false or ""auto""","useLanguages muss true, false oder ""auto"" sein",,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,49b8b1bb8898114ba73e7e13de0e9d48
-Automatic language support requires a Text or Textarea input,Automatische Sprachunterstützung benötigt eine Text- oder Textarea-Eingabe,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,bfb539967c29bab650a421feba494fdc
 useLanguages on '%s' requires LanguageSupport and LanguageSupportFields,useLanguages für „%s“ benötigt LanguageSupport und LanguageSupportFields,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,9e21157c2503f48a1d9f0ca9db19d73a
 Flex fieldset tree is cyclic or too deep,Der Flex-Feldgruppenbaum ist zyklisch oder zu tief,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,f37d2bb0ecfd0c1a51367038368ada94
 Flex property '%s' must be an array,Die Flex-Eigenschaft „%s“ muss ein Array sein,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,8a12a05730ce24337d04b6ca073a45df
@@ -87,7 +85,6 @@ children of '%s' must be an array,children von „%s“ muss ein Array sein,,sit
 minItems must not exceed maxItems,minItems darf maxItems nicht überschreiten,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,42635a24cd5f93ea3c9d469692f71f4d
 Invalid or reserved Flex row type: %s,Ungültiger oder reservierter Flex-Zeilentyp: %s,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,494f1af3974891140e2d2ed60c809be8
 Settings for row type %s must be an array,Einstellungen für Zeilentyp %s müssen ein Array sein,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,a135ec89b74ae4b4f25d0707a601e5c5
-Unsupported row type setting: %s,Nicht unterstützte Zeilentypeinstellung: %s,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,8bef0d4a783784eeb869ff8d4d617ab9
 Invalid renamedFrom for '%s',Ungültiges renamedFrom für „%s“,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,6f90dccbaf9f861437264d8c9bc84787
 "Flex media outputFormat must be 0 (auto), 1 (collection) or 2 (single)","Flex-Medien-outputFormat muss 0 (automatisch), 1 (Sammlung) oder 2 (einzeln) sein",,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,06ed598bdc8c096a6ac2ff91af21c255
 Flex media uses owned collections and staged replacement; overwrite/custom metadata templates/archive extraction are unsupported,"Flex-Medien verwenden zugeordnete Sammlungen und vorgemerkten Ersatz; Überschreiben, eigene Metadaten-Templates und Archivextraktion werden nicht unterstützt",,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,b4d12c0c1ad3600fee1452fb9f3d9c17
@@ -118,16 +115,13 @@ Media copy source no longer exists,Die Quelle der Medienkopie existiert nicht me
 Duplicate media basename,Doppelter Medien-Dateiname,,site/modules/FieldtypeFlex/src/FlexMedia.php,995df33fd94aa9de0133dba7bb29af82
 Disable output formatting before changing Flex files,Deaktivieren Sie die Ausgabeformatierung vor dem Ändern von Flex-Dateien,,site/modules/FieldtypeFlex/src/FlexMedia.php,1a534417785bd2f8696024a3ec089e7e
 Flex media cannot be changed on a page version,Flex-Medien können in einer Seitenversion nicht geändert werden,,site/modules/FieldtypeFlex/src/FlexMedia.php,907a015cc09662a20c3574a4e4588187
-Add a local file path or Pagefile to a Flex media collection,Fügen Sie einen lokalen Dateipfad oder eine Pagefile zu einer Flex-Mediensammlung hinzu,,site/modules/FieldtypeFlex/src/FlexMedia.php,fd14b3a71bc84fc49cbac99bb5b0920d
 Flex imports require a readable local file,Flex-Importe benötigen eine lesbare lokale Datei,,site/modules/FieldtypeFlex/src/FlexMedia.php,7da10cfb8e69c85c2505f0b812435dc0
 A Flex file must belong to its collection,Eine Flex-Datei muss zu ihrer Sammlung gehören,,site/modules/FieldtypeFlex/src/FlexMedia.php,702083c1d97abad259864a2b881175d8
 File does not belong to this collection,Die Datei gehört nicht zu dieser Sammlung,,site/modules/FieldtypeFlex/src/FlexMedia.php,46a0a2643d0076f562b791bc0146d229
 Unknown media original,Unbekanntes Medienoriginal,,site/modules/FieldtypeFlex/src/FlexMedia.php,17e0f163b204eb858d053954a336e79f
 Save the owner page before committing its files,"Speichern Sie die zugehörige Seite, bevor Sie ihre Dateien endgültig speichern",,site/modules/FieldtypeFlex/src/FlexMedia.php,a68ccac7f4b7d809710ebafd36dca707
 Maximum Flex file count reached,Maximale Anzahl von Flex-Dateien erreicht,,site/modules/FieldtypeFlex/src/FlexMedia.php,34629dc95acc25c639c1ff72150ee68d
-Unknown Flex file clone option,Unbekannte Option zum Klonen einer Flex-Datei,,site/modules/FieldtypeFlex/src/FlexMedia.php,d4dab82606b1193e2780dd07b6a0bf81
-Add the source file to the target Flex collection when copying between collections,Fügen Sie beim Kopieren zwischen Sammlungen die Quelldatei zur Flex-Zielsammlung hinzu,,site/modules/FieldtypeFlex/src/FlexMedia.php,1caaafa7e41ab8ff859593f5b9f22717
-Unknown Flex file clone action,Unbekannte Aktion zum Klonen einer Flex-Datei,,site/modules/FieldtypeFlex/src/FlexMedia.php,20342f398b68c773ebaf1c38a4f995ac
+Maximum Flex file count reached,Maximale Anzahl von Flex-Dateien erreicht,,site/modules/FieldtypeFlex/src/FlexValue.php,34629dc95acc25c639c1ff72150ee68d
 Media staging requires an independent connection,Das Vormerken von Medien benötigt eine unabhängige Verbindung,,site/modules/FieldtypeFlex/src/FlexMedia.php,48021ab6d5987c0ee4c313998c0b8956
 Media staging needs a saved owner and field,Das Vormerken von Medien benötigt einen gespeicherten Eigentümer und ein gespeichertes Feld,,site/modules/FieldtypeFlex/src/FlexMedia.php,7b9e9ed5e3f7d031313aaa77a92ae118
 Invalid page assets directory,Ungültiges Seiten-Asset-Verzeichnis,,site/modules/FieldtypeFlex/src/FlexMedia.php,c58fc48aa12c5debc0128645a32a308e
@@ -176,9 +170,7 @@ Flex tree budget exceeded at %s,Flex-Baumlimit unter %s überschritten,,site/mod
 Invalid Flex selector property,Ungültige Flex-Selektoreigenschaft,,site/modules/FieldtypeFlex/src/FlexQuery.php,03ac917f154ea4f8c3052c3e0b855c77
 Unknown Flex selector property: %1$s.%2$s. Page-dependent schemas must expose queryable properties without a page context.,Unbekannte Flex-Selektoreigenschaft: %1$s.%2$s. Seitenabhängige Schemas müssen abfragbare Eigenschaften ohne Seitenkontext bereitstellen.,,site/modules/FieldtypeFlex/src/FlexQuery.php,697874c1d5a9e4eab3aede4c244c1256
 Use a Flex media count or blank selector,Verwenden Sie einen Flex-Medienanzahl- oder Leerselektor,,site/modules/FieldtypeFlex/src/FlexQuery.php,be312dda2f009ee3b4fb7c06d640f270
-Invalid Flex date selector,Ungültiger Flex-Datumsselektor,,site/modules/FieldtypeFlex/src/FlexQuery.php,3f5d29a3f618595284a85b3eefd30852
 Multi-selection Flex properties support = and != membership,Flex-Mehrfachauswahleigenschaften unterstützen die Zugehörigkeitsprüfung mit = und !=,,site/modules/FieldtypeFlex/src/FlexQuery.php,f11e84878ef84ea529249d8cd7a262b0
-Numeric Flex selectors require a number,Numerische Flex-Selektoren benötigen eine Zahl,,site/modules/FieldtypeFlex/src/FlexQuery.php,1dd6b8d6d32347b964297615e06c4dba
 OR between nested Flex paths is not supported,OR zwischen verschachtelten Flex-Pfaden wird nicht unterstützt,,site/modules/FieldtypeFlex/src/FlexQuery.php,bf29bfb27147d27d1efc5eef202f3767
 Invalid Flex selector path,Ungültiger Flex-Selektorpfad,,site/modules/FieldtypeFlex/src/FlexQuery.php,fa5fd5fcad8167565ba1f9dd16c892db
 Unknown row property: %s,Unbekannte Zeileneigenschaft: %s,,site/modules/FieldtypeFlex/src/FlexQuery.php,57602568f3558529e32d7093af14cc6e
@@ -187,8 +179,6 @@ Invalid row property path: %s,Ungültiger Zeileneigenschaftspfad: %s,,site/modul
 Unknown repeatable path: %s,Unbekannter Pfad einer wiederholbaren Sammlung: %s,,site/modules/FieldtypeFlex/src/FlexQuery.php,95e27f20f99c9660f49ff6d3c5d182d1
 Unknown Flex row type: %s,Unbekannter Flex-Zeilentyp: %s,,site/modules/FieldtypeFlex/src/FlexQuery.php,25190f2f0dca01df858567d77610872f
 Invalid Flex collection path,Ungültiger Flex-Sammlungspfad,,site/modules/FieldtypeFlex/src/FlexQuery.php,c85048f815dc0dff6a09afe563d5afd1
-Flex counts require a number,Flex-Anzahlwerte benötigen eine Zahl,,site/modules/FieldtypeFlex/src/FlexQuery.php,773bd704517bad0c92de788bf5eda45a
-Flex row type selectors require = or != and a known type or blank,Flex-Zeilentypselektoren benötigen = oder != und einen bekannten Typ oder einen leeren Wert,,site/modules/FieldtypeFlex/src/FlexQuery.php,d40728388ddba3a629a689b0df5eab84
 Use blank collection checks or type-qualified @ selectors,Verwenden Sie Leerprüfungen für Sammlungen oder typqualifizierte @-Selektoren,,site/modules/FieldtypeFlex/src/FlexQuery.php,c30f390915798f7692a8bc36a20f8198
 Use type-qualified @ selectors for same-row conditions,Verwenden Sie typqualifizierte @-Selektoren für Bedingungen in derselben Zeile,,site/modules/FieldtypeFlex/src/FlexQuery.php,43101bfc85c15bbe35160bc02f17261f
 Empty same-row selector,Leerer Selektor für dieselbe Zeile,,site/modules/FieldtypeFlex/src/FlexQuery.php,c7eb22c1491b103ed129c17c77536e71
@@ -224,8 +214,6 @@ Flex JSON tree is cyclic or exceeds the platform depth budget,Der Flex-JSON-Baum
 Unknown Flex property: %s,Unbekannte Flex-Eigenschaft: %s,,site/modules/FieldtypeFlex/src/FlexValue.php,60476f516cf3510774659c5ef9a496e5
 Disable page output formatting before changing Flex values,Deaktivieren Sie die Seitenausgabeformatierung vor dem Ändern von Flex-Werten,,site/modules/FieldtypeFlex/src/FlexValue.php,b16bcd4c1055c3217a801864fbb50c15
 Flex '%s' requires a scalar value,Flex „%s“ benötigt einen skalaren Wert,,site/modules/FieldtypeFlex/src/FlexValue.php,b69ad20106f674c5a21c50863af528b2
-Invalid date for Flex '%s',Ungültiges Datum für Flex „%s“,,site/modules/FieldtypeFlex/src/FlexValue.php,caf135cec083e357abab5a490a051cdb
-Flex '%s' requires a number,Flex „%s“ benötigt eine Zahl,,site/modules/FieldtypeFlex/src/FlexValue.php,480ea5bafedd7379a8f43aa3dd28efc5
 Upload Flex files with the editor upload control before saving the page.,Laden Sie Flex-Dateien vor dem Speichern der Seite mit der Upload-Funktion des Editors hoch.,,site/modules/FieldtypeFlex/src/InputfieldFlexMedia.php,9846c12527b9ceba9b9be425f57d7abd
 Rotate 90°,Um 90° drehen,,site/modules/FieldtypeFlex/src/InputfieldFlexMedia.php,6174ad1ae2f9bcd2afdcea846cb4a800
 Rotate 180°,Um 180° drehen,,site/modules/FieldtypeFlex/src/InputfieldFlexMedia.php,c3f606a2e1fae204da410754e5823017
@@ -330,17 +318,16 @@ Invalid stored object envelope,Ungültige gespeicherte Object-Struktur,,site/mod
 Invalid stored object envelope,Ungültige gespeicherte Object-Struktur,,site/modules/FieldtypeFlex/src/FlexMaintenance.php,7daa26f98654d383bec9a7ba3ebb5291
 Unknown object property,Unbekannte Object-Eigenschaft,,site/modules/FieldtypeFlex/src/FlexQuery.php,ffc24754af6b0c65a53330da804c161c
 Invalid retained Flex object,Ungültiges beibehaltenes Flex-Object,,site/modules/FieldtypeFlex/src/FlexPath.php,5e57fdb11b51b32f54dace15821d3508
-"Source and PHPDoc reflect saved settings, evaluated without a specific page. Page-dependent definitions may differ.","Quelle und PHPDoc spiegeln die gespeicherten Einstellungen wider, ausgewertet ohne konkrete Seite. Seitenabhängige Definitionen können abweichen.",,"site/modules/FieldtypeFlex/FieldtypeFlex.module.php","6948d0da713cc8575f77b81e8bef6105"
+"Source and PHPDoc reflect saved settings, evaluated without a specific page. Page-dependent definitions may differ.","Quelle und PHPDoc spiegeln die gespeicherten Einstellungen wider, ausgewertet ohne konkrete Seite. Seitenabhängige Definitionen können abweichen.",,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,6948d0da713cc8575f77b81e8bef6105
 These helpers describe the NullPage definition for your IDE. Keep them out of runtime loading. Types cover formatted and unformatted reads; page-dependent definitions may differ.,Diese Hilfsklassen beschreiben die NullPage-Definition für Ihre IDE. Nicht zur Laufzeit laden. Die Typen umfassen formatierte und unformatierte Lesezugriffe; seitenabhängige Definitionen können abweichen.,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,d26b91284c6a7263548527dcc7d34abd
 Save the following helper classes in a PHP file indexed by your IDE:,"Speichern Sie die folgenden Hilfsklassen in einer PHP-Datei, die Ihre IDE indexiert:",,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,b254fe6590921f51abcbecedc9b038d3
 Assign the field value and declare its type for code completion:,Weisen Sie den Feldwert einer Variablen zu und geben Sie deren Typ für die Code-Vervollständigung an:,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,5ff8a42e1fb8d65c24127533fc1438a5
 Use the typed variable to access a defined property:,Greifen Sie über die typisierte Variable auf eine definierte Eigenschaft zu:,,site/modules/FieldtypeFlex/FieldtypeFlex.module.php,90bae5ce77636dedf41290dc4f3e7e7e
 Apply property renames,Umbenennungen von Eigenschaften anwenden,,site/modules/FieldtypeFlex/src/FlexMaintenanceAdmin.php,c2fb535f301536cca99441a6a3f852a8
 %s is not supported on a table,%s wird bei Tabellen nicht unterstützt,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,1ce4a5e05e091a8a3841d8782d38e6a0
-%s must be a boolean,%s muss ein boolescher Wert sein,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,8f43197ee7bf39c7de4f4de7deb94b60
 Each table column must be an Inputfield definition,Jede Tabellenspalte muss eine Inputfield-Definition sein,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,fff9007c63960e2891eaee20213e928e
 Label,Bezeichnung,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,b021df6aac4654c454f46c77646e745f
-"Unsupported table Page widget: %s","Nicht unterstütztes Page-Widget in der Tabelle: %s",,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,d5ce97cd2028480513c5793cd2a55a94
+Unsupported table Page widget: %s,Nicht unterstütztes Page-Widget in der Tabelle: %s,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,d5ce97cd2028480513c5793cd2a55a94
 Table cells cannot use AJAX collapse or tabs,Tabellenzellen können keine AJAX-Einklappfunktion oder Tabs verwenden,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,40e44a53d749a267ff6cafb837f0591f
 Table column width must be a positive rem or px length,Die Tabellenspaltenbreite muss eine positive Länge in rem oder px sein,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,bc77fe042f21b79c170edebe192cab48
 Table columns must be a non-empty property map,Tabellenspalten müssen als nicht leere Eigenschaftszuordnung definiert sein,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,f527432e7133c23cd6c50404c0e4e7a7
@@ -382,3 +369,13 @@ Sort by %s in ascending order,Aufsteigend nach %s sortieren,,site/modules/Fieldt
 Sort by %s in descending order,Absteigend nach %s sortieren,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,2327567cf885c08ce662237a5d80c8a6
 Sorted by %s in ascending order on save,Wird beim Speichern aufsteigend nach %s sortiert,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,f1407a75547d7859af538b50abeef4cc
 Sorted by %s in descending order on save,Wird beim Speichern absteigend nach %s sortiert,,site/modules/FieldtypeFlex/InputfieldFlexRows.module.php,c6d81ef846db040ee529d28deca321c3
+The clipboard content exceeds the available server memory.,Der Inhalt der Zwischenablage überschreitet den verfügbaren Arbeitsspeicher des Servers.,,site/modules/FieldtypeFlex/src/FlexClipboard.php,2f1c0e72ad176938441e5cf4dea2a8a3
+The clipboard content exceeds the server upload limit.,Der Inhalt der Zwischenablage überschreitet das Upload-Limit des Servers.,,site/modules/FieldtypeFlex/InputfieldFlex.module.php,cfd71a25d1db09346c7c2ad34d2cfbed
+The clipboard content exceeds the server upload limit.,Der Inhalt der Zwischenablage überschreitet das Upload-Limit des Servers.,,site/modules/FieldtypeFlex/src/FlexAdmin.php,cfd71a25d1db09346c7c2ad34d2cfbed
+Unable to load input for inheritField: %s,Eingabefeld für inheritField konnte nicht geladen werden: %s,,site/modules/FieldtypeFlex/src/FlexFieldDefs.php,56ca8eb4f4b2aa26f0189a403f36cfc3
+"Add a local file path, remote HTTP(S) URL or Pagefile to a Flex media collection","Fügen Sie einer Flex-Mediensammlung einen lokalen Dateipfad, eine HTTP(S)-URL oder ein Pagefile hinzu",,site/modules/FieldtypeFlex/src/FlexMedia.php,25cbe2a3a0fe72b026c5a346d128dd07
+Unable to clone pending media file,Vorgemerkte Mediendatei konnte nicht geklont werden,,site/modules/FieldtypeFlex/src/FlexMedia.php,7de8b685fd66c4cb30fdc6703a11db1b
+Unable to download remote file,Entfernte Datei konnte nicht heruntergeladen werden,,site/modules/FieldtypeFlex/src/FlexMedia.php,8a8ee488851b638f8941ba0f79c3d7b3
+Invalid remote file,Ungültige entfernte Datei,,site/modules/FieldtypeFlex/src/FlexMedia.php,e90733f18bfe6283d799f52fc69214af
+Target pagefiles must be a Pagefiles collection,Ziel-pagefiles muss eine Pagefiles-Sammlung sein,,site/modules/FieldtypeFlex/src/FlexMedia.php,7c59d167f2631e8831aad1b3382f0d31
+Flex row type selectors require = or != and a type string or blank,Flex-Zeilentyp-Selektoren erfordern = oder != sowie einen Typnamen oder leer,,site/modules/FieldtypeFlex/src/FlexQuery.php,1f308eba306cbf6e917d782f35f9647d

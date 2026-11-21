@@ -471,7 +471,6 @@
 
   // scripts/typescript/FieldtypeFlex.ts
   var state = /* @__PURE__ */ new WeakMap();
-  var titleRequests = /* @__PURE__ */ new WeakMap();
   var disabledBeforeRemoval = /* @__PURE__ */ new WeakMap();
   var busyTrees = /* @__PURE__ */ new WeakSet();
   var overlayMenus = ".flex-table-more, .flex-collection-menu";
@@ -581,7 +580,6 @@
     tree.setAttribute("aria-busy", String(busy));
     all(tree, ".flex-rows").forEach(updateActions);
     const form = closest(tree, "form");
-    if (!busy && titleRequests.get(tree)?.queued) queueTitleRefresh(tree);
     if (!busy && !form.querySelector('.InputfieldFlex[aria-busy="true"], .flex-row[data-flex-load-failed="1"]')) all(form, ":scope > .flex-form-request-error").forEach((error) => error.remove());
   }
   function updateActions(set) {
@@ -689,55 +687,6 @@
   }
   function requestHeaders(set) {
     return { "X-Requested-With": "XMLHttpRequest", "X-FIELDNAME": attr(set, "data-flex-field"), "X-FLEX-DRAFT": attr(set, "data-flex-draft") };
-  }
-  function externalTitleDependencies(tree) {
-    return new Set(all(tree, "[data-flex-external-dependencies]").flatMap((input) => attr(input, "data-flex-external-dependencies").split(" ")));
-  }
-  function dependencyName(name) {
-    return name.replace(/\[\]$|^_|_$/g, "").replace(/__\d+$/, "");
-  }
-  function queueTitleRefresh(tree) {
-    if (!tree.querySelector(".flex-row[data-flex-title-refresh]")) return;
-    const request = titleRequests.get(tree) ?? { revision: 0, queued: false };
-    titleRequests.set(tree, request);
-    const revision = ++request.revision;
-    clearTimeout(request.timer);
-    request.queued = true;
-    if (treeBusy(tree)) return;
-    request.timer = window.setTimeout(async () => {
-      if (!tree.isConnected || treeBusy(tree)) return;
-      request.queued = false;
-      const targets = all(tree, ".flex-row[data-flex-title-refresh]").filter((row) => row.closest(".InputfieldFlex") === tree && !row.closest(".flex-row-remove-pending"));
-      if (!targets.length) return;
-      const set = closest(targets[0], ".flex-rows");
-      const addresses = targets.map((row) => [attr(closest(row, ".flex-rows"), "data-flex-set"), attr(row, "data-flex-row")]);
-      const token = csrf(), draft = attr(set, "data-flex-draft");
-      if (!token || !draft) return;
-      classic.saveReady(tree);
-      const data = new URLSearchParams(serialize(tree));
-      const dependencies = externalTitleDependencies(tree);
-      if (dependencies.size) {
-        serialize(closest(tree, "form")).forEach(([name, value2]) => {
-          if (name !== "id" && (dependencies.has(name) || dependencies.has(dependencyName(name)))) data.append(name, value2);
-        });
-      }
-      data.set(token.name, token.value);
-      data.set("flex_action", "row-titles");
-      data.set("flex_title_rows", JSON.stringify(addresses));
-      data.set("flex_complete", draft);
-      try {
-        const response = await fetch(attr(set, "data-flex-page-url"), { method: "POST", credentials: "same-origin", headers: requestHeaders(set), body: data });
-        const result = await response.json();
-        if (!response.ok || result.error || request.revision !== revision || !tree.isConnected) return;
-        targets.forEach((row, index) => {
-          const title = rowTitleData(row), update = result.titles[addresses[index].join(".")];
-          if (!title || !update || !row.isConnected) return;
-          Object.assign(title, update);
-          renderTitle(row, title, rows(closest(row, ".flex-rows")).indexOf(row) + 1);
-        });
-      } catch {
-      }
-    }, 240);
   }
   function moved(set, row) {
     const status = one(set, ":scope > .flex-rows-status");
@@ -1008,7 +957,6 @@
     } else if (action === "hide") {
       chosen.forEach((row) => setVisibility(row, true));
       closest(set, ".InputfieldFlex").classList.add("InputfieldStateChanged");
-      queueTitleRefresh(closest(set, ".InputfieldFlex"));
       updateActions(set);
     } else if (action === "remove" && activeRows(set).length - chosen.length >= Number(attr(set, "data-flex-min"))) {
       window.tinymce?.triggerSave();
@@ -1019,7 +967,6 @@
       current.rows.clear();
       current.anchor = void 0;
       order(set);
-      queueTitleRefresh(closest(set, ".InputfieldFlex"));
     }
   });
   function formError(form, text, pending) {
@@ -1327,20 +1274,7 @@
   });
   function titlesChanged(target) {
     const tree = target.closest(".InputfieldFlex");
-    if (tree) {
-      all(tree, ".flex-row[data-flex-title]").forEach((row) => syncTitleSources(row, target));
-      queueTitleRefresh(tree);
-      return;
-    }
-    const form = target.closest("form");
-    if (!form) return;
-    const name = attr(target, "name");
-    if (!name) return;
-    all(form, ".InputfieldFlex").forEach((field) => {
-      if (!field.querySelector("[data-flex-title-refresh]")) return;
-      const dependencies = externalTitleDependencies(field);
-      if (dependencies.has(name) || dependencies.has(dependencyName(name))) queueTitleRefresh(field);
-    });
+    if (tree) all(tree, ".flex-row[data-flex-title]").forEach((row) => syncTitleSources(row, target));
   }
   ["input", "change"].forEach((name) => document.addEventListener(name, (event) => {
     const input = event.target;
@@ -1428,7 +1362,6 @@
       removalState(row, removed);
       rowState(row).removalReady = true;
       order(set);
-      queueTitleRefresh(closest(set, ".InputfieldFlex"));
       control.focus();
       return;
     }
@@ -1439,7 +1372,10 @@
     try {
       const clipboard = pasting ? await readClipboard() : "";
       window.tinymce?.triggerSave();
-      const data = new URLSearchParams({ flex_action: action, flex_set: attr(set, "data-flex-set"), flex_order: activeRows(set).map((row2) => attr(row2, "data-flex-row")).join(",") });
+      const data = pasting ? new FormData() : new URLSearchParams();
+      data.set("flex_action", action);
+      data.set("flex_set", attr(set, "data-flex-set"));
+      data.set("flex_order", activeRows(set).map((row2) => attr(row2, "data-flex-row")).join(","));
       const orders = {};
       all(closest(set, ".InputfieldFlex"), ".flex-rows").forEach((current) => {
         if (!current.closest(".flex-row-remove-pending")) orders[attr(current, "data-flex-set")] = activeRows(current).map((row2) => attr(row2, "data-flex-row"));
@@ -1455,7 +1391,11 @@
       if (token) data.set(token.name, token.value);
       data.set("flex_complete", attr(set, "data-flex-draft"));
       const response = await fetch(attr(set, "data-flex-page-url"), { method: "POST", credentials: "same-origin", headers: requestHeaders(set), body: data });
-      const result = await response.json();
+      const parsed = await response.json().catch(() => null);
+      if (response.status === 413) {
+        throw new Error(parsed?.message || message("clipboardTooLarge", "The clipboard content exceeds the server upload limit."));
+      }
+      const result = parsed ?? { html: "", error: true, message: message("unableToAdd", "Unable to add item") };
       if (!response.ok || result.error) throw new Error(result.message || message("unableToAdd", "Unable to add item"));
       if (!set.isConnected) return;
       const inserted = (result.rows ?? [result]).map((item) => parseHTML(item.html));
@@ -1472,7 +1412,6 @@
         [fresh, ...all(fresh, ".flex-row[data-flex-title]")].forEach((row2) => syncTitleSources(row2));
         classic.added(fresh);
       }
-      queueTitleRefresh(closest(set, ".InputfieldFlex"));
       focus = inserted[0]?.querySelector(":scope > .flex-row-header .flex-row-toggle, :scope > .flex-table-actions summary") || void 0;
       if (pasting) {
         const pasted = inserted.length === 1 ? message("rowPasted", "Row pasted.") : message("rowsPasted", "Rows pasted.");

@@ -5,17 +5,8 @@ final class FlexClipboard extends Wire {
 	private const FORMAT = 'fieldtype-flex-row';
 	private const BATCH_FORMAT = 'fieldtype-flex-rows';
 	private const VERSION = 1;
-	private const MAX_BYTES = 8388608;
-	private const MAX_MEDIA_BYTES = 20971520;
-	private const REMOTE_FILE_TYPES = [
-		'image/jpeg', 'image/gif', 'image/png', 'image/webp', 'image/avif', 'image/bmp', 'image/tiff',
-		'audio/mpeg', 'audio/wav', 'video/mp4', 'video/quicktime', 'video/webm',
-		'text/plain', 'text/csv', 'application/pdf', 'application/zip', 'application/rtf',
-		'application/msword', 'application/vnd.ms-excel', 'application/vnd.ms-powerpoint',
-		'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-		'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-		'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-	];
+	private const MAX_BYTES = 25165824;
+	private const MAX_INLINE_BYTES = 16777216;
 
 	private array $warnings = [];
 	private array $skippedFiles = [];
@@ -23,12 +14,12 @@ final class FlexClipboard extends Wire {
 	private string $source = '';
 	private int $sourcePage = 0;
 	private bool $sameSite = false;
-	private float $deadline = 0;
-	private int $remainingBytes = self::MAX_MEDIA_BYTES;
-	private int $downloads = 0;
+	private int $remainingBytes = self::MAX_INLINE_BYTES;
+	private int $inlineRemaining = 0;
 
 	/** @param list<FlexRow> $rows */
 	public function export(array $rows): string {
+		$this->inlineRemaining = $this->inlineBudget();
 		$source = $rows[0];
 		$batch = count($rows) > 1;
 		$data = [
@@ -41,6 +32,7 @@ final class FlexClipboard extends Wire {
 		if($batch) $data['rows'] = array_map(fn(FlexRow $row) => $this->exportRow($row), $rows);
 		else $data['row'] = $this->exportRow($source);
 		$text = json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR, FlexPath::MAX_JSON_DEPTH);
+		unset($data);
 		if(strlen($text) > self::MAX_BYTES) throw new WireException($this->_('The row is too large for the clipboard.'));
 		return $text;
 	}
@@ -48,6 +40,9 @@ final class FlexClipboard extends Wire {
 	/** Import in clipboard order. The editor registers the entire batch or abandons it. @return list<FlexRow> */
 	public function paste(FlexRows $rows, array $definition, mixed $text, string $token, int $existing = 0): array {
 		if(!is_string($text) || strlen($text) > self::MAX_BYTES) throw $this->invalid();
+		if(strlen($text) > $this->pasteMemoryLimit()) {
+			throw new WireException($this->_('The clipboard content exceeds the available server memory.'));
+		}
 		try {
 			$data = json_decode($text, true, FlexPath::MAX_JSON_DEPTH, JSON_THROW_ON_ERROR);
 		} catch(\JsonException) {
@@ -72,7 +67,6 @@ final class FlexClipboard extends Wire {
 		$site = $this->site();
 		$this->sameSite = $site !== '' && is_string($data['site'] ?? null) && hash_equals($site, $data['site']);
 		$this->sourcePage = is_int($data['page'] ?? null) ? $data['page'] : 0;
-		$this->deadline = microtime(true) + 8;
 		$imported = [];
 		foreach($entries as $index => $entry) {
 			$row = $rows->addRow($entry['type']);
@@ -155,12 +149,15 @@ final class FlexClipboard extends Wire {
 					$descriptions = $file->description(true, true);
 					$custom = $this->exportValues($file->metadataInputValue());
 					unset($custom['description'], $custom['tags']);
-					$items[] = [
+					$item = [
 						'name' => $file->basename(), 'url' => $file->httpUrl(),
 						'descriptions' => $descriptions, 'tags' => (string) $file->tags,
 						'focus' => $file instanceof Pageimage ? $file->filedata('focus') : null,
 						'values' => (object) $custom,
 					];
+					$inline = $this->inlineFileData($file->filename());
+					if($inline !== null) $item['data'] = $inline;
+					$items[] = $item;
 				}
 				$value = $items;
 			} else if($value instanceof LanguagesPageFieldValue) {
@@ -252,7 +249,7 @@ final class FlexClipboard extends Wire {
 			foreach($value as $code => $translation) {
 				$language = is_string($code) && preg_match('/^[a-z0-9_-]+$/D', $code) ? $languages->get('name=' . $code) : null;
 				$languagePath = $path . '.' . $code;
-				if(!$language || !$language->id || !is_string($translation) || !$this->validText($input, $translation)) {
+				if(!$language || !$language->id || !is_string($translation) || str_contains($translation, "\0")) {
 					if($translation !== '') $this->warnings[] = $languagePath;
 					continue;
 				}
@@ -265,10 +262,10 @@ final class FlexClipboard extends Wire {
 			'checkbox' => is_bool($value),
 			'select', 'toggle' => $value === '' || ((is_string($value) || is_int($value)) && array_key_exists($value, $options)),
 			'array' => is_array($value) && array_is_list($value),
-			'integer' => $value === '' || (is_int($value) && $this->inRange($input, $value)),
-			'float' => $value === '' || ((is_float($value) || is_int($value)) && is_finite((float) $value) && $this->inRange($input, $value)),
+			'integer' => $value === '' || is_int($value),
+			'float' => $value === '' || ((is_float($value) || is_int($value)) && is_finite((float) $value)),
 			'date' => $value === '' || $this->validDate($value),
-			default => is_string($value) && $this->validText($input, $value),
+			default => is_string($value) && !str_contains($value, "\0"),
 		};
 		if(!$valid) {
 			$this->warnings[] = $path;
@@ -309,19 +306,6 @@ final class FlexClipboard extends Wire {
 		} catch(WireException) {
 			$this->warnings[] = $path;
 		}
-	}
-
-	private function validText(Inputfield $input, string $value): bool {
-		if(str_contains($value, "\0")) return false;
-		if($value === '') return true;
-		$length = mb_strlen($value);
-		if($length < (int) $input->minlength || ($input->maxlength && $length > (int) $input->maxlength)) return false;
-		$pattern = $input->pattern;
-		return !$pattern || @preg_match('#' . str_replace('#', '\\#', $pattern) . '#', $value) === 1;
-	}
-
-	private function inRange(Inputfield $input, int|float $value): bool {
-		return (!is_numeric($input->min) || $value >= $input->min) && (!is_numeric($input->max) || $value <= $input->max);
 	}
 
 	private function validDate(mixed $value): bool {
@@ -397,11 +381,16 @@ final class FlexClipboard extends Wire {
 		$url = $this->httpUrl($data['url'] ?? null);
 		$definition = $files->definition();
 		$settings = $definition['settings'];
-		$extensions = preg_split('/[\s,]+/', strtolower((string) ($settings['extensions'] ?? '')), -1, PREG_SPLIT_NO_EMPTY);
+		$extensions = preg_split(
+			'/[\s,]+/',
+			strtolower((string) ($settings['extensions'] ?? ($files instanceof Pageimages ? 'jpg jpeg gif png' : 'pdf doc docx xls xlsx gif jpg jpeg png'))),
+			-1,
+			PREG_SPLIT_NO_EMPTY
+		);
 		$extension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
 		$bad = preg_split('/\s+/', strtolower((string) $this->wire()->config->uploadBadExtensions));
 		$upload = $this->wire(new WireUpload('flex_clipboard'));
-		$limit = min((int) ($settings['maxFilesize'] ?? 0) ?: self::MAX_MEDIA_BYTES, self::MAX_MEDIA_BYTES);
+		$fieldMax = (int) ($settings['maxFilesize'] ?? 0);
 		if(!$url || $name === '' || $name !== basename($name) || str_contains($name, "\\")
 			|| $name !== rawurldecode(basename($url['path'] ?? ''))
 			|| isset($url['query']) || $definition['input']->noUpload || !in_array($extension, $extensions, true)
@@ -409,35 +398,65 @@ final class FlexClipboard extends Wire {
 			$this->skippedFiles[] = $label;
 			return;
 		}
-		$temp = null;
+		$tempDir = null;
+		$staged = null;
 		try {
 			$files->checkLimit(true);
 			$filename = $upload->validateFilename($name, $extensions);
-			$temp = $this->wire()->files->tempDir('FlexClipboard')->get() . $filename;
 			$local = $this->sameSite ? $this->localFile($files->field->type, $name, $data['url']) : null;
 			if($local) {
+				// Stage the copy first so FileValidator modules never mutate the live source original.
 				$size = filesize($local);
-				if(!$size || $size > $limit || $size > $this->remainingBytes || !@copy($local, $temp)) throw $this->invalid();
-				$this->remainingBytes -= $size;
-			} else {
-				$expected = ltrim($this->wire()->config->fileContentTypes[$extension] ?? '', '+');
-				if(!in_array($expected, self::REMOTE_FILE_TYPES, true) || !class_exists(\finfo::class)
-					|| !$this->download($data['url'], $url, $temp, $limit)) {
+				if(!$size || ($fieldMax && $size > $fieldMax)) throw $this->invalid();
+				if($files instanceof Pageimages && !@getimagesize($local)) throw $this->invalid();
+				$files->draft($token);
+				$staged = $files->importClipboardFile($local, $filename);
+				$stagedPath = $staged->filename();
+				if($this->wire()->sanitizer->validateFile($stagedPath, ['page' => $files->page, 'field' => $files->field]) === false) {
 					throw $this->invalid();
 				}
-				$actual = (new \finfo(FILEINFO_MIME_TYPE))->file($temp);
-				if($actual !== $expected && !($extension === 'csv' && $actual === 'text/plain')) throw $this->invalid();
+				// Re-verify size and image integrity on the final bytes after potentially sanitizing validators.
+				clearstatcache(true, $stagedPath);
+				$finalSize = @filesize($stagedPath);
+				if(!$finalSize || ($fieldMax && $finalSize > $fieldMax)) throw $this->invalid();
+				if($files instanceof Pageimages && !@getimagesize($stagedPath)) throw $this->invalid();
+				$file = $staged;
+				$staged = null;
+			} else {
+				$encoded = $data['data'] ?? null;
+				$maxBytes = min($fieldMax ?: self::MAX_INLINE_BYTES, self::MAX_INLINE_BYTES, $this->remainingBytes, $this->pasteMemoryLimit());
+				if(!is_string($encoded) || $encoded === '' || $maxBytes <= 0 || strlen($encoded) > (int) ceil($maxBytes * 4 / 3) + 4) {
+					throw $this->invalid();
+				}
+				$decoded = base64_decode($encoded, true);
+				$size = is_string($decoded) ? strlen($decoded) : 0;
+				$tempDir = $this->wire()->files->tempDir('FlexClipboard-' . bin2hex(random_bytes(8)));
+				$temp = $tempDir->get() . $filename;
+				if($decoded === false || $size === 0 || $size > $maxBytes || @file_put_contents($temp, $decoded, LOCK_EX) !== $size) {
+					throw $this->invalid();
+				}
+				unset($decoded);
+				if($files instanceof Pageimages && !@getimagesize($temp)) throw $this->invalid();
+				if($this->wire()->sanitizer->validateFile($temp, ['page' => $files->page, 'field' => $files->field]) === false) throw $this->invalid();
+				clearstatcache(true, $temp);
+				$finalSize = @filesize($temp);
+				if(!$finalSize || $finalSize > $maxBytes || ($fieldMax && $finalSize > $fieldMax)) throw $this->invalid();
+				if($files instanceof Pageimages && !@getimagesize($temp)) throw $this->invalid();
+				$this->remainingBytes -= max($size, $finalSize);
+				$files->draft($token);
+				$file = $files->importClipboardFile($temp, $filename);
 			}
-			if($files instanceof Pageimages && !@getimagesize($temp)) throw $this->invalid();
-			if($this->wire()->sanitizer->validateFile($temp, ['page' => $files->page, 'field' => $files->field]) === false) throw $this->invalid();
-			$files->draft($token);
-			$file = $files->importClipboardFile($temp, $filename);
 			$this->assets[] = $file->assetId();
 		} catch(WireException) {
 			$this->skippedFiles[] = $label;
 			return;
 		} finally {
-			if($temp !== null && is_file($temp)) unlink($temp);
+			// Always clean up an unaccepted staged copy, even if a third-party validator throws a non-WireException.
+			if($staged !== null) {
+				$files->field->type->media()->abandon($staged->assetId(), $files->page, $files->field, $token);
+				if($files->has($staged)) $files->remove($staged);
+			}
+			if($tempDir !== null) $tempDir->remove();
 		}
 		$descriptions = [];
 		$languages = $this->wire()->languages;
@@ -498,49 +517,52 @@ final class FlexClipboard extends Wire {
 		return !is_link($path) && is_file($path) && is_readable($path) ? $path : null;
 	}
 
-	private function download(string $url, array $parts, string $target, int $limit): bool {
-		$host = strtolower($parts['host'] ?? '');
-		if(($parts['scheme'] ?? '') !== 'https' || ($parts['port'] ?? 443) !== 443
-			|| !preg_match('/^[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z][a-z0-9-]+$/D', $host)
-			|| preg_match('/\.(?:internal|local|localhost|test|invalid|example|onion|home\.arpa)$/D', $host)
-			|| !function_exists('curl_init') || !defined('FILTER_FLAG_GLOBAL_RANGE') || $this->downloads >= 6
-			|| $this->remainingBytes <= 0 || microtime(true) >= $this->deadline) return false;
-		$this->downloads++;
-		$addresses = @gethostbynamel($host);
-		if(!$addresses) return false;
-		foreach($addresses as $ip) {
-			if(!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 | FILTER_FLAG_GLOBAL_RANGE)) return false;
+	/** Parse a PHP shorthand byte limit ini setting; returns 0 when unset or unlimited. */
+	public static function iniBytes(string $setting): int {
+		$raw = trim((string) ini_get($setting));
+		if($raw === '' || str_starts_with($raw, '-')) return 0;
+		if(!preg_match('/^(\d+)\s*([kmgt])?b?$/i', $raw, $match)) return 0;
+		return (int) $match[1] * match(strtolower($match[2] ?? '')) {
+			'k' => 1024,
+			'm' => 1048576,
+			'g' => 1073741824,
+			't' => 1099511627776,
+			default => 1,
+		};
+	}
+
+	/** Bound inline Base64 payloads by the module cap, post_max_size and available PHP memory. */
+	private function inlineBudget(): int {
+		$budget = self::MAX_INLINE_BYTES;
+		$postMax = self::iniBytes('post_max_size');
+		if($postMax > 0) $budget = min($budget, (int) floor($postMax * 0.6));
+		$memLimit = self::iniBytes('memory_limit');
+		if($memLimit > 0) {
+			// Base64 + JSON + AJAX response envelope temporarily hold ~5x raw bytes; keep 8 MiB headroom.
+			$headroom = $memLimit - memory_get_usage(true) - 8388608;
+			$budget = min($budget, max(0, (int) floor($headroom / 5)));
 		}
-		$time = min(3000, (int) (($this->deadline - microtime(true)) * 1000));
-		if($time <= 0) return false;
-		$request = curl_init($url);
-		if(!$request) return false;
-		$stream = @fopen($target, 'xb');
-		if(!$stream) return false;
-		$written = 0;
-		try {
-			$configured = curl_setopt_array($request, [
-				CURLOPT_PROTOCOLS => CURLPROTO_HTTPS,
-				CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
-				CURLOPT_RESOLVE => [$host . ':443:' . $addresses[0]],
-				CURLOPT_FOLLOWLOCATION => false,
-				CURLOPT_PROXY => '',
-				CURLOPT_SSL_VERIFYPEER => true,
-				CURLOPT_SSL_VERIFYHOST => 2,
-				CURLOPT_CONNECTTIMEOUT_MS => $time,
-				CURLOPT_TIMEOUT_MS => $time,
-				CURLOPT_MAXFILESIZE => min($limit, $this->remainingBytes),
-				CURLOPT_WRITEFUNCTION => function($handle, string $chunk) use ($stream, $limit, &$written): int {
-					$length = strlen($chunk);
-					if($written + $length > $limit || $length > $this->remainingBytes) return 0;
-					$written += $length;
-					$this->remainingBytes -= $length;
-					return (int) fwrite($stream, $chunk);
-				},
-			]);
-			return $configured && curl_exec($request) === true && curl_getinfo($request, CURLINFO_HTTP_CODE) === 200 && $written > 0;
-		} finally {
-			fclose($stream);
-		}
+		return max(0, $budget);
+	}
+
+	/** Bound target JSON/base64 decoding against the receiving server's memory_limit. */
+	private function pasteMemoryLimit(): int {
+		$memLimit = self::iniBytes('memory_limit');
+		if($memLimit <= 0) return self::MAX_BYTES;
+		// JSON decoding + base64 expansion temporarily hold ~4x input bytes; keep 8 MiB headroom.
+		$headroom = $memLimit - memory_get_usage(true) - 8388608;
+		return min(self::MAX_BYTES, max(0, (int) floor($headroom / 4)));
+	}
+
+	private function inlineFileData(string $path): ?string {
+		if($this->inlineRemaining <= 0 || is_link($path) || !is_file($path) || !is_readable($path)) return null;
+		$size = filesize($path);
+		if(!$size || $size > $this->inlineRemaining) return null;
+		$bytes = @file_get_contents($path);
+		if(!is_string($bytes) || strlen($bytes) !== $size) return null;
+		$encoded = base64_encode($bytes);
+		unset($bytes);
+		$this->inlineRemaining -= $size;
+		return $encoded;
 	}
 }

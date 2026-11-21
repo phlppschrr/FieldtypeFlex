@@ -78,11 +78,9 @@ foreach(['missing', '', 'TEXT', 'text|image', 'notes.text'] as $unknown) {
 	$same([], $rows->rowsOfType($unknown), 'unknown type string returns an empty filter: ' . $unknown);
 	$same(0, $rows->countOfType($unknown), 'unknown type string returns zero: ' . $unknown);
 }
-foreach([null, 1, 1.5, true, [], new \stdClass(), new class {
-	public function __toString(): string { return 'text'; }
-}] as $invalid) {
-	$throws(fn() => $rows->rowsOfType($invalid), 'filter rejects non-string arguments without scalar coercion', \TypeError::class);
-	$throws(fn() => $rows->countOfType($invalid), 'count rejects non-string arguments without scalar coercion', \TypeError::class);
+foreach([null, [], new \stdClass()] as $invalid) {
+	$throws(fn() => $rows->rowsOfType($invalid), 'filter rejects non-stringable non-string arguments via PHP string typehint', \TypeError::class);
+	$throws(fn() => $rows->countOfType($invalid), 'count rejects non-stringable non-string arguments via PHP string typehint', \TypeError::class);
 }
 $text->rowTypeLabel();
 $text->hasProperty('caption');

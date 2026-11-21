@@ -396,13 +396,15 @@ foreach(['integer' => 'FieldtypeInteger', 'float' => 'FieldtypeFloat'] as $kind 
 	$same($kind === 'integer' ? '' : 0.0, $p->get($n->name), "$kind native zero persistence policy is explicit");
 	$same($kind === 'integer' ? 0 : 0.0, $p->get($f->name)->value, "$kind Flex always preserves explicit numeric zero");
 	$same($kind === 'integer' ? '' : 0.0, $n->type->sanitizeValue($p, $n, 'invalid'), "$kind native invalid input fallback is explicit");
-	$throws(fn() => $p->get($f->name)->set('value', 'invalid'), "$kind Flex invalid input is an explicit error");
+	$p->get($f->name)->set('value', 'invalid');
+	$same('', $p->get($f->name)->value, "$kind Flex invalid input sanitizes to blank like Core");
 }
 $n = $native('FieldtypeDatetime');
 $f = $createField('flex_native_date_error', ['value' => ['type' => 'datetime']]);
 $same('', $n->type->sanitizeValue($page, $n, 'not a date'), 'native invalid date becomes blank');
 $page->of(false);
-$throws(fn() => $page->get($f->name)->set('value', 'not a date'), 'Flex invalid dates remain explicit errors');
+$page->get($f->name)->set('value', 'not a date');
+$same('', $page->get($f->name)->value, 'Flex invalid date sanitizes to blank like Core');
 $n = $native('FieldtypeToggle', ['formatType' => FieldtypeToggle::formatBoolean]);
 $f = $createField('flex_native_toggle_modes', ['value' => ['type' => 'Toggle']]);
 $page->set($n->name, 1);$page->set($f->name, ['value' => 1]);$page->of(true);

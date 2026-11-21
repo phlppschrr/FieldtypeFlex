@@ -170,7 +170,8 @@ $same([$second->id], $findTyped("$typedName.blocks.text.value!=Seventeen", $seco
 $same([$typedBlankMediaId], $findTyped("$typedName.blocks.text.value=", $typedBlankMediaId), 'blank typed leaf ignores other row types');
 $same([], $findTyped("@$typedName.blocks.text.value!=Seventeen", $id), 'inner negative predicate tests an existing row of the specified type');
 $same([$id], $findTyped("@$typedName.blocks.number.value!=18", $id), 'inner negative predicate uses the numeric type schema');
-$throws(fn() => $findTyped("$typedName.blocks._type=missing"), 'type selector rejects unknown type names');
+$same([], $findTyped("$typedName.blocks._type=missing"), 'type selector returns no matches for unknown type names like Core');
+$same([$id], $findTyped("$typedName.blocks._type!=missing", $id), 'negative type selector matches pages without unknown type');
 $throws(fn() => $findTyped("$typedName.blocks._type*=text"), 'type selector rejects unsupported operators');
 $throws(fn() => $findTyped("$typedName.blocks=\"value=Seventeen\""), 'nonblank same-row selector requires an explicit type');
 $throws(fn() => $findTyped("$typedName.blocks.text.value.count=1"), 'scalar typed leaf rejects a media count suffix');

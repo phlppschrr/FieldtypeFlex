@@ -115,7 +115,7 @@ class InputfieldFlexRows extends Inputfield implements BridgeComponent {
 		return null;
 	}
 
-	/** Prepare one title for initial rendering or a detached AJAX preview. @internal */
+	/** Prepare one title for initial rendering or server-rendered row insertion. @internal */
 	public function titleData(FlexRow $row, int $index): array {
 		$root = $this->flexRoot;
 		$path = [];
@@ -130,8 +130,7 @@ class InputfieldFlexRows extends Inputfield implements BridgeComponent {
 		$sources = $custom = [];
 		$references = array_unique(iterator_to_array(FlexRowTitle::references($nodes), false));
 		$customRefs = array_filter($references, static fn($ref) => $ref[0] === '@' && !in_array($ref, FlexRowTitle::BUILT_INS, true));
-		$usesValues = $customRefs && $this->hasHook('rowTitleValues()');
-		if($usesValues) {
+		if($customRefs && $this->hasHook('rowTitleValues()')) {
 			$provided = $this->rowTitleValues($row, $root, $parent);
 			foreach($customRefs as $reference) {
 				$value = $provided[$reference] ?? '';
@@ -150,7 +149,7 @@ class InputfieldFlexRows extends Inputfield implements BridgeComponent {
 		// The index remains local even when a template contains server-provided values.
 		unset($values['@index']);
 		return ['nodes' => $nodes, 'values' => (object) $values, 'sources' => (object) $sources, 'custom' => (object) $custom,
-			'override' => $override, 'refresh' => $usesValues || $override !== null,
+			'override' => $override,
 			'parts' => $override === null ? $parts : ($override ?: [['text' => '#' . $index]])];
 	}
 
@@ -181,8 +180,7 @@ class InputfieldFlexRows extends Inputfield implements BridgeComponent {
 		$typeLabel = $row->rowTypeLabel();
 		$title = $this->titleData($row, $number);
 		$label = FlexRowTitle::markup($title['parts']);
-		$refreshTitle = $title['refresh'];
-		unset($title['parts'], $title['refresh']);
+		unset($title['parts']);
 		$entities = fn($value) => $this->wire()->sanitizer->entities((string) $value);
 		$bodyId = 'flex_row_' . $this->name . '__' . $id;
 		$buttons = $this->rowActions($row, $removed);
@@ -199,7 +197,7 @@ class InputfieldFlexRows extends Inputfield implements BridgeComponent {
 			$fallbackLabel = $entities($this->_('Load all items'));
 			$body = '<p class="flex-row-load-status" role="status"></p><button type="button" class="ui-button flex-row-retry" hidden>' . $retryLabel . '</button><noscript><a href="' . $entities($url) . '">' . $fallbackLabel . '</a></noscript>';
 		}
-		return '<li class="Inputfield InputfieldFieldset InputfieldNoFocus flex-row' . ($collapsed ? ' InputfieldStateCollapsed' : '') . ($row->isHidden() ? ' flex-row-hidden' : '') . ($removed ? ' flex-row-remove-pending' : '') . '" id="wrap_' . $entities($bodyId) . '" data-flex-row="' . $entities($id) . '"' . ($entry ? ' data-flex-loaded="' . ($loaded ? '1' : '0') . '"' : '') . ' data-flex-type="' . $entities($type) . '" data-flex-type-label="' . $entities($typeLabel) . '" data-flex-title="' . $entities(json_encode($title, JSON_THROW_ON_ERROR)) . '"' . ($refreshTitle ? ' data-flex-title-refresh' : '') . '>' .
+		return '<li class="Inputfield InputfieldFieldset InputfieldNoFocus flex-row' . ($collapsed ? ' InputfieldStateCollapsed' : '') . ($row->isHidden() ? ' flex-row-hidden' : '') . ($removed ? ' flex-row-remove-pending' : '') . '" id="wrap_' . $entities($bodyId) . '" data-flex-row="' . $entities($id) . '"' . ($entry ? ' data-flex-loaded="' . ($loaded ? '1' : '0') . '"' : '') . ' data-flex-type="' . $entities($type) . '" data-flex-type-label="' . $entities($typeLabel) . '" data-flex-title="' . $entities(json_encode($title, JSON_THROW_ON_ERROR)) . '">' .
 			'<input type="hidden" class="flex-row-remove-value" name="' . $entities(FlexPath::controlName($this->flexInputName ?: $this->name, $row->address(), 'remove')) . '" value="' . ($removed ? '1' : '0') . '">' .
 			'<input type="hidden" class="flex-row-hidden-value" name="' . $entities(FlexPath::controlName($this->flexInputName ?: $this->name, $row->address(), 'hidden')) . '" value="' . ($row->isHidden() ? '1' : '0') . '">' .
 			'<div class="InputfieldHeader flex-row-header' . ($boldHeader ? ' flex-row-header-bold' : '') . ($removed ? ' ui-state-error' : '') . '"><div class="flex-row-bar' . ($konkat ? '' : ' uk-background-primary uk-light') . '">' .
@@ -462,7 +460,6 @@ class InputfieldFlexRows extends Inputfield implements BridgeComponent {
 		if($input->{FlexPath::controlName($this->flexInputName ?: $this->name, $this->setName, 'present')} !== '1' && $input->{FlexPath::controlName($this->flexInputName ?: $this->name, $this->setName, 'present')} !== 1) {
 			return $this;
 		}
-		$preview = $this->admin()->previewingRowTitles();
 		try {
 			$before = $this->value;
 			$rawOrder = $input->{FlexPath::controlName($this->flexInputName ?: $this->name, $this->setName, 'order')};
@@ -476,8 +473,12 @@ class InputfieldFlexRows extends Inputfield implements BridgeComponent {
 			$rows = new FlexRows($this->flexRoot->ownerPage(), $this->flexRoot->ownerField(), $this->setName, $this->definition);
 			$this->renderRows = [];
 			$this->removedRows = [];
+			$existingIds = [];
+			foreach($before as $existingRow) {
+				$existingIds[$existingRow->rowId()] = true;
+			}
 			foreach($ids as $id) {
-				$row = $this->admin()->row($this->flexDraft, $this->setName, $id, $this->flexBaseRoot ?: $this->flexRoot, $preview);
+				$row = $this->admin()->row($this->flexDraft, $this->setName, $id, $this->flexBaseRoot ?: $this->flexRoot, false);
 				if(!isset($this->rowInputs[$id])) {
 					$view = $this->admin()->row($this->flexDraft, $this->setName, $id, $this->flexRoot);
 					$this->inputsFor($view);
@@ -486,7 +487,6 @@ class InputfieldFlexRows extends Inputfield implements BridgeComponent {
 				$this->renderRows[$id] = $row;
 				$removed = self::removalRequested($input, $this->flexInputName ?: $this->name, $row->address());
 				if($removed) {
-					if($preview) continue;
 					$this->removedRows[$id] = true;
 					// Processing copies retain submitted inputs for undo after a failed save.
 					// Removed rows contribute no validation errors or values to persistence.
@@ -500,20 +500,23 @@ class InputfieldFlexRows extends Inputfield implements BridgeComponent {
 				if(!FlexLazy::unloaded($this->flexRoot, $this->flexDraft, $row->address())) {
 					InputfieldFlex::applyInputs($row, $form, FlexPath::inputPrefix($this->flexInputName ?: $this->name, $row->address()));
 				}
-				foreach($preview ? [] : $form->getErrors() as $error) {
+				foreach($form->getErrors() as $error) {
 					$this->error($error);
 				}
-				$rows->add($row);
+				if(isset($existingIds[$row->rowId()])) {
+					$rows->addExisting($row);
+				} else {
+					$rows->add($row);
+				}
 			}
 			$this->attr('value', $rows);
-			if(!$preview) $rows->checkLimit(true);
+			$rows->checkLimit(true, $existingIds);
 			if($before->rawArray() !== $rows->rawArray()) {
 				$this->trackChange('value', $before, $rows);
 			}
 		} catch(FlexDefinitionException $error) {
 			throw $error;
 		} catch(\Throwable $error) {
-			if($preview) throw $error;
 			// A native child can throw before it has a chance to add a normal
 			// validation message. Classify it with the same narrow boundary as
 			// root inputs so the containing editor can lock and block the save.

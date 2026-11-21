@@ -2,15 +2,36 @@
 
 ## WIP
 
+### Added
+
+- Support adding remote `http://` and `https://` file URLs directly via `FlexFiles::add()` and `FlexImages::add()` using native `WireHttp::download()`.
+
 ### Changed
 
+- Embed original media files inline as base64 in clipboard JSON (16 MB raw-data budget / 24 MB payload cap, bounded by `post_max_size`) for cross-site paste without outbound server requests, and submit clipboard pastes via `FormData` with explicit HTTP 413 handling. Same-site paste continues copying owned local originals directly.
+- Align Flex validation, schema loading and selectors closer to ProcessWire Core parity:
+  - Allow hydrating and saving existing rows/media that exceed a lowered `maxItems` or `maxFiles` limit while still blocking new additions past the limit.
+  - Enforce `minItems` during editor submission (`InputfieldFlex`) instead of throwing on API `$page->save()`.
+  - Sanitize invalid `integer`, `float` and `date` values to `''` (matching `FieldtypeInteger`, `FieldtypeFloat` and `FieldtypeDatetime`) instead of throwing `WireException`.
+  - Default `['type' => 'file']` extensions to ProcessWire Core's standard file extension list when `extensions` is omitted.
+  - Allow `inheritField` without a redundant `type` and accept subclasses of the declared input type; coerce `editableHeaders`/`rowLabels` to `bool`, numeric-string `minItems`/`maxItems` to `int`, ignore `useLanguages` on non-Text/Textarea inputs, and accept custom developer metadata keys on row types.
+  - Replace hardcoded exact-class allowlists for table columns and media `customFields` with structural `instanceof` checks so third-party input subclasses are accepted.
+  - Keep pasted leaf values intact for native editor validation on save instead of silently dropping values that fail `minlength`, `maxlength`, `pattern`, `min` or `max`.
+  - Delegate `FlexRows::find()` to native `WireArray::filter()` via `getItemPropertyValue()` for full ProcessWire selector compatibility (`sort=`, `limit=`, `start=`, OR-fields, dot paths, unknown properties returning empty).
+  - Return empty matches instead of throwing `PageFinderSyntaxException` for unknown `_type` values, non-numeric comparisons and invalid dates in `FlexQuery` selectors.
+  - Accept standard `string` typehints on `FlexRows::rowsOfType()`/`countOfType()`, ignore unknown option keys in `FlexMediaCollection::___clone()` (with target `pagefiles` support), and ignore unknown column names in `FieldtypeFlex::saveFile()`.
 - Evaluate Flex definitions once per selector predicate and sort expression in `FlexQuery`, deduplicating nested object path traversal.
 - Skip transient `Field` allocation in `FlexMediaCollection::formatDescription()` when no textformatters are configured, read formatted custom metadata without cloning the whole `FlexValue`, target known native POST keys in `InputfieldFlexMedia`, and avoid describing unchanged files during metadata processing.
 - Migrate TypeScript admin sources from legacy `outFile` namespaces to standard ES modules bundled with `esbuild` (`tsc --noEmit` for strict type checking, IIFE output without a global `FieldtypeFlex` namespace leak, shared DOM helpers in `FlexMaintenance.js`, and slice-free JS tests).
 
+### Removed
+
+- Remove live debounced AJAX row-title keystroke previews (`row-titles` endpoint). Declarative `rowTitle` templates continue updating live in the browser, while PHP `rowTitleValues` and `rowTitleParts` hooks continue running on initial render, row insert/duplicate/paste and page save.
+- Remove the server-side cURL downloader (`FlexClipboard::download()`) in favor of inline base64 media payloads in clipboard JSON.
+
 ### Fixed
 
-- Reuse the request-local admin service so live row-title previews run in preview mode across row, field-definition and media inputs.
+- Reuse the request-local admin service instance in `FieldtypeFlex::admin()`.
 - Include nested `object` and `table` children in `flex schema` inspection output.
 - Reserve native `Pagefile`/`Pageimage` magic properties with an explicit list instead of reading runtime PHPDoc comments, preserving validation when `opcache.save_comments` is disabled.
 - Allow read-only `slice()` calls on formatted `FlexRows`, `FlexFiles` and `FlexImages` views without triggering write guards, and stop formatted `FlexRows` operations from marking the owning page changed.

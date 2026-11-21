@@ -22,7 +22,7 @@ const ref = (ref, classes) => ({choices: [{ref}], ...(classes ? {classes} : {})}
 function row(id, text = id, extra = '', title = {}) {
     const data = {nodes: [ref('heading')], values: {heading: text}, sources: {heading: {names: [`heading_${id}`], kind: 'text'}}, custom: {}, override: null, ...title};
     const encoded = JSON.stringify(data).replaceAll('&', '&amp;').replaceAll("'", '&#39;');
-    return `<li class="Inputfield flex-row" data-flex-row="${id}" data-flex-type-label="Text" data-flex-title='${encoded}' ${title.refresh ? 'data-flex-title-refresh' : ''}>
+    return `<li class="Inputfield flex-row" data-flex-row="${id}" data-flex-type-label="Text" data-flex-title='${encoded}'>
     <div class="flex-row-header">${rowCheckbox}<button type="button" class="flex-row-toggle"></button><span class="flex-row-title"></span><button type="button" class="flex-row-sort"></button>${action('duplicate')}${action('remove')}${action('visibility')}</div>
     <input class="flex-row-remove-value" name="remove_${id}" value="0"><input class="flex-row-hidden-value" name="hidden_${id}" value="0">
     <div class="flex-row-content"><div class="Inputfield"><input name="heading_${id}" value="${text}"></div>${extra}</div></li>`;
@@ -386,50 +386,53 @@ test('titles read native inline text, date parts, Page labels and per-file descr
     assert.equal(h.calls.length, 0);
     h.close();
 });
-test('hook title previews debounce edits, retain local indexes and discard stale responses', async () => {
-    const pending = [];
+test('server-provided custom title tokens and live local tokens update without AJAX title previews', async () => {
     const content = row('a', 'Alpha', '', {
         nodes: [{text: '#'}, ref('@index'), {text: ' '}, ref('heading'), {children: [{text: ' · '}, ref('@details')], classes: ['flex-muted']}],
-        custom: {'@details': 'Initial'}, refresh: true,
+        custom: {'@details': 'Initial'},
     }) + row('b', 'Beta');
-    const h = await harness(set(content + '<li data-flex-external-dependencies="enabled"></li>'), {response: () => new Promise(resolve => pending.push(resolve))});
+    const h = await harness(set(content));
     const {document: d, window: w} = h;
-    const external = d.createElement('div');
-    external.innerHTML = '<input type="checkbox" name="enabled" value="1" checked><input name="unrelated" value="secret">';
-    d.querySelector('.InputfieldFlex').before(external);
     const header = d.querySelector('[data-flex-row="a"] .flex-row-title');
     const input = d.querySelector('[name="heading_a"]');
-    const edit = value => { input.value = value; input.dispatchEvent(new w.Event('input', {bubbles: true})); };
-    const wait = () => new Promise(resolve => setTimeout(resolve, 270));
-    const respond = (index, label) => pending[index]({ok: true, json: async () => ({error: false, titles: {'blocks.a': {custom: {'@details': label}, override: null}}})});
     assert.equal(header.textContent, '#1 Alpha · Initial');
-    edit('first'); edit('second');
-    await wait();
-    assert.equal(h.calls.length, 1);
-    assert.equal(h.calls[0].body.get('heading_a'), 'second');
-    assert.equal(h.calls[0].body.get('enabled'), '1');
-    assert.equal(h.calls[0].body.has('unrelated'), false);
-    assert.deepEqual(JSON.parse(h.calls[0].body.get('flex_title_rows')), [['blocks', 'a']]);
-    edit('Newest');
-    respond(0, 'Stale');
-    await tick();
+    input.value = 'Newest';
+    input.dispatchEvent(new w.Event('input', {bubbles: true}));
     assert.equal(header.textContent, '#1 Newest · Initial');
     d.querySelector('[data-flex-row="a"] .flex-row-sort').dispatchEvent(new w.KeyboardEvent('keydown', {key: 'End', bubbles: true}));
     assert.equal(header.textContent, '#2 Newest · Initial');
-    await wait();
-    assert.equal(h.calls.length, 2);
-    respond(1, '<em>Safe</em>');
+    assert.equal(header.querySelector('.flex-muted').textContent, ' · Initial');
+    assert.equal(h.calls.length, 0);
+    h.close();
+});
+test('clipboard paste sends FormData and reports HTTP 413 upload limit errors cleanly', async () => {
+    const clipboard = '{"format":"fieldtype-flex-row","version":1}';
+    let mode = 'html';
+    const h = await harness(pickerSet(row('a').replace('</span>', '</span>' + clipboardMenu())), {
+        before(w) {
+            Object.defineProperty(w.navigator, 'clipboard', {value: {readText: () => Promise.resolve(clipboard)}});
+        },
+        response: async () => {
+            if(mode === 'html') return {ok: false, status: 413, json: async () => { throw new SyntaxError('HTML 413'); }};
+            if(mode === 'json-empty') return {ok: false, status: 413, json: async () => ({error: true})};
+            return {ok: false, status: 413, json: async () => ({error: true, message: 'Server limit hit.'})};
+        },
+    });
+    const trigger = h.document.querySelector('[data-flex-row-action="paste-above"]');
+    const error = h.document.querySelector('.flex-rows-error');
+    trigger.click();
     await tick();
-    assert.equal(header.querySelector('.flex-muted').textContent, ' · <em>Safe</em>');
-    assert.equal(header.querySelector('em'), null);
-    await wait();
-    assert.equal(h.calls.length, 2);
-    const enabled = d.querySelector('[name="enabled"]');
-    enabled.checked = false;
-    enabled.dispatchEvent(new w.Event('change', {bubbles: true}));
-    await wait();
-    assert.equal(h.calls.length, 3);
-    assert.equal(h.calls[2].body.has('enabled'), false);
+    assert(h.calls[0].body instanceof h.window.FormData, 'paste uses FormData so Base64 payloads are not URL-encoded');
+    assert.equal(h.calls[0].body.get('flex_clipboard'), clipboard);
+    assert.match(error.textContent, /upload limit/i, 'non-JSON 413 falls back to localized upload limit error');
+    mode = 'json-empty';
+    trigger.click();
+    await tick();
+    assert.match(error.textContent, /upload limit/i, 'JSON 413 without message still reports localized upload limit error');
+    mode = 'json-message';
+    trigger.click();
+    await tick();
+    assert.equal(error.textContent, 'Server limit hit.', 'JSON 413 with server message surfaces server message');
     h.close();
 });
 test('successful controls match AJAX serialization, empty selections and disabled fieldsets', async () => {

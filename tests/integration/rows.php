@@ -266,7 +266,95 @@ $minPost = [
 	FlexPath::inputPrefix($minField->name, 'items.' . $row->rowId()) . 'heading' => 'Preserved after minimum error',
 ];
 $editor->processInput($wire->wire(new WireInputData($minPost)));
-$assert(count($editor->getErrors()) > 0 && str_contains($editor->render(), 'Preserved after minimum error'), 'minimum-count validation preserves new rows in the recovery UI');
+$assert(count($editor->getErrors(true)) > 0 && str_contains($editor->render(), 'Preserved after minimum error'), 'minimum-count validation preserves new rows in the recovery UI');
 $same(0, count($editor->value->items), 'minimum-count error rejects the containing canonical value');
+
+// C-02: API saves succeed below minItems (like Core required/repeaterMinItems), while editor enforces minItems.
+$apiMinPage = $wire->pages->getFresh($id);
+$apiMinPage->of(false);
+$apiMinValue = $apiMinPage->getUnformatted($minField->name);
+$apiMinValue->items->addRow('item', ['heading' => 'Only one row via API']);
+$apiMinPage->set($minField->name, $apiMinValue);
+$apiMinPage->save($minField->name);
+$same(1, count($wire->pages->getFresh($id)->getUnformatted($minField->name)->items), 'API save allows saving fewer than minItems');
+
+// C-01: Lowering maxItems below existing rows still loads cleanly without lockout, while addRow enforces maxItems.
+$apiMinPage = $wire->pages->getFresh($id);
+$apiMinPage->of(false);
+$apiMinValue = $apiMinPage->getUnformatted($minField->name);
+$apiMinValue->items->addRow('item', ['heading' => 'Second row']);
+$apiMinValue->items->addRow('item', ['heading' => 'Third row']);
+$apiMinPage->save($minField->name);
+$minField->flexDefinition = json_encode([
+	'items' => [
+		'type' => 'rows',
+		'maxItems' => 1,
+		'types' => ['item' => ['label' => 'Item', 'children' => ['heading' => ['type' => 'text']]]],
+	],
+]);
+$minField->save();
+$overRowsPage = $wire->pages->getFresh($id);
+$overRowsPage->of(false);
+$overRowsValue = $overRowsPage->getUnformatted($minField->name);
+$same(3, count($overRowsValue->items), 'lowering maxItems still hydrates existing rows without lockout');
+$throws(fn() => $overRowsValue->items->addRow('item'), 'adding a row above lowered maxItems is still rejected');
+// P2: Editor submit can reduce/save existing rows even while still above a lowered maxItems.
+$overEditor = $minField->getInputfield($overRowsPage);
+$overEditor->value = $overRowsValue;
+$overHtml = $overEditor->render();
+preg_match('/name="' . preg_quote($minField->name . '__0draft', '/') . '" value="([a-f0-9]{64})"/', $overHtml, $overMatch);
+$overDraft = $overMatch[1] ?? '';
+$overIds = array_keys($overRowsValue->items->getArray());
+$overPost = [
+	$minField->name . '__0draft'                                  => $overDraft,
+	$minField->name . '__0complete'                               => $overDraft,
+	FlexPath::controlName($minField->name, 'items', 'present')    => '1',
+	FlexPath::controlName($minField->name, 'items', 'order')      => implode(',', $overIds),
+	FlexPath::controlName($minField->name, 'items.' . $overIds[2], 'remove') => '1',
+	FlexPath::inputPrefix($minField->name, 'items.' . $overIds[0]) . 'heading' => 'Kept first',
+	FlexPath::inputPrefix($minField->name, 'items.' . $overIds[1]) . 'heading' => 'Kept second',
+];
+$overEditor->processInput($wire->wire(new WireInputData($overPost)));
+$same([], $overEditor->getErrors(), 'editor submit allows saving existing rows after lowering maxItems');
+$same(2, count($overEditor->value->items), 'editor submit removes marked row while keeping remaining existing rows above lowered maxItems');
+// P2: Bulk API assignment must still enforce maxItems for newly introduced rows.
+$bulkTarget = $createField('flex_rows_bulk_cap', [
+	'items' => [
+		'type' => 'rows',
+		'maxItems' => 1,
+		'types' => ['item' => ['label' => 'Item', 'children' => ['heading' => ['type' => 'text']]]],
+	],
+]);
+$throws(fn() => $overRowsPage->getUnformatted($bulkTarget->name)->set('items', $overRowsValue->items), 'bulk FlexRows assignment above maxItems is rejected');
+$throws(fn() => $overRowsPage->set($bulkTarget->name, $overRowsValue->rawArray()), 'bulk page field assignment above maxItems is rejected');
+
+// P2: addRow($type, $values) recursively enforces nested maxItems on initial values.
+$nestedCapField = $createField('flex_rows_nested_cap', [
+	'sections' => [
+		'type' => 'rows',
+		'types' => [
+			'section' => [
+				'children' => [
+					'children' => [
+						'type' => 'rows',
+						'maxItems' => 1,
+						'types' => ['leaf' => ['children' => ['title' => ['type' => 'text']]]],
+					],
+				],
+			],
+		],
+	],
+]);
+$nestedCapVal = $overRowsPage->getUnformatted($nestedCapField->name);
+$throws(fn() => $nestedCapVal->sections->addRow('section', [
+	'children' => [
+		'_flex' => FlexStorage::ROWS_FORMAT,
+		'items' => [
+			['id' => bin2hex(random_bytes(16)), 'type' => 'leaf', 'values' => ['title' => 'One']],
+			['id' => bin2hex(random_bytes(16)), 'type' => 'leaf', 'values' => ['title' => 'Two']],
+		],
+	],
+]), 'addRow() rejects nested initial row arrays exceeding nested maxItems');
+
 $template->fieldgroup->remove($minField);
 $template->fieldgroup->save();

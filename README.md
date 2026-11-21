@@ -154,9 +154,10 @@ installations, language values match by language name. Page references resolve
 to existing pages with the same full path, parent path and template name. The
 destination field's local parent, template, selector and access rules still
 apply. Relative rich-text links retain their source URL. Media uses owned
-local originals when available. Remote media requires cURL and PHP's global IP
-range filter. Downloads use public IPv4 HTTPS URLs without redirects, with file
-type, size and time limits. Any skipped contents are reported in the editor.
+local originals on the same installation when available and embeds original
+files inline as base64 in the clipboard JSON for cross-site paste (up to the
+16 MB raw-data budget, bounded by PHP `post_max_size`). Any skipped contents
+are reported in the editor.
 
 ## Examples and documentation
 

@@ -192,8 +192,11 @@ foreach(['automatic', [], 'false'] as $invalid) {
 	$bad->flexDefinition = json_encode(['heading' => ['type' => 'text', 'useLanguages' => $invalid]]);
 	$throws(fn() => new FlexFieldDefs($bad, $page), 'invalid language mode is rejected', FlexDefinitionException::class, 'useLanguages must be');
 }
+$nonTextAuto = clone $autoField;
+$nonTextAuto->flexDefinition = json_encode(['qty' => ['type' => 'integer', 'useLanguages' => 'auto']]);
+$same(false, (new FlexFieldDefs($nonTextAuto, $page))->property('qty')['languages'], 'useLanguages auto is ignored on non-text inputs like Core');
 $bad = clone $autoField;
-$bad->flexDefinition = json_encode(['image' => ['type' => 'image', 'useLanguages' => 'auto']]);
-$throws(fn() => new FlexFieldDefs($bad, $page), 'auto does not enable unsupported media translations', FlexDefinitionException::class, 'requires a Text or Textarea');
+$bad->flexDefinition = json_encode(['image' => ['type' => 'image', 'useLanguages' => true]]);
+$throws(fn() => new FlexFieldDefs($bad, $page), 'explicit media useLanguages remains rejected', FlexDefinitionException::class);
 $same($before, $wire->pages->getFresh($id)->getUnformatted($autoField->name)->rawArray(), 'capability probes leave the original multilingual value unchanged');
 $assert($wire->languages instanceof Languages && $wire->modules->isInstalled('LanguageSupportFields'), 'capability probes leave real language support installed');

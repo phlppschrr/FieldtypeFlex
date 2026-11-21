@@ -127,8 +127,11 @@ class FlexQuery extends Wire {
 			$count = $this->mediaCount($field, $root, $defs);
 			if($subfield === $root && $value === '' && in_array($operator, ['=', '!='], true)) {
 				$query->where("$count" . ($operator === '=' ? '=0' : '>0'));
-			} else if($subfield === $root . '.count' && is_numeric($value)) {
-				$query->where($this->compare($query, $count, $operator, 0 + $value, self::NUMBER_OPERATORS));
+			} else if($subfield === $root . '.count') {
+				$this->assertOperator($operator, self::NUMBER_OPERATORS);
+				$query->where(is_numeric($value)
+					? $this->compare($query, $count, $operator, 0 + $value, self::NUMBER_OPERATORS)
+					: ($operator === '!=' ? '1=1' : '1=0'));
 			} else {
 				throw new PageFinderSyntaxException($this->_('Use a Flex media count or blank selector'));
 			}
@@ -278,9 +281,10 @@ class FlexQuery extends Wire {
 			return $operator === '=' ? $empty : "NOT $empty";
 		}
 		if($def['kind'] === 'date') {
+			$this->assertOperator($operator, self::NUMBER_OPERATORS);
 			$timestamp = strtotime((string) $value);
 			if($timestamp === false) {
-				throw new PageFinderSyntaxException($this->_('Invalid Flex date selector'));
+				return '1=0';
 			}
 			$value = date(preg_match('/\d{2}:\d{2}/', (string) $value) ? 'Y-m-d H:i:s' : 'Y-m-d', $timestamp);
 		}
@@ -294,8 +298,11 @@ class FlexQuery extends Wire {
 			return $operator === '=' ? "$contains=1" : "$contains=0";
 		} else {
 			$numeric = in_array($def['kind'], ['integer', 'float', 'page'], true);
-			if($numeric && !is_numeric($value)) {
-				throw new PageFinderSyntaxException($this->_('Numeric Flex selectors require a number'));
+			if($numeric) {
+				$this->assertOperator($operator, self::NUMBER_OPERATORS);
+				if(!is_numeric($value)) {
+					return '1=0';
+				}
 			}
 			return $this->compare(
 				$query,
@@ -358,10 +365,13 @@ class FlexQuery extends Wire {
 			if(count($parts) === 1 && $value === '' && in_array($operator, ['=', '!='], true)) {
 				return "$count" . ($operator === '=' ? '=0' : '>0');
 			}
-			if($parts !== [$parts[0], 'count'] || !is_numeric($value)) {
+			if($parts !== [$parts[0], 'count']) {
 				throw new PageFinderSyntaxException($this->_('Use a row media count or blank selector'));
 			}
-			return $this->compare($query, $count, $operator, 0 + $value, self::NUMBER_OPERATORS);
+			$this->assertOperator($operator, self::NUMBER_OPERATORS);
+			return is_numeric($value)
+				? $this->compare($query, $count, $operator, 0 + $value, self::NUMBER_OPERATORS)
+				: ($operator === '!=' ? '1=1' : '1=0');
 		}
 		if(count($parts) !== 1) {
 			throw new PageFinderSyntaxException(sprintf($this->_('Invalid row property path: %s'), $name));
@@ -517,14 +527,15 @@ class FlexQuery extends Wire {
 		$conditions[] = $parent === null ? "$first.parent_row_key=''" : "$first.parent_row_key=$parent.row_key";
 		$from .= ' WHERE ' . implode(' AND ', $conditions);
 		if($mode === 'count') {
+			$this->assertOperator($operator, self::NUMBER_OPERATORS);
 			if(!is_numeric($value)) {
-				throw new PageFinderSyntaxException($this->_('Flex counts require a number'));
+				return $operator === '!=' ? '1=1' : '1=0';
 			}
 			return $this->compare($query, "(SELECT COUNT(*) $from)", $operator, 0 + $value, self::NUMBER_OPERATORS);
 		}
 		if($mode === '_type') {
-			if(!in_array($operator, ['=', '!='], true) || !is_string($value) || ($value !== '' && !isset($definition['types'][$value]))) {
-				throw new PageFinderSyntaxException($this->_('Flex row type selectors require = or != and a known type or blank'));
+			if(!in_array($operator, ['=', '!='], true) || !is_string($value)) {
+				throw new PageFinderSyntaxException($this->_('Flex row type selectors require = or != and a type string or blank'));
 			}
 			if($value !== '') {
 				$key = $query->bindValueGetKey($value);
@@ -578,10 +589,14 @@ class FlexQuery extends Wire {
 		return $rest ? ($leafSchema->property($rest[0])['kind'] ?? '') : 'object';
 	}
 
-	private function compare($query, string $expression, string $operator, $value, array $allowed): string {
+	private function assertOperator(string $operator, array $allowed): void {
 		if(!in_array($operator, $allowed, true)) {
 			throw new PageFinderSyntaxException(sprintf($this->_('Unsupported Flex selector operator: %s'), $operator));
 		}
+	}
+
+	private function compare($query, string $expression, string $operator, $value, array $allowed): string {
+		$this->assertOperator($operator, $allowed);
 		if(in_array($operator, self::NUMBER_OPERATORS, true)) {
 			$key = $query->bindValueGetKey($value);
 			return "$expression $operator $key";

@@ -69,6 +69,9 @@ $same(1, count($rows->find('_type=image')->find('heading!=Gallery')), 'chained s
 $same($raw, $value->rawArray(), 'find preserves canonical data and identities');
 $same(false, $value->isChanged(), 'find does not mark rows or owner changed');
 $same(false, $page->isChanged($name), 'find does not mark owning field changed');
+$cleanSelection = $rows->find('_type=text');
+$same(false, $cleanSelection->isChanged(), 'find result starts clean without recording filter removals as changes');
+$same([], $cleanSelection->getItemsRemoved(), 'find result records no removed items');
 $selection = $rows->find('_type=text');
 $selection->removeRow($blank->rowId());
 $same(5, count($rows), 'result membership is independent of source collection');
@@ -78,11 +81,12 @@ $same('Shared row edit', $a->body, 'selected rows remain shared owned objects');
 $rows->find('_type=text');
 $same(true, $a->isChanged('body'), 'find retains pre-existing changes on shared rows');
 $a->body = 'Other';
-foreach(['missing=x', 'photo.name=x', '_type>image', 'number*=2', '@heading=x', 'heading|body=x', 'notes.note.heading=X', 'photo.count=', 'sort=heading'] as $invalid) {
-	$throws(fn() => $rows->find($invalid), 'runtime rejects invalid or unsupported selector: ' . $invalid);
-}
-$empty = $rows->makeNew();
-$throws(fn() => $empty->find('missing=x'), 'empty runtime collection still validates paths');
+// Native WireArray::find() semantics: unknown paths return empty, OR fields / sort / limit / start work.
+$same(0, count($rows->find('missing=x')), 'unknown runtime property returns empty collection like PageArray::find()');
+$same(0, count($rows->makeNew()->find('missing=x')), 'empty runtime collection returns empty for unknown property');
+$same(2, count($rows->find('heading|body*=Other')), 'OR fields work natively in FlexRows::find()');
+$same([$b->rowId()], array_keys($rows->find('_type=text, sort=-number, limit=1')->getArray()), 'sort and limit directives work natively in FlexRows::find()');
+$same([$a->rowId()], array_keys($rows->find('_type=text, sort=-number, start=1, limit=1')->getArray()), 'start and limit pagination work natively in FlexRows::find()');
 $fresh = $wire->pages->getFresh($id);
 $fresh->of(true);
 $formatted = $fresh->get($name)->blocks;
@@ -141,6 +145,8 @@ $same([], $find("@$name.blocks.image.heading=Hidden, @$name.blocks.image.photo.c
 $same([], $find("@$name.blocks.text.notes.note.heading=Secret, @$name.blocks.text.notes.note.number=4"), '@ SQL excludes hidden descendants');
 $same([$id], $find("@$name.blocks.image.heading=Gallery, @$name.blocks.image.photo.count=3"), '@ SQL supports media counts on same image row');
 $same([], $find("@$name.blocks.image.heading=Gallery, @$name.blocks.image.photo.count=0"), '@ SQL media count cannot match another row');
+$same([], $find("@$name.blocks.image.heading=Gallery, @$name.blocks.image.photo.count=abc"), '@ SQL non-numeric media count equality returns no matches');
+$same([$id], $find("@$name.blocks.image.heading=Gallery, @$name.blocks.image.photo.count!=abc"), '@ SQL non-numeric media count inequality keeps matching row');
 $same([], $find("id=$second->id, @$name.blocks.text.heading=, @$name.blocks.text.body!=ProcessWire"), '@ positive same-row needs an actual row even for blank and negative conditions');
 $same([$second->id], $find("$name.blocks.text.heading!=Other"), 'ungrouped negative still includes absent collection');
 foreach(["@$name.blocks.text.heading=x, @$name.blocks.image.heading=x", "@$name.blocks._type=text", "@$name.blocks.text.count=0", "@$name.blocks.text.missing=x", "@$name.blocks.text.notes.note.photo.name=x", "@$name.blocks.text.notes._type=note"] as $invalid) {
