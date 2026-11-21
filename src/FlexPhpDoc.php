@@ -24,7 +24,7 @@ final class FlexPhpDoc {
 				if($def['kind'] === 'object') {
 					$type = $name('FlexValue', $propertyPath);
 					$walk($def['schema'], $type, 'FlexValue', $propertyPath);
-				} elseif($def['kind'] === 'rows') {
+				} else if($def['kind'] === 'rows') {
 					$collection = $name('FlexRows', $propertyPath);
 					$rows = [];
 					foreach($def['types'] as $key => $row) {
@@ -35,7 +35,7 @@ final class FlexPhpDoc {
 					$rowType = implode('|', $rows);
 					$classes[] = "/**\n * @method $rowType|false first()\n * @method $rowType|false last()\n */\nclass $collection extends FlexRows {}";
 					$type = $collection . '|' . implode('|', array_map(static fn($row) => $row . '[]', $rows));
-				} elseif(in_array($def['kind'], ['file', 'image'], true)) {
+				} else if(in_array($def['kind'], ['file', 'image'], true)) {
 					$image = $def['kind'] === 'image';
 					$item = $image ? 'FlexPageimage' : 'FlexPagefile';
 					$collection = $image ? 'FlexImages' : 'FlexFiles';
@@ -49,7 +49,7 @@ final class FlexPhpDoc {
 					if($settings['outputFormat'] === 2 || ($settings['outputFormat'] === 0 && $settings['maxFiles'] === 1)) {
 						$type .= '|' . $item . '|null';
 					}
-				} elseif($input instanceof InputfieldToggle) {
+				} else if($input instanceof InputfieldToggle) {
 					$type = match($def['settings']['formatType']) {
 						1 => 'int|string|bool',
 						default => 'int|string',

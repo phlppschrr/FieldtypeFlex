@@ -433,10 +433,11 @@
     margin: 0;
 }
 .AdminThemeUikitDefault .flex-rows li.flex-row > .flex-row-header {
-    /* Match Konkat's native header, including its collapsed hover specificity. */
+    /* Match Konkat's native header, including its collapsed hover specificity; keep surface opaque and fade contents instead. */
     background-color: var(--pw-inputs-background) !important;
     border: 1px solid var(--pw-border-color);
     color: var(--pw-text-color);
+    opacity: 1;
 }
 .AdminThemeUikitDefault .flex-row-header > .flex-row-bar { min-height: 2.2rem; }
 .AdminThemeUikitDefault .flex-rows li.flex-row > .flex-row-header-bold {
@@ -499,10 +500,6 @@
 }
 .flex-row.flex-row-hidden > .flex-row-header {
     opacity: .5;
-}
-/* Default/Konkat preserves the header surface and fades its contents instead. */
-.AdminThemeUikitDefault .flex-rows li.flex-row > .flex-row-header {
-    opacity: 1;
 }
 .AdminThemeUikit:not(.AdminThemeUikitOriginal) .flex-row-hidden > .flex-row-header .flex-row-bar > * {
     opacity: .5;
