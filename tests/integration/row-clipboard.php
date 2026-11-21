@@ -247,10 +247,208 @@ $same(1, count($actual->notes), 'unsupported nested types are skipped');
 $same($firstReference->id, $actual->link instanceof Page ? $actual->link->id : $actual->link, 'paste resolves the portable reference to the local Page despite a colliding source ID');
 $same([$secondReference->id, $firstReference->id], array_map('intval', $actual->links->explode('id')), 'valid multiple references retain their order around a rejected parent');
 $assert(str_contains($cross['warning'], 'links'), 'a partial Page selection reports the skipped reference');
-$same(0, count($actual->images), 'an unavailable original does not leave a media reference');
-$assert(str_contains($cross['warning'], 'amount') && str_contains($cross['warning'], $file->basename()), 'the result reports individual skipped properties and filenames: ' . $cross['warning']);
+$same(1, count($actual->images), 'cross-site paste imports inline Base64 original media without outbound HTTP requests');
+$crossImage = $actual->images->first();
+$same(file_get_contents($file->filename()), file_get_contents($crossImage->filename()), 'cross-site Base64 image preserves exact original bytes');
+$same('Image description', $crossImage->rawDescription(), 'cross-site Base64 image preserves native description');
+$same('Photographer', $crossImage->getFieldValue('credit', false), 'cross-site Base64 image preserves custom metadata');
+$assert(str_contains($cross['warning'], 'amount'), 'the result reports individual skipped properties: ' . $cross['warning']);
 $assert(str_contains($actual->body, 'https://example.test/original-link/') && !str_contains($actual->body, 'bad()'), 'HTML is purified and relative links retain their source site');
 $same(true, $ajax($second, $target, $targetDraft, $paste($targetSet, 'paste-end', [$cross['id']], $text))['error'], 'paste enforces the target collection maximum');
+
+// Cross-site files without inline data (e.g. exceeding export budget) or with corrupt Base64 are skipped cleanly without HTTP fetches.
+$omittedImage = $crossSite;
+unset($omittedImage['row']['values']['images']['value'][0]['data']);
+$probeOmitted = $type->getBlankValue($second, $target);
+$probeOmittedParent = $probeOmitted->parents->addRow('group');
+$omittedClipboard = $wire->wire(new FlexClipboard());
+[$omittedRow] = $omittedClipboard->paste($probeOmittedParent->children, $probeOmittedParent->definitions()->property('children'), json_encode($omittedImage, JSON_THROW_ON_ERROR), $targetDraft);
+$same(0, count($omittedRow->images), 'cross-site image without inline data is skipped without leaving a media reference');
+$assert(str_contains($omittedClipboard->warningSummary(), $file->basename()), 'omitted cross-site image filename is reported');
+$corruptImage = $crossSite;
+$corruptImage['row']['values']['images']['value'][0]['data'] = base64_encode('not a valid png image');
+$corruptClipboard = $wire->wire(new FlexClipboard());
+$probeCorruptParent = $type->getBlankValue($second, $target)->parents->addRow('group');
+[$corruptRow] = $corruptClipboard->paste($probeCorruptParent->children, $probeCorruptParent->definitions()->property('children'), json_encode($corruptImage, JSON_THROW_ON_ERROR), $targetDraft);
+$same(0, count($corruptRow->images), 'corrupt cross-site Base64 image fails image validation and is skipped');
+$assert(str_contains($corruptClipboard->warningSummary(), $file->basename()), 'corrupt cross-site image filename is reported');
+
+// C-09: Pasting leaves editor constraint violations (maxlength/min/max) visible for correction instead of silently dropping values.
+$constrainedField = $createField('flex_clip_constraints', [
+	'items' => [
+		'type' => 'rows',
+		'types' => [
+			'card' => [
+				'children' => [
+					'heading' => ['type' => 'text', 'maxlength' => 5],
+					'amount' => ['type' => 'integer', 'min' => 1, 'max' => 3],
+					'ratio' => ['type' => 'float', 'min' => 0.5, 'max' => 2.5],
+				],
+			],
+		],
+	],
+]);
+$constrainedValue = $type->getBlankValue($second, $constrainedField);
+$constrainedDraft = $type->admin()->open($constrainedValue, $constrainedField->name);
+$constrainedClipboard = $wire->wire(new FlexClipboard());
+$constrainedPayload = json_decode($text, true, 64, JSON_THROW_ON_ERROR);
+$constrainedPayload['row']['values']['ratio'] = ['kind' => 'float', 'value' => 9.5];
+[$constrainedRow] = $constrainedClipboard->paste($constrainedValue->items, $constrainedValue->definitions()->property('items'), json_encode($constrainedPayload, JSON_THROW_ON_ERROR), $constrainedDraft);
+$same('Unsaved heading', $constrainedRow->heading, 'clipboard keeps text exceeding maxlength so the editor can correct it on save');
+$same(7, $constrainedRow->amount, 'clipboard keeps integer outside min/max so the editor can correct it on save');
+$same(9.5, $constrainedRow->ratio, 'clipboard keeps float outside min/max so the editor can correct it on save');
+// P2: Out-of-range integer/float values must render visibly in their inputs and fail native validation on submit.
+$constrainedInputs = $constrainedRow->definitions()->getInputfields($constrainedRow, FlexPath::inputPrefix($constrainedField->name, $constrainedRow->address()), $constrainedDraft, $constrainedValue, $constrainedValue, $constrainedField->name);
+$renderedConstrained = $constrainedInputs->render();
+$assert(str_contains($renderedConstrained, 'value="7"') || str_contains($renderedConstrained, "value='7'"), 'out-of-range integer renders visibly instead of vanishing');
+$assert(str_contains($renderedConstrained, 'value="9.5"') || str_contains($renderedConstrained, "value='9.5'"), 'out-of-range float renders visibly instead of vanishing');
+$amountName = FlexPath::inputPrefix($constrainedField->name, $constrainedRow->address()) . 'amount';
+$ratioName = FlexPath::inputPrefix($constrainedField->name, $constrainedRow->address()) . 'ratio';
+$constrainedPost = [$amountName => '7', $ratioName => '9.5'];
+$constrainedInputs->processInput($wire->wire(new WireInputData($constrainedPost)));
+$assert(count($constrainedInputs->getErrors()) >= 2, 'submitting rendered out-of-range integer and float triggers native validation errors');
+
+// P2: Same-site paste imports owned local originals directly without requiring inline Base64 data.
+$sameSiteNoInline = json_decode($text, true, 64, JSON_THROW_ON_ERROR);
+unset($sameSiteNoInline['row']['values']['images']['value'][0]['data']);
+$sameSiteNoInlineClipboard = $wire->wire(new FlexClipboard());
+$probeLocalParent = $type->getBlankValue($second, $target)->parents->addRow('group');
+[$localNoInlineRow] = $sameSiteNoInlineClipboard->paste($probeLocalParent->children, $probeLocalParent->definitions()->property('children'), json_encode($sameSiteNoInline, JSON_THROW_ON_ERROR), $targetDraft);
+$same(1, count($localNoInlineRow->images), 'same-site paste imports owned local original directly even when inline Base64 data is omitted');
+
+// P1/P2: Same-site paste validates the staged copy, re-verifies post-validator size/image integrity and cleans up on throw.
+$sourceOriginalPath = $file->filename();
+$sourceOriginalBytes = file_get_contents($sourceOriginalPath);
+$validatedPaths = [];
+$validatorMode = 'sanitize';
+$origSanitizer = $wire->wire('sanitizer');
+$mutatingSanitizer = new class($validatedPaths, $validatorMode) extends Sanitizer {
+	private array $paths;
+	private string $mode;
+	public function __construct(array &$paths, string &$mode) {
+		$this->paths = &$paths;
+		$this->mode = &$mode;
+		parent::__construct();
+	}
+	public function validateFile($filename, array $options = []) {
+		$this->paths[] = (string) $filename;
+		if($this->mode === 'throw') {
+			throw new \RuntimeException('Third-party validator failure');
+		}
+		if($this->mode === 'corrupt') {
+			file_put_contents($filename, 'corrupted-not-an-image');
+			return true;
+		}
+		if($this->mode === 'bloat') {
+			file_put_contents($filename, (string) file_get_contents($filename) . str_repeat('B', 4096));
+			return true;
+		}
+		file_put_contents($filename, (string) file_get_contents($filename) . 'MUTATED-BY-VALIDATOR');
+		return $this->mode === 'sanitize';
+	}
+};
+$wire->wire($mutatingSanitizer);
+$wire->wire('sanitizer', $mutatingSanitizer);
+try {
+	// Case 1: In-place sanitizing FileValidator succeeds (returns true) — target copy gets sanitized bytes, source original stays untouched.
+	$probeSanitizedParent = $type->getBlankValue($second, $target)->parents->addRow('group');
+	$sanitizedClipboard = $wire->wire(new FlexClipboard());
+	[$sanitizedRow] = $sanitizedClipboard->paste($probeSanitizedParent->children, $probeSanitizedParent->definitions()->property('children'), json_encode($sameSiteNoInline, JSON_THROW_ON_ERROR), $targetDraft);
+	$same(1, count($sanitizedRow->images), 'in-place sanitizing FileValidator keeps the sanitized target copy');
+	$assert(count($validatedPaths) === 1 && $validatedPaths[0] !== $sourceOriginalPath, 'same-site paste runs validateFile on the staged target copy, never the source original');
+	$same($sourceOriginalBytes, file_get_contents($sourceOriginalPath), 'in-place sanitizing FileValidator leaves source original bytes unchanged');
+	$same($sourceOriginalBytes . 'MUTATED-BY-VALIDATOR', file_get_contents($sanitizedRow->images->first()->filename()), 'in-place sanitizing FileValidator applies only to the staged target copy');
+	// Case 2: Mutating FileValidator fails (returns false) — target copy is rejected/abandoned and source original stays untouched.
+	$validatorMode = 'reject';
+	$probeProtectedParent = $type->getBlankValue($second, $target)->parents->addRow('group');
+	$protectedClipboard = $wire->wire(new FlexClipboard());
+	[$protectedRow] = $protectedClipboard->paste($probeProtectedParent->children, $probeProtectedParent->definitions()->property('children'), json_encode($sameSiteNoInline, JSON_THROW_ON_ERROR), $targetDraft);
+	$same(0, count($protectedRow->images), 'failing FileValidator rejects the staged copy');
+	$same($sourceOriginalBytes, file_get_contents($sourceOriginalPath), 'failing mutating FileValidator leaves source original bytes unchanged');
+	// Case 3: Post-validator corrupted image is rejected even if validator returned true.
+	$validatorMode = 'corrupt';
+	$probeCorruptPost = $type->getBlankValue($second, $target)->parents->addRow('group');
+	$corruptPostClipboard = $wire->wire(new FlexClipboard());
+	[$corruptPostRow] = $corruptPostClipboard->paste($probeCorruptPost->children, $probeCorruptPost->definitions()->property('children'), json_encode($sameSiteNoInline, JSON_THROW_ON_ERROR), $targetDraft);
+	$same(0, count($corruptPostRow->images), 'image corrupted by validator is rejected after validation');
+	// Case 4: Post-validator file exceeding maxFilesize is rejected even if source was within limit.
+	$smallCapField = $createField('flex_clip_small_cap', [
+		'items' => ['type' => 'rows', 'types' => ['card' => ['children' => ['images' => ['type' => 'image', 'maxFilesize' => 1024]]]]],
+	]);
+	$smallCapVal = $type->getBlankValue($second, $smallCapField);
+	$smallCapDraft = $type->admin()->open($smallCapVal, $smallCapField->name);
+	$validatorMode = 'bloat';
+	$bloatClipboard = $wire->wire(new FlexClipboard());
+	[$bloatRow] = $bloatClipboard->paste($smallCapVal->items, $smallCapVal->definitions()->property('items'), json_encode($sameSiteNoInline, JSON_THROW_ON_ERROR), $smallCapDraft);
+	$same(0, count($bloatRow->images), 'file bloated past maxFilesize by validator is rejected after validation');
+	// Case 5: Non-WireException thrown by a validator still abandons the staged asset cleanly.
+	$validatorMode = 'throw';
+	$assetsBeforeThrow = (int) $wire->database->query('SELECT COUNT(*) FROM fieldtype_flex_assets WHERE fields_id=' . (int) $smallCapField->id)->fetchColumn();
+	$throwVal = $type->getBlankValue($second, $smallCapField);
+	$throwClipboard = $wire->wire(new FlexClipboard());
+	$throws(
+		fn() => $throwClipboard->paste($throwVal->items, $throwVal->definitions()->property('items'), json_encode($sameSiteNoInline, JSON_THROW_ON_ERROR), $smallCapDraft),
+		'non-WireException from FileValidator propagates after cleanup',
+		\RuntimeException::class
+	);
+	$assetsAfterThrow = (int) $wire->database->query('SELECT COUNT(*) FROM fieldtype_flex_assets WHERE fields_id=' . (int) $smallCapField->id)->fetchColumn();
+	$same($assetsBeforeThrow, $assetsAfterThrow, 'throwing non-WireException validator does not leak a staged asset record');
+	$same($sourceOriginalBytes, file_get_contents($sourceOriginalPath), 'all validator failure modes leave source original bytes unchanged');
+} finally {
+	$wire->wire('sanitizer', $origSanitizer);
+}
+
+// P2: Target paste rejects payloads exceeding the receiving server memory budget before decoding JSON.
+$prevMemLimit = ini_get('memory_limit');
+$tightLimitBytes = memory_get_usage(true) + 8388608 + 16384;
+$changedMem = @ini_set('memory_limit', (string) $tightLimitBytes);
+if($changedMem !== false) {
+	try {
+		$bigPayload = str_repeat(' ', 20000);
+		$memClipboard = $wire->wire(new FlexClipboard());
+		$probeMemParent = $type->getBlankValue($second, $target)->parents->addRow('group');
+		$throws(
+			fn() => $memClipboard->paste($probeMemParent->children, $probeMemParent->definitions()->property('children'), $bigPayload, $targetDraft),
+			'paste rejects payloads exceeding the target server memory budget before json_decode',
+			WireException::class,
+			'memory'
+		);
+	} finally {
+		@ini_set('memory_limit', (string) $prevMemLimit);
+	}
+}
+
+// P2: Oversized POST dropped by PHP post_max_size returns HTTP 413 upload-limit error instead of CSRF error.
+$prevMethod = $_SERVER['REQUEST_METHOD'] ?? null;
+$prevLen = $_SERVER['CONTENT_LENGTH'] ?? null;
+$prevDraftHeader = $_SERVER['HTTP_X_FLEX_DRAFT'] ?? null;
+$prevFieldHeader = $_SERVER['HTTP_X_FIELDNAME'] ?? null;
+$prevPost = $_POST;
+$prevFiles = $_FILES;
+$prevCode = http_response_code();
+try {
+	$_SERVER['REQUEST_METHOD'] = 'POST';
+	$_SERVER['CONTENT_LENGTH'] = (string) (max(FlexClipboard::iniBytes('post_max_size'), 1048576) + 1024);
+	$_SERVER['HTTP_X_FLEX_DRAFT'] = $targetDraft;
+	$_SERVER['HTTP_X_FIELDNAME'] = $target->name;
+	$_POST = [];
+	$_FILES = [];
+	$overflowEvent = new HookEvent(['arguments' => [$second]]);
+	ob_start();
+	$type->admin()->ajax($overflowEvent);
+	$overflowOut = json_decode((string) ob_get_clean(), true);
+	$same(true, $overflowOut['error'] ?? false, 'oversized POST returns an error JSON payload');
+	$assert(str_contains((string) ($overflowOut['message'] ?? ''), 'upload limit'), 'oversized POST reports upload limit instead of CSRF failure');
+} finally {
+	if($prevMethod === null) unset($_SERVER['REQUEST_METHOD']); else $_SERVER['REQUEST_METHOD'] = $prevMethod;
+	if($prevLen === null) unset($_SERVER['CONTENT_LENGTH']); else $_SERVER['CONTENT_LENGTH'] = $prevLen;
+	if($prevDraftHeader === null) unset($_SERVER['HTTP_X_FLEX_DRAFT']); else $_SERVER['HTTP_X_FLEX_DRAFT'] = $prevDraftHeader;
+	if($prevFieldHeader === null) unset($_SERVER['HTTP_X_FIELDNAME']); else $_SERVER['HTTP_X_FIELDNAME'] = $prevFieldHeader;
+	$_POST = $prevPost;
+	$_FILES = $prevFiles;
+	if(!headers_sent()) http_response_code($prevCode ?: 200);
+}
+$type->admin()->forget($constrainedDraft);
 
 // Batch copy uses the same submitted values and preserves the selected order.
 $batchPost = ['flex_sources' => $banner->rowId() . ',' . $card->rowId()] + $copy + $post;

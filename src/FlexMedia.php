@@ -257,6 +257,7 @@ trait FlexMediaCollection {
 	private array $flexDefinition;
 	private bool $flexHydrating = true;
 	private array $pendingCopies = [];
+	private array $pendingTempDirs = [];
 	private string $flexDraft = '';
 	private bool $rawDescriptions = false;
 	private ?FlexFieldDefs $flexMetadataSchema = null;
@@ -365,7 +366,6 @@ trait FlexMediaCollection {
 			}
 			WireArray::add($item);
 		}
-		$this->checkLimit();
 		$this->flexHydrating = false;
 		$this->resetTrackChanges();
 	}
@@ -508,7 +508,11 @@ trait FlexMediaCollection {
 			return $this;
 		}
 		if(!is_string($item)) {
-			throw new WireException($this->_('Add a local file path or Pagefile to a Flex media collection'));
+			throw new WireException($this->_('Add a local file path, remote HTTP(S) URL or Pagefile to a Flex media collection'));
+		}
+		if(preg_match('/^https?:\/\//i', $item)) {
+			$this->addRemoteUrl($item);
+			return $this;
 		}
 		$record = $this->field->type->media()->assetByName($this->page, basename($item));
 		if(
@@ -542,6 +546,97 @@ trait FlexMediaCollection {
 		return $this;
 	}
 
+	/** Download an HTTP(S) URL via native WireHttp, validate it and stage it as an owned copy. */
+	private function addRemoteUrl(string $url): void {
+		$path = (string) parse_url($url, PHP_URL_PATH);
+		$basename = rawurldecode(basename($path));
+		$clean = $this->wire()->sanitizer->filename($basename, Sanitizer::translate);
+		$ext = strtolower(pathinfo($clean, PATHINFO_EXTENSION));
+		$extensions = preg_split(
+			'/[\s,]+/',
+			strtolower((string) ($this->flexDefinition['settings']['extensions'] ?? ($this instanceof Pageimages ? 'jpg jpeg gif png' : 'pdf doc docx xls xlsx gif jpg jpeg png'))),
+			-1,
+			PREG_SPLIT_NO_EMPTY
+		);
+		if($clean === '' || !in_array($ext, $extensions, true)) {
+			throw new WireException($this->_('Unsupported file extension'));
+		}
+		$max = (int) ($this->flexDefinition['settings']['maxFilesize'] ?? 0);
+		$http = $this->wire(new WireHttp());
+		$url = $http->validateURL($url, true);
+		if(!preg_match('/^https?:\/\//i', $url)) {
+			throw new WireException($this->_('Unable to download remote file'));
+		}
+		// Use a unique per-download directory because WireFileTools::tempDir() caches by name.
+		$tempDir = $this->wire()->files->tempDir('FlexMedia-' . bin2hex(random_bytes(8)));
+		$tempFile = $tempDir->get() . $clean;
+		$keepTempDir = false;
+		try {
+			$tooLarge = $this->_('File exceeds maxFilesize');
+			$options = ['timeout' => 30];
+			$curlOpts = [];
+			if(defined('CURLOPT_MAXREDIRS')) $curlOpts[CURLOPT_MAXREDIRS] = 3;
+			if(defined('CURLOPT_PROTOCOLS_STR') && defined('CURLOPT_REDIR_PROTOCOLS_STR')) {
+				$curlOpts[CURLOPT_PROTOCOLS_STR] = 'http,https';
+				$curlOpts[CURLOPT_REDIR_PROTOCOLS_STR] = 'http,https';
+			} else if(defined('CURLOPT_PROTOCOLS') && defined('CURLOPT_REDIR_PROTOCOLS') && defined('CURLPROTO_HTTP') && defined('CURLPROTO_HTTPS')) {
+				$curlOpts[CURLOPT_PROTOCOLS] = CURLPROTO_HTTP | CURLPROTO_HTTPS;
+				$curlOpts[CURLOPT_REDIR_PROTOCOLS] = CURLPROTO_HTTP | CURLPROTO_HTTPS;
+			}
+			if($curlOpts) $options['curl_setopt'] = $curlOpts;
+			$http->download($url, $tempFile, $options);
+			if(!is_file($tempFile) || !is_readable($tempFile)) {
+				throw new WireException($this->_('Unable to download remote file'));
+			}
+			// Guard against truncated WireHttp fopen fallback downloads when the final response declares Content-Length.
+			$expectedLength = null;
+			$ignoreLength = false;
+			foreach((array) $http->getResponseHeader() as $line) {
+				if(preg_match('/^HTTP\/\S+\s+\d{3}\b/i', $line)) {
+					$expectedLength = null;
+					$ignoreLength = false;
+				} else if(preg_match('/^Content-Length:\s*(\d+)$/i', trim($line), $m)) {
+					$expectedLength = (int) $m[1];
+				} else if(preg_match('/^(?:Transfer-Encoding|Content-Encoding):/i', trim($line))) {
+					$ignoreLength = true;
+				}
+			}
+			if(!$ignoreLength && $expectedLength !== null && filesize($tempFile) !== $expectedLength) {
+				throw new WireException($this->_('Unable to download remote file'));
+			}
+			if($max && filesize($tempFile) > $max) {
+				throw new WireException($tooLarge);
+			}
+			if($this instanceof Pageimages && !@getimagesize($tempFile)) {
+				throw new WireException($this->_('Invalid image file'));
+			}
+			if($this->wire()->sanitizer->validateFile($tempFile, ['page' => $this->page, 'field' => $this->field]) === false) {
+				throw new WireException($this->_('Invalid remote file'));
+			}
+			clearstatcache(true, $tempFile);
+			if($max && filesize($tempFile) > $max) {
+				throw new WireException($tooLarge);
+			}
+			if($this instanceof Pageimages && !@getimagesize($tempFile)) {
+				throw new WireException($this->_('Invalid image file'));
+			}
+			$meta = [
+				'id'       => bin2hex(random_bytes(16)),
+				'basename' => $clean,
+			];
+			FlexMedia::validateMeta($meta);
+			$this->appendCopy($meta, $tempFile);
+			if(!$this->page->id) {
+				$this->pendingTempDirs[$meta['id']] = $tempDir;
+				$keepTempDir = true;
+			}
+		} finally {
+			if(!$keepTempDir) {
+				$tempDir->remove();
+			}
+		}
+	}
+
 	/**
 	 * Assign a value through the collection’s ownership and type checks.
 	 *
@@ -571,6 +666,12 @@ trait FlexMediaCollection {
 		if($file->pagefiles !== $this || !isset($this->data[$file->basename()])) {
 			throw new WireException($this->_('File does not belong to this collection'));
 		}
+		$id = $file->assetId();
+		if(isset($this->pendingTempDirs[$id])) {
+			$this->pendingTempDirs[$id]->remove();
+			unset($this->pendingTempDirs[$id]);
+		}
+		unset($this->pendingCopies[$id]);
 		return WireArray::remove($file->basename());
 	}
 
@@ -683,7 +784,8 @@ trait FlexMediaCollection {
 				}
 			}
 			if(!$file) {
-				unset($this->pendingCopies[$id]);
+				if(isset($this->pendingTempDirs[$id])) $this->pendingTempDirs[$id]->remove();
+				unset($this->pendingCopies[$id], $this->pendingTempDirs[$id]);
 				continue;
 			}
 			if($this->page->get('_cloning') instanceof Page) {
@@ -699,7 +801,8 @@ trait FlexMediaCollection {
 				}
 				$this->rekeyFile($old, $file);
 			}
-			unset($this->pendingCopies[$id]);
+			if(isset($this->pendingTempDirs[$id])) $this->pendingTempDirs[$id]->remove();
+			unset($this->pendingCopies[$id], $this->pendingTempDirs[$id]);
 		}
 	}
 
@@ -710,7 +813,6 @@ trait FlexMediaCollection {
 	 */
 	public function prepareCommit(): void {
 		$this->preparePending();
-		$this->checkLimit();
 		foreach($this as $file) {
 			if((int) $file->created === 10 || !$file->created) {
 				$file->created = time();
@@ -900,6 +1002,30 @@ trait FlexMediaCollection {
 		$this->data = [];
 		$this->flexHydrating = true;
 		$this->hookIDs = [];
+		// Duplicate pending temp files so removing from a clone never deletes bytes needed by the source.
+		$clonedDirs = [];
+		$clonedCopies = $this->pendingCopies;
+		try {
+			foreach($this->pendingTempDirs as $id => $tempDir) {
+				$source = $clonedCopies[$id] ?? null;
+				if(!is_string($source) || !is_file($source)) {
+					throw new WireException($this->_('Unable to clone pending media file'));
+				}
+				$dir = $this->wire()->files->tempDir('FlexMedia-' . bin2hex(random_bytes(8)));
+				$dest = $dir->get() . basename($source);
+				if(!@copy($source, $dest)) {
+					$dir->remove();
+					throw new WireException($this->_('Unable to clone pending media file'));
+				}
+				$clonedDirs[$id] = $dir;
+				$clonedCopies[$id] = $dest;
+			}
+		} catch(\Throwable $error) {
+			foreach($clonedDirs as $dir) $dir->remove();
+			throw $error;
+		}
+		$this->pendingTempDirs = $clonedDirs;
+		$this->pendingCopies = $clonedCopies;
 		foreach($metadata as $meta) {
 			WireArray::add($this->hydrateFile($meta));
 		}
@@ -930,17 +1056,19 @@ trait FlexMediaCollection {
 	 * @return Pagefile
 	 */
 	public function ___clone(Pagefile $file, array $options = []) {
-		foreach(array_keys($options) as $key) {
-			if(!in_array($key, ['action', 'pagefiles'], true)) {
-				throw new WireException($this->_('Unknown Flex file clone option'));
+		$action = array_key_exists('action', $options) ? $options['action'] : 'after';
+		if($action !== false && !in_array($action, ['append', 'prepend', 'before', 'after'], true)) {
+			$action = 'after';
+		}
+		$target = $options['pagefiles'] ?? $this;
+		if($target !== $this) {
+			if($target instanceof FlexFiles || $target instanceof FlexImages) {
+				return $target->clone($file, ['action' => $action === false ? 'after' : $action]);
 			}
-		}
-		if(isset($options['pagefiles']) && $options['pagefiles'] !== $this) {
-			throw new WireException($this->_('Add the source file to the target Flex collection when copying between collections'));
-		}
-		$action = $options['action'] ?? 'after';
-		if(!in_array($action, ['append', 'prepend', 'before', 'after'], true)) {
-			throw new WireException($this->_('Unknown Flex file clone action'));
+			if($target instanceof Pagefiles) {
+				return $this->cloneToNative($file, $target, $action);
+			}
+			throw new WireException($this->_('Target pagefiles must be a Pagefiles collection'));
 		}
 		$this->assertWritable();
 		$this->checkLimit(true);
@@ -955,6 +1083,72 @@ trait FlexMediaCollection {
 				WireArray::insertAfter($copy, $file);
 			}
 		}
+		return $copy;
+	}
+
+	/** Copy a Flex file into a distinct physical file inside a native Pagefiles target. */
+	private function cloneToNative(Pagefile $file, Pagefiles $target, string|false $action): Pagefile|false {
+		$path = $target->path();
+		if(!is_dir($path)) {
+			$this->wire()->files->mkdir($path, true);
+		}
+		$parts = explode('.', $file->basename(), 2);
+		$n = $path === $this->path() ? 1 : 0;
+		if($n && preg_match('/^(.+?)-(\d+)$/', $parts[0], $matches)) {
+			$parts[0] = $matches[1];
+			$n = max(1, (int) $matches[2]);
+		}
+		$suffix = isset($parts[1]) ? '.' . $parts[1] : '';
+		// Atomically reserve a distinct file path so concurrent clones cannot collide on the same target file.
+		$fp = false;
+		$pathname = '';
+		$attempts = 0;
+		while($fp === false && $attempts < 10000) {
+			$pathname = $n ? ($path . $parts[0] . "-$n" . $suffix) : ($path . $file->basename());
+			$n++;
+			$attempts++;
+			$fp = @fopen($pathname, 'xb');
+		}
+		if($fp === false) {
+			return false;
+		}
+		$src = @fopen($file->filename(), 'rb');
+		$copied = false;
+		try {
+			if(is_resource($src)) {
+				$copied = stream_copy_to_stream($src, $fp) !== false;
+			}
+		} finally {
+			if(is_resource($src)) fclose($src);
+			fclose($fp);
+		}
+		if(!$copied) {
+			@unlink($pathname);
+			return false;
+		}
+		$this->wire()->files->chmod($pathname);
+		$copy = $target instanceof Pageimages ? new Pageimage($target, $pathname) : new Pagefile($target, $pathname);
+		$this->wire($copy);
+		$copy->isTemp(true);
+		$descriptions = $file->description(true, true);
+		if($descriptions) {
+			$copy->description(true, $descriptions);
+		}
+		$copy->tags = (string) $file->tags;
+		$filedata = $file->filedata();
+		if(is_array($filedata) && $filedata) {
+			$copy->filedata($filedata);
+		}
+		if($action === 'prepend') {
+			$target->prepend($copy);
+		} else if($action === 'before' && $target->has($file)) {
+			$target->insertBefore($copy, $file);
+		} else if($action === 'after' && $target->has($file)) {
+			$target->insertAfter($copy, $file);
+		} else if($action !== false) {
+			$target->append($copy);
+		}
+		$target->unTempQueue($copy);
 		return $copy;
 	}
 }
@@ -1060,16 +1254,18 @@ class FlexMedia extends Wire {
 			$descriptions['0'] = $file instanceof FlexPagefile || $file instanceof FlexPageimage
 				? $file->rawDescription() : $file->description();
 		}
+		$rawData = $file->getArray();
+		$liveFile = (bool) ($file->page->id && !$file->page->get('_cloning'));
 		$meta = [
 			'id'                => $id,
 			'basename'          => $file->basename(),
 			'description'       => $descriptions,
 			'tags'              => (string) $file->tags,
-			'created'           => (int) $file->created,
-			'modified'          => (int) $file->modified,
+			'created'           => (int) ($liveFile ? $file->created : ($rawData['created'] ?? 0)),
+			'modified'          => (int) ($liveFile ? $file->modified : ($rawData['modified'] ?? 0)),
 			'created_users_id'  => (int) $file->created_users_id,
 			'modified_users_id' => (int) $file->modified_users_id,
-			'filesize'          => (int) ($file->page->id && !$file->page->get('_cloning') ? $file->get('filesize') : ($file->getArray()['filesize'] ?? 0)),
+			'filesize'          => (int) ($liveFile ? $file->get('filesize') : ($rawData['filesize'] ?? 0)),
 			'filedata'          => $file->filedata(),
 		];
 		if(($file instanceof FlexPagefile || $file instanceof FlexPageimage) && $file->rawCustomValues() !== null) $meta['values'] = $file->rawCustomValues();
@@ -1274,7 +1470,7 @@ class FlexMedia extends Wire {
 		if(str_contains($source, '://') || !is_file($source) || !is_readable($source)) {
 			throw new WireException($this->_('Media copy source is not a readable local file'));
 		}
-		$extensions = preg_split('/[\s,]+/', strtolower((string) ($files->definition()['settings']['extensions'] ?? ($files instanceof Pageimages ? 'jpg jpeg gif png' : ''))), -1, PREG_SPLIT_NO_EMPTY);
+		$extensions = preg_split('/[\s,]+/', strtolower((string) ($files->definition()['settings']['extensions'] ?? ($files instanceof Pageimages ? 'jpg jpeg gif png' : 'pdf doc docx xls xlsx gif jpg jpeg png'))), -1, PREG_SPLIT_NO_EMPTY);
 		if(!in_array(strtolower(pathinfo($requested, PATHINFO_EXTENSION)), $extensions, true)) {
 			throw new WireException($this->_('Unsupported file extension'));
 		}

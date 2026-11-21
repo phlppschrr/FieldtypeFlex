@@ -132,3 +132,42 @@ $legacyWrapper->add($legacyFieldset);
 foreach(['PHP' => $legacySchema, 'JSON' => null, 'native' => $legacyWrapper] as $format => $source) {
 	$throws(fn() => new FlexFieldDefs($legacyField, $page, $source), "$format rejects repeatable fieldsets", FlexDefinitionException::class, 'repeatable');
 }
+
+// Core-parity definition conveniences: default file extensions, inheritField without type, numeric string limits and extra row-type metadata.
+$parityDefs = new FlexFieldDefs($field, $page, [
+	'doc' => ['type' => 'file'],
+	'inherited_title' => ['inheritField' => 'title'],
+	'inherited_base' => ['type' => 'text', 'inheritField' => 'title'],
+	'cards' => [
+		'type' => 'rows',
+		'minItems' => '1',
+		'maxItems' => '3',
+		'types' => [
+			'hero' => ['label' => 'Hero', 'icon' => 'star', 'group' => 'layout', 'children' => ['heading' => ['type' => 'text']]],
+		],
+	],
+]);
+$same('pdf doc docx xls xlsx gif jpg jpeg png', $parityDefs->property('doc')['settings']['extensions'], 'file properties inherit ProcessWire default extensions when omitted');
+$assert($parityDefs->getPropertyInputfield('inherited_title') instanceof InputfieldPageTitle, 'inheritField resolves its Inputfield class without requiring a redundant type');
+$assert($parityDefs->getPropertyInputfield('inherited_base') instanceof InputfieldPageTitle, 'inheritField accepts a compatible base type');
+$same([1, 3], [$parityDefs->property('cards')['settings']['minItems'], $parityDefs->property('cards')['settings']['maxItems']], 'numeric string minItems/maxItems coerce to integers');
+$same('star', $parityDefs->rowType('cards', 'hero')['settings']['icon'], 'row type definitions preserve custom developer metadata keys');
+
+// P2: Subclasses of InputfieldPassword are rejected structurally even if the class name omits "Password".
+$wire->modules->get('InputfieldPassword');
+$secretInput = new class extends InputfieldPassword {
+	public function __construct() {
+		InputfieldText::__construct();
+	}
+	public function set($key, $value) {
+		return InputfieldText::set($key, $value);
+	}
+	public function className($options = null) {
+		return 'InputfieldSecretToken';
+	}
+};
+$wire->wire($secretInput);
+$secretInput->name = 'secret';
+$secretWrapper = $wire->wire(new InputfieldWrapper());
+$secretWrapper->add($secretInput);
+$throws(fn() => new FlexFieldDefs($field, $page, $secretWrapper), 'InputfieldPassword subclasses are rejected structurally', FlexDefinitionException::class, 'not a supported');

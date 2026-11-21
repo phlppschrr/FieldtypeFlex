@@ -383,6 +383,7 @@ class FlexFieldDefs extends Wire {
 		}
 		if(
 			$input instanceof InputfieldFlex
+			|| $input instanceof InputfieldPassword
 			|| preg_match('/(Repeater|PageTable|Password|FlexFile|FlexImage)/i', $input->className())
 		) {
 			throw new WireException(sprintf($this->_('%s is not a supported Flex definition input'), $input->className()));
@@ -395,8 +396,10 @@ class FlexFieldDefs extends Wire {
 		if(!$auto && !in_array($mode, [null, '', false, true, 0, 1, '0', '1'], true)) {
 			throw new WireException($this->_('useLanguages must be true, false or "auto"'));
 		}
-		if($auto && !$input instanceof InputfieldText && !$input instanceof InputfieldTextarea) {
-			throw new WireException($this->_('Automatic language support requires a Text or Textarea input'));
+		if(!$input instanceof InputfieldText && !$input instanceof InputfieldTextarea) {
+			if($input instanceof InputfieldFile && ($auto || $mode)) return;
+			$input->useLanguages = false;
+			return;
 		}
 		$available = ($auto || $mode) && $this->wire()->languages && $this->wire()->modules->isInstalled('LanguageSupportFields');
 		if(!$auto && $mode && !$available) {
@@ -419,22 +422,21 @@ class FlexFieldDefs extends Wire {
 			$isRows = ($settings['type'] ?? '') === 'rows';
 			$isObject = ($settings['type'] ?? '') === 'object';
 			$this->validateStructureSettings($settings, $isRows);
-			$class = $isRows ? 'InputfieldFlexRows' : ($isObject ? 'InputfieldFieldset' : $this->resolveType((string) ($settings['type'] ?? 'text')));
-			if(!$isRows && $class === 'InputfieldFlexRows') {
-				throw new WireException($this->_('Declare a Rows collection with type rows'));
-			}
-			$input = $this->wire()->modules->get($class);
-			if(!$input instanceof Inputfield) {
-				throw new WireException(sprintf($this->_('Unable to load %s'), $class));
-			}
 			if(!empty($settings['inheritField'])) {
 				$inherit = $this->wire()->fields->get($settings['inheritField']);
 				if(!$inherit) {
 					throw new WireException(sprintf($this->_('Unknown inheritField: %s'), $settings['inheritField']));
 				}
 				$input = $inherit->getInputfield($this->flexPage);
-				if($input->className() !== $class) {
-					throw new WireException(sprintf($this->_('inheritField must use %s'), $class));
+				if(!$input instanceof Inputfield) {
+					throw new WireException(sprintf($this->_('Unable to load input for inheritField: %s'), $settings['inheritField']));
+				}
+				if(array_key_exists('type', $settings)) {
+					$expectedClass = $isObject ? 'InputfieldFieldset' : $this->resolveType((string) $settings['type']);
+					$expected = $this->wire()->modules->get($expectedClass);
+					if(!$expected instanceof Inputfield || !$input instanceof $expected) {
+						throw new WireException(sprintf($this->_('inheritField must use %s'), $expectedClass));
+					}
 				}
 				if($input instanceof InputfieldToggle && !array_key_exists('formatType', $settings)) {
 					$settings['formatType'] = $inherit->get('formatType') ?? 0;
@@ -447,6 +449,15 @@ class FlexFieldDefs extends Wire {
 				// Textformatters belong to the Fieldtype, not the source Inputfield.
 				if(($inherit->type instanceof FieldtypeText || $inherit->type instanceof FieldtypeFile) && !array_key_exists('textformatters', $settings)) {
 					$settings['textformatters'] = $inherit->get('textformatters') ?? [];
+				}
+			} else {
+				$class = $isRows ? 'InputfieldFlexRows' : ($isObject ? 'InputfieldFieldset' : $this->resolveType((string) ($settings['type'] ?? 'text')));
+				if(!$isRows && $class === 'InputfieldFlexRows') {
+					throw new WireException($this->_('Declare a Rows collection with type rows'));
+				}
+				$input = $this->wire()->modules->get($class);
+				if(!$input instanceof Inputfield) {
+					throw new WireException(sprintf($this->_('Unable to load %s'), $class));
 				}
 			}
 			$this->assertSupported($input);
@@ -501,7 +512,7 @@ class FlexFieldDefs extends Wire {
 	/** Tables are syntax and presentation over existing Object/Rows schemas. */
 	private function tableDefinition(array $settings): array {
 		foreach(['editableHeaders', 'rowLabels'] as $key) {
-			if(array_key_exists($key, $settings) && !is_bool($settings[$key])) throw new WireException(sprintf($this->_('%s must be a boolean'), $key));
+			if(array_key_exists($key, $settings)) $settings[$key] = (bool) $settings[$key];
 		}
 		foreach(['children', 'types', 'rowTitle', 'rowCollapse', 'rowLazyLoad', 'inheritField'] as $key) {
 			if(array_key_exists($key, $settings)) throw new WireException(sprintf($this->_('%s is not supported on a table'), $key));
@@ -565,8 +576,8 @@ class FlexFieldDefs extends Wire {
 		foreach($source->children() as $original) {
 			$name = (string) $original->name;
 			$this->checkName($name);
+			$this->assertSupported($original);
 			$input = $this->copyInput($original);
-			$this->assertSupported($input);
 			if($input->customFields !== null && !$input instanceof InputfieldFile) throw new WireException($this->_('customFields requires a File or Image property'));
 			$input->hasPage = $this->flexPage;
 			$input->_flex_property = $name;
@@ -606,8 +617,11 @@ class FlexFieldDefs extends Wire {
 	private function registerRows(string $name, Inputfield $input, array $settings): void {
 		if($this->mediaSettings !== null) throw new WireException($this->_('Rows are not supported in customFields'));
 		foreach(['minItems', 'maxItems'] as $limit) {
-			if(isset($settings[$limit]) && (!is_int($settings[$limit]) || $settings[$limit] < 0)) {
-				throw new WireException(sprintf($this->_('%s must be a non-negative integer'), $limit));
+			if(isset($settings[$limit])) {
+				if(!is_numeric($settings[$limit]) || (int) $settings[$limit] != $settings[$limit] || (int) $settings[$limit] < 0) {
+					throw new WireException(sprintf($this->_('%s must be a non-negative integer'), $limit));
+				}
+				$settings[$limit] = (int) $settings[$limit];
 			}
 		}
 		$min = $settings['minItems'] ?? 0;
@@ -649,10 +663,8 @@ class FlexFieldDefs extends Wire {
 			if(!is_array($typeSettings)) {
 				throw new WireException(sprintf($this->_('Settings for row type %s must be an array'), $type));
 			}
-			foreach($typeSettings as $key => $_) {
-				if(!in_array($key, ['label', 'rowTitle', 'children'], true)) {
-					throw new WireException(sprintf($this->_('Unsupported row type setting: %s'), $key));
-				}
+			if(array_key_exists('repeaterTitle', $typeSettings)) {
+				throw new WireException(sprintf($this->_('Unsupported Flex definition setting: %s'), 'repeaterTitle'));
 			}
 			foreach(['label', 'rowTitle'] as $key) {
 				if(array_key_exists($key, $typeSettings) && !is_string($typeSettings[$key])) {
@@ -665,10 +677,9 @@ class FlexFieldDefs extends Wire {
 			}
 			$schema = new self($this->flexField, $this->flexPage, $children, $this->depth + 1);
 			if(isset($settings['_flexTable'])) {
-				$allowed = ['InputfieldText', 'InputfieldEmail', 'InputfieldURL', 'InputfieldInteger', 'InputfieldFloat', 'InputfieldTextarea', 'InputfieldCheckbox', 'InputfieldToggle', 'InputfieldSelect', 'InputfieldRadios', 'InputfieldCheckboxes', 'InputfieldSelectMultiple', 'InputfieldAsmSelect', 'InputfieldTextTags', 'InputfieldDatetime', 'InputfieldPage', 'InputfieldImage', 'InputfieldFile', 'InputfieldTinyMCE'];
 				foreach($schema->properties() as $column => $definition) {
 					$cell = $definition['input'];
-					if(!in_array($cell->className(), $allowed, true) || in_array($definition['kind'], ['object', 'rows'], true)) throw new WireException(sprintf($this->_('Unsupported table column input: %s'), $cell->className()));
+					if(!$this->isSupportedTableInput($cell) || in_array($definition['kind'], ['object', 'rows'], true)) throw new WireException(sprintf($this->_('Unsupported table column input: %s'), $cell->className()));
 					if($cell instanceof InputfieldPage && !$cell->labelFieldName) $cell->labelFieldName = 'title';
 					if($cell instanceof InputfieldPage && !in_array(ltrim((string) $cell->inputfield, '_'), ['InputfieldSelect', 'InputfieldSelectMultiple', 'InputfieldAsmSelect', 'InputfieldPageAutocomplete', 'InputfieldCheckboxes', 'InputfieldRadios', 'InputfieldTextTags', 'InputfieldPageListSelect', 'InputfieldPageListSelectMultiple'], true)) throw new WireException(sprintf($this->_('Unsupported table Page widget: %s'), $cell->inputfield));
 					if(in_array((int) $cell->collapsed, [Inputfield::collapsedYesAjax, Inputfield::collapsedBlankAjax, Inputfield::collapsedTab, Inputfield::collapsedTabAjax, Inputfield::collapsedTabLocked], true)) throw new WireException($this->_('Table cells cannot use AJAX collapse or tabs'));
@@ -720,9 +731,24 @@ class FlexFieldDefs extends Wire {
 		$input->useLanguages = (bool) $mode;
 	}
 
+	private function isSupportedTableInput(Inputfield $input): bool {
+		return !$input instanceof InputfieldHidden
+			&& !$input instanceof InputfieldWrapper
+			&& !$input instanceof InputfieldMarkup
+			&& ($input instanceof InputfieldText
+				|| $input instanceof InputfieldTextarea
+				|| $input instanceof InputfieldInteger
+				|| $input instanceof InputfieldTextTags
+				|| $input instanceof InputfieldSelect
+				|| $input instanceof InputfieldCheckbox
+				|| $input instanceof InputfieldToggle
+				|| $input instanceof InputfieldDatetime
+				|| $input instanceof InputfieldPage
+				|| $input instanceof InputfieldFile);
+	}
+
 	private function validateMetadataInput(string $name, Inputfield $input, array &$settings): void {
-		$allowed = ['InputfieldText', 'InputfieldTextarea', 'InputfieldTinyMCE', 'InputfieldHidden', 'InputfieldPage', 'InputfieldEmail', 'InputfieldURL', 'InputfieldInteger', 'InputfieldFloat', 'InputfieldSelect', 'InputfieldRadios', 'InputfieldSelectMultiple', 'InputfieldCheckboxes', 'InputfieldAsmSelect', 'InputfieldCheckbox', 'InputfieldToggle', 'InputfieldDatetime', 'InputfieldTextTags'];
-		if(!in_array($input->className(), $allowed, true)) {
+		if($input instanceof InputfieldFile || (!$this->isSupportedTableInput($input) && !$input instanceof InputfieldHidden)) {
 			throw new WireException(sprintf($this->_('Unsupported customFields input: %s'), $input->className()));
 		}
 		if($input instanceof InputfieldPage && !in_array(ltrim((string) $input->inputfield, '_') ?: 'InputfieldSelect', ['InputfieldSelect', 'InputfieldAsmSelect'], true)) {
@@ -732,10 +758,10 @@ class FlexFieldDefs extends Wire {
 			if(in_array($name, ['description', 'tags'], true) || in_array($old, ['description', 'tags'], true)) throw new WireException($this->_('Renames between native description/tags and custom values are unsupported'));
 		}
 		if($name === 'description') {
-			if(!in_array($input->className(), ['InputfieldText', 'InputfieldTextarea', 'InputfieldTinyMCE'], true)) throw new WireException($this->_('customFields.description requires Text, Textarea or TinyMCE'));
+			if(!$input instanceof InputfieldText && !$input instanceof InputfieldTextarea) throw new WireException($this->_('customFields.description requires Text, Textarea or TinyMCE'));
 			if(!array_key_exists('textformatters', $settings)) $settings['textformatters'] = $this->mediaSettings['textformatters'] ?? [];
 		} else if($name === 'tags') {
-			if(!in_array($input->className(), ['InputfieldText', 'InputfieldTextTags', 'InputfieldSelect', 'InputfieldRadios', 'InputfieldSelectMultiple', 'InputfieldCheckboxes', 'InputfieldAsmSelect'], true) || $input->useLanguages) throw new WireException($this->_('customFields.tags requires a plain text, tag or choice input'));
+			if((!$input instanceof InputfieldText && !$input instanceof InputfieldTextTags && !$input instanceof InputfieldSelect) || $input->useLanguages) throw new WireException($this->_('customFields.tags requires a plain text, tag or choice input'));
 			$tagKeys = [];
 			foreach(method_exists($input, 'getOptions') ? $input->getOptions() : [] as $key => $label) {
 				if(!preg_match('/^[a-zA-Z0-9_-]+$/D', (string) $key) || isset($tagKeys[strtolower((string) $key)])) throw new WireException($this->_('customFields.tags option keys must be unambiguous native tags'));
@@ -811,7 +837,7 @@ class FlexFieldDefs extends Wire {
 				throw new WireException($this->_('Flex media uses owned collections and staged replacement; overwrite/custom metadata templates/archive extraction are unsupported'));
 			}
 			if(!isset($settings['extensions'])) {
-				$settings['extensions'] = $input->extensions ?: ($kind === 'image' ? 'jpg jpeg gif png' : '');
+				$settings['extensions'] = $input->extensions ?: ($kind === 'image' ? 'jpg jpeg gif png' : 'pdf doc docx xls xlsx gif jpg jpeg png');
 			}
 			if(trim((string) ($settings['extensions'] ?? '')) === '') {
 				throw new WireException($this->_('File properties require allowed extensions'));
@@ -1058,7 +1084,6 @@ class FlexFieldDefs extends Wire {
 				}
 				$input->name = $prefix . $name;
 				$input->id = 'Inputfield_' . $prefix . $name;
-				$externalDependencies = [];
 				foreach(['showIf', 'requiredIf'] as $key) {
 					$expression = (string) $input->get($key);
 					if($prefix && $expression) {
@@ -1067,9 +1092,7 @@ class FlexFieldDefs extends Wire {
 							$fields = [];
 							$not = $selector->not;
 							foreach($selector->fields() as $fieldName) {
-								$resolved = FlexDependencies::fieldName($fieldName, $value, $inputName, $prefix, $this->names, $this->flexPage, $this->flexField, $parentAddress);
-								$fields[] = $resolved;
-								if(preg_match('/^(?:page|forpage)\./', $fieldName)) $externalDependencies[explode('.', $resolved, 2)[0]] = true;
+								$fields[] = FlexDependencies::fieldName($fieldName, $value, $inputName, $prefix, $this->names, $this->flexPage, $this->flexField, $parentAddress);
 							}
 							$selector->setField($fields);
 							$selector->not = $not;
@@ -1077,12 +1100,19 @@ class FlexFieldDefs extends Wire {
 						$input->set($key, (string) $selectors);
 					}
 				}
-				if($externalDependencies) $input->wrapAttr('data-flex-external-dependencies', implode(' ', array_keys($externalDependencies)));
-				if(($input->disabled || $input->attr('disabled')) && $this->flexField->type instanceof FieldtypeFlex && $this->flexField->type->admin()->previewingRowTitles()) $input->editable(false);
 				if($value && isset($this->properties[$name]) && $definition['kind'] !== 'object') {
 					$v = $value->getUnformatted($name);
 					if($v instanceof LanguagesPageFieldValue) {
 						$v->setToInputfield($input);
+					} else if($input instanceof InputfieldInteger && $v !== '' && $v !== null) {
+						// Preserve out-of-range values for rendering so native min/max validation catches them on save.
+						$min = $input->attr('min');
+						$max = $input->attr('max');
+						$input->setAttribute('min', '');
+						$input->setAttribute('max', '');
+						$input->value = $v;
+						$input->setAttribute('min', $min);
+						$input->setAttribute('max', $max);
 					} else {
 						$input->value = $v;
 					}

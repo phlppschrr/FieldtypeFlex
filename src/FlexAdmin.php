@@ -5,7 +5,6 @@
 class FlexAdmin extends Wire {
 	private const DRAFT_FORMAT = 1;
 	private FieldtypeFlex $type;
-	private bool $previewingRowTitles = false;
 
 	/**
 	 * Initialize the object with its owning ProcessWire context.
@@ -550,76 +549,6 @@ class FlexAdmin extends Wire {
 		}, $event->return);
 	}
 
-	/** Only the authenticated title request uses detached, side-effect-free processing. @internal */
-	public function previewingRowTitles(): bool {
-		return $this->previewingRowTitles;
-	}
-
-	private function rowTitles(string $token, array $draft, FlexValue $value): array {
-		$post = $this->wire()->input->post;
-		if($post->flex_complete !== $token || $post->{$draft['input'] . '__0complete'} !== $token || $_FILES || isset($_SERVER['HTTP_X_FILENAME'])) {
-			throw new WirePermissionException($this->_('Invalid Flex editor context'));
-		}
-		$targets = json_decode((string) $post->flex_title_rows, true, FlexPath::JSON_DEPTH, JSON_THROW_ON_ERROR);
-		if(!is_array($targets) || !array_is_list($targets) || count($targets) > 2000) throw new WirePermissionException($this->_('Invalid Flex editor context'));
-		$requested = [];
-		foreach($targets as $target) {
-			if(!is_array($target) || !array_is_list($target) || count($target) !== 2 || !is_string($target[0]) || !is_string($target[1])) {
-				throw new WirePermissionException($this->_('Invalid Flex editor context'));
-			}
-			[$set, $id] = $target;
-			[$parent, $name, $definition] = $this->collection($token, $set, $value, true);
-			$this->loadRow($token, $set, $id, $parent, $name, false);
-			$order = $post->{FlexPath::controlName($draft['input'], $set, 'order')};
-			$index = is_string($order) ? array_search($id, explode(',', $order), true) : false;
-			if($index === false) throw new WirePermissionException($this->_('Invalid Flex editor context'));
-			$requested[$set . '.' . $id] = [$set, $id, $index + 1, $definition];
-		}
-		if(!$requested) return [];
-
-		$session = $this->wire()->session;
-		$inputErrors = static fn($key) => str_starts_with($key, '_errors_');
-		$errors = array_filter($session->getAll(), $inputErrors, ARRAY_FILTER_USE_KEY);
-		foreach($errors as $key => $error) $session->remove($key);
-		$notices = $this->wire()->notices->getArray();
-		$this->previewingRowTitles = true;
-		try {
-			$preview = $this->overlay($token, $value);
-			$prefix = FlexPath::inputPrefix($draft['input']);
-			$inputs = $preview->definitions()->getInputfields($preview, $prefix, $token);
-			$prepared = FlexLazy::prepare($value, $token, $post)->getArray();
-			// A native Page widget can create pages using this helper on a real save.
-			$prepared = array_filter($prepared, static fn($key) => !preg_match('/^_.*_add_items$/D', $key), ARRAY_FILTER_USE_KEY);
-			$form = FlexDependencies::processInput($inputs, $value->ownerPage(), $this->wire(new WireInputData($prepared)));
-			InputfieldFlex::applyInputs($preview, $form, $prefix);
-			$result = [];
-			foreach($requested as $address => [$set, $id, $index, $definition]) {
-				[$parent, $name] = FlexPath::resolve($preview, $set);
-				$row = $parent->getUnformatted($name)->getById($id);
-				if(!$row) continue;
-				$input = $this->wire(new InputfieldFlexRows());
-				$input->name = FlexPath::inputPrefix($draft['input'], $parent->address()) . $name;
-				$input->definition = $definition;
-				$input->label = $definition['input']->label;
-				$input->value = $parent->getUnformatted($name);
-				$input->flexRoot = $preview;
-				$input->flexDraft = $token;
-				$input->flexInputName = $draft['input'];
-				$input->setName = $set;
-				$title = $input->titleData($row, $index);
-				$result[$address] = ['custom' => $title['custom'], 'override' => $title['override']];
-			}
-			return $result;
-		} finally {
-			$this->previewingRowTitles = false;
-			foreach(array_keys(array_filter($session->getAll(), $inputErrors, ARRAY_FILTER_USE_KEY)) as $key) $session->remove($key);
-			foreach($errors as $key => $error) $session->set($key, $error);
-			foreach($this->wire()->notices->getArray() as $notice) {
-				if(!in_array($notice, $notices, true)) $this->wire()->notices->remove($notice);
-			}
-		}
-	}
-
 	/** Process current form values through the same scoped inputs for copy and duplicate. */
 	private function submittedRow(string $token, array $draft, string $set, FlexValue $value, string $id, ?WireInputData $post = null): FlexRow {
 		$input = $this->wire()->input;
@@ -676,6 +605,14 @@ class FlexAdmin extends Wire {
 			}
 			$field = $page->fieldgroup->getFieldContext($field);
 			$this->editable($page, $field);
+			if(($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && empty($_POST) && empty($_FILES)) {
+				$postMax = FlexClipboard::iniBytes('post_max_size');
+				$contentLength = (int) ($_SERVER['CONTENT_LENGTH'] ?? 0);
+				if($postMax > 0 && $contentLength > $postMax) {
+					if(!headers_sent()) http_response_code(413);
+					throw new WireException($this->_('The clipboard content exceeds the server upload limit.'));
+				}
+			}
 			$this->wire()->session->CSRF->validate();
 			$this->assertFresh($token, $page, $field);
 			$page->of(false);
@@ -687,9 +624,7 @@ class FlexAdmin extends Wire {
 				$value = new FlexValue($page, $field, $this->type->getDefinitions($field, $page), $value->rawArray());
 			}
 			FlexLazy::assertSchema($value, $token);
-			if($action === 'row-titles') {
-				$response = ['error' => false, 'titles' => (object) $this->rowTitles($token, $draft, $value)];
-			} else if($action === 'row-render') {
+			if($action === 'row-render') {
 				if($this->wire()->input->post('flex_complete') !== $token) throw new WireException($this->_('Incomplete Flex row request; check the PHP input limits'));
 				$set = (string) $this->wire()->input->post('flex_set');
 				[$parent, $setName, $definition] = $this->collection($token, $set, $value, true);
@@ -725,6 +660,7 @@ class FlexAdmin extends Wire {
 				}
 				$clipboard = $this->wire(new FlexClipboard());
 				$response = ['error' => false, 'clipboard' => $clipboard->export($selected)];
+				unset($selected, $clipboard);
 			} else if(in_array($action, ['add', 'duplicate', 'paste-above', 'paste-below', 'paste-end'], true)) {
 				if($this->wire()->input->post('flex_complete') !== $token) {
 					throw new WireException($this->_('Incomplete Flex row request; check the PHP input limits'));

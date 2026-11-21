@@ -29,7 +29,6 @@ export interface TitleData {
     sources: Record<string, TitleSource>;
     custom: Record<string, string>;
     override: TitlePart[] | null;
-    refresh: boolean;
 }
 
 export function titleFragment(parts: TitlePart[]): DocumentFragment {

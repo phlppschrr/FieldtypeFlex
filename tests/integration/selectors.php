@@ -97,6 +97,18 @@ try {
 		$wire->pages->findIDs("id=$id, $expr");
 		$same($expected, $GLOBALS['__flex_query_def_loads'], $label);
 	}
+	// C-13: Non-numeric values and invalid dates return no matches (or match for !=) instead of throwing.
+	$same([], $wire->pages->findIDs("id=$id, flex_test.age=abc"), 'non-numeric integer equality returns no matches');
+	$same([$id], $wire->pages->findIDs("id=$id, flex_test.age!=abc"), 'non-numeric integer inequality matches page');
+	$same([], $wire->pages->findIDs("id=$id, flex_test.age>abc"), 'non-numeric integer range returns no matches');
+	$same([], $wire->pages->findIDs("id=$id, flex_test.date=not-a-date"), 'invalid date equality returns no matches');
+	$same([$id], $wire->pages->findIDs("id=$id, flex_test.date!=not-a-date"), 'invalid date inequality matches page');
+	$same([], $wire->pages->findIDs("id=$id, {$countedField->name}.photo.count=abc"), 'non-numeric media count returns no matches');
+	$same([$id], $wire->pages->findIDs("id=$id, {$countedField->name}.photo.count!=abc"), 'non-numeric media count inequality matches page');
+	$same([], $wire->pages->findIDs("id=$id, {$countedField->name}.blocks.count=abc"), 'non-numeric rows count returns no matches');
+	$same([$id], $wire->pages->findIDs("id=$id, {$countedField->name}.blocks.count!=abc"), 'non-numeric rows count inequality matches page');
+	$throws(fn() => $wire->pages->findIDs("id=$id, flex_test.age*=abc"), 'unsupported numeric operator still throws', PageFinderSyntaxException::class);
+	$throws(fn() => $wire->pages->findIDs("id=$id, flex_test.unknown_prop=abc"), 'unknown property path still throws', PageFinderSyntaxException::class);
 } finally {
 	unset($GLOBALS['__flex_query_def_loads']);
 }

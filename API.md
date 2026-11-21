@@ -26,7 +26,7 @@ $blocks = $value->blocks;          // FlexRows
 $row = $blocks->first();           // FlexRow, or false when empty
 ```
 
-Examples assume the `ProcessWire` namespace after bootstrap, a saved editable Page, and a Flex field named `content` with the illustrated properties. Definition fragments belong inside your field definition. TinyMCE examples require InputfieldTinyMCE; imports require your own readable local file.
+Examples assume the `ProcessWire` namespace after bootstrap, a saved editable Page, and a Flex field named `content` with the illustrated properties. Definition fragments belong inside your field definition. TinyMCE examples require InputfieldTinyMCE; imports accept readable local files or HTTP(S) URLs.
 
 | Definition | Unformatted value | Formatted value | Stored data |
 | --- | --- | --- | --- |
@@ -107,9 +107,9 @@ Helpers also work on Rows and accept type-qualified schema paths such as `blocks
 
 ### Dates, numbers, and text
 
-Datetime accepts canonical ISO strings, timestamps, numeric timestamp strings or `DateTime` objects. ISO input takes precedence over localized input formats. Blank/null/false/zero becomes `''`. Storage uses `Y-m-d` or `Y-m-d H:i:s` in PHP/site timezone; time survives even without a time editor. Formatted reads use `dateOutputFormat` (current language/default); blank format or `U` returns a timestamp. SQL selectors use ISO dates.
+Datetime accepts canonical ISO strings, timestamps, numeric timestamp strings or `DateTimeInterface` objects. ISO input takes precedence over localized input formats. Blank, null, false, invalid input or Unix epoch `0` becomes `''` (matching `FieldtypeDatetime` and `InputfieldDatetime`). Storage uses `Y-m-d` or `Y-m-d H:i:s` in PHP/site timezone; time survives even without a time editor. Formatted reads use `dateOutputFormat` (current language/default); blank format or `U` returns a timestamp. SQL selectors use ISO dates.
 
-Integer/Float normalize numeric strings, preserve zero and reject non-numbers with `WireException`; blank/null becomes `''`. Float `precision` rounds on assignment/hydration (default `2`; null, blank or negative disables rounding). Invalid dates also throw. Email/URL use native sanitizers and configured IDN/relative-URL settings.
+Integer/Float normalize numeric strings, preserve zero and sanitize non-numbers to `''`; blank/null becomes `''`. Float `precision` rounds on assignment/hydration (default `2`; null, blank or negative disables rounding). Invalid dates also sanitize to `''`. Email/URL use native sanitizers and configured IDN/relative-URL settings.
 
 Toggle defaults to keys `0`/`1`/`2` (no/yes/other; enable `useOther` for the third choice), or accepts custom integer options from -128 to 127. `formatType`: `0` key, `1` boolean for keys 0/1 only, `2` label, `3` encoded label without icons. See [formatting and languages](#textformatters).
 
@@ -290,7 +290,7 @@ $wire->addHookAfter('InputfieldFlexRows::rowTitleValues', function(HookEvent $ev
 });
 ```
 
-`InputfieldFlexRows::rowTitleParts($row, $parts, $root, $parent)` receives the computed parts. Return an array of parts with `text` and optional `classes` to replace the complete title. Text is escaped and class names are validated. You can retain computed parts, including their live position. Returning `null` uses the template. For an override that only applies after an edit, return the computed `$parts` in its initial state to enable refresh. Returning an empty array uses the position fallback.
+`InputfieldFlexRows::rowTitleParts($row, $parts, $root, $parent)` receives the computed parts. Return an array of parts with `text` and optional `classes` to replace the complete title. Text is escaped and class names are validated. You can retain computed parts, including their live position. Returning `null` uses the template. Returning an empty array uses the position fallback.
 
 ```php
 $wire->addHookAfter('InputfieldFlexRows::rowTitleParts', function(HookEvent $event) {
@@ -303,11 +303,11 @@ $wire->addHookAfter('InputfieldFlexRows::rowTitleParts', function(HookEvent $eve
 });
 ```
 
-Standard tokens update locally as you type or reorder. Titles referencing custom tokens with a registered hook, or returning an override on initial render, also refresh in a debounced editor request using unsaved Flex values. Read `$row`, `$root` and `$parent` from the hook arguments for those edits. Title hooks should compute display values without saving pages or changing files.
+Standard tokens (`{heading}`, `{image.description}`, `{parent.heading}`, `{root.heading}`, `{@index}`, `{@type}`, `{@path}`) update locally in the browser as you type or reorder. PHP hooks (`rowTitleValues` and `rowTitleParts`) run on initial editor render, server-rendered row insertions (add, duplicate, paste) and after saving. Title hooks should compute display values without saving pages or changing files.
 
 `rowCollapse` uses `FieldtypeFlex::ROW_COLLAPSE_EXISTING` (0, default: existing closed/new open), `ROW_COLLAPSE_ALL` (1), or `ROW_EXPAND_ALL` (3). Use `addRowLabel` for the add-button text. See [Rows examples](examples/07-rows.php).
 
-`minItems`/`maxItems` are nonnegative integers across all types; zero maximum means no extra collection cap. Maxima apply on adding/hydration, minima on save. Hidden Rows count. Error Rows stay open. `rowLazyLoad => true` optionally loads eligible closed scalar-only bodies on opening; unsupported types render eagerly. Unopened values still validate on Save; failed loads block saving. Without JavaScript use `flex_eager=1`. See [lazy-loading eligibility](docs/development.md#lazy-row-eligibility).
+`minItems`/`maxItems` are nonnegative integers across all types; zero maximum means no extra collection cap. `maxItems` applies when adding items (lowering a maximum below existing rows still loads the collection so excess rows can be removed); `minItems` is enforced on editor form submissions rather than API saves. Hidden Rows count. Error Rows stay open. `rowLazyLoad => true` optionally loads eligible closed scalar-only bodies on opening; unsupported types render eagerly. Unopened values still validate on Save; failed loads block saving. Without JavaScript use `flex_eager=1`. See [lazy-loading eligibility](docs/development.md#lazy-row-eligibility).
 
 ```php
 $row->rowId();                     // Stable 32-character hex ID
@@ -352,8 +352,8 @@ $page->save('content');
 | --- | --- |
 | `addRow(string $type, array $values = []): FlexRow` | Append with generated ID |
 | `getById(string $id): ?FlexRow` | Lookup; null if absent |
-| `find($selector): FlexRows` | Selection of existing Row objects in current order |
-| `rowsOfType($type): array` / `countOfType($type): int` | Direct Rows / count for a string type |
+| `find($selector): FlexRows` | Selection of existing Row objects (supports `sort=`, `limit=`, `start=`) |
+| `rowsOfType(string $type): array` / `countOfType(string $type): int` | Direct Rows / count for a string type |
 | `duplicateRow(string $id): FlexRow` | Append independent copy, new descendant IDs/media copies |
 | `moveRow(string $id, ?string $before = null): self` | Move before sibling, or to end |
 | `removeRow(string $id): self` | Remove; unknown ID is a no-op |
@@ -377,9 +377,9 @@ $intro = $blocks->find('_type=text, heading=Introduction, body*=ProcessWire');
 $notes = $block->notes->find('_type=note, text*=Sources');
 ```
 
-`find()` accepts a selector string, native array or `Selectors`, including unsaved values. Conditions match the same direct Row. Paths: `_type`, direct properties, Object leaves and media/child collection `.count`; search child collections directly for child leaves. `_type` addresses metadata, `type` an ordinary property. OR values and prefix negation work. Invalid paths/operators raise `WireException` even on empty collections.
+`find()` delegates to native [[WireArray]] filtering and accepts a selector string, native array or `Selectors`, including unsaved values. Paths support `_type`, direct properties, Object leaves, media/child collection `.count` and Page dot paths; search child collections directly for child leaves. `_type` addresses metadata, `type` an ordinary property. OR fields (`heading|body*=foo`), OR values, prefix negation, `sort=`, `limit=` and `start=` work like `PageArray::find()`. Missing or unknown property paths evaluate to blank `''` per row (matching `PageArray::find()`: positive value queries return no matches, while blank `=""` and negative `!=value` checks match rows without that property, and OR fields evaluate each branch independently).
 
-Results share Row objects but have separate membership. Edit selected unformatted Rows normally; change membership on the original collection. Chaining narrows the selection. Formatted results exclude hidden Rows permanently from that selection. Leaf comparisons are unformatted native `Selector::matches()` comparisons: dates use timestamps, and numeric zero can match blank. Counts follow current Row visibility. No type-qualified paths, `@` groups, OR field names, arbitrary traversal, sorting or pagination directives; collections/media without `.count` support only blank checks. See [operator families](#operators-and-matching-semantics).
+Results share Row objects with separate membership; formatted results exclude hidden Rows permanently from that selection. Leaf comparisons are unformatted native `Selector::matches()` comparisons: dates use timestamps, and numeric zero can match blank. Counts follow current Row visibility. Collections/media without `.count` match blank/nonblank checks. See [operator families](#operators-and-matching-semantics).
 
 <a id="nested-repeatables-and-resource-limits"></a>
 
@@ -431,7 +431,7 @@ if($image) {
 $images = $page->content->getUnformatted('hero'); // FlexImages collection
 ```
 
-`maxFiles=0` means unlimited. Limits also apply on hydration/writes: lowering a maximum below existing content can reject reads/saves rather than prune files. Image resize/crop/focus and native Variations are supported. Deleting a generated variation is immediate and needs no field save; originals follow the staged lifecycle below.
+`maxFiles=0` means unlimited. `maxFiles` applies when adding files; lowering a maximum below existing files still loads the collection without locking the page and caps formatted output to `maxFiles`. Image resize/crop/focus and native Variations are supported. Deleting a generated variation is immediate and needs no field save; originals follow the staged lifecycle below.
 
 ### Adding, saving, and ownership
 
@@ -441,19 +441,19 @@ $page->content->downloads->add('/absolute/path/to/document.pdf');
 $page->save('content');
 ```
 
-Imports require readable local paths; remote URLs are rejected. New/replaced originals and renames remain staged until the owning field saves. Ownership belongs to the actual Page/Field, including Repeater items. Cross-owner assignment and Row duplication create independent media copies. Original deletion waits for canonical commit.
+Imports accept readable local paths or remote `http://`/`https://` URLs (for example `$page->content->hero->add('https://example.com/images/hero.jpg')`, downloaded via native `WireHttp::download()` with extension, `maxFilesize`, image integrity and `Sanitizer::validateFile()` checks before staging); non-HTTP(S) schemes are rejected. New/replaced originals and renames remain staged until the owning field saves. Ownership belongs to the actual Page/Field, including Repeater items. Cross-owner assignment and Row duplication create independent media copies. Original deletion waits for canonical commit.
 
 | Public operations | Behavior |
 | --- | --- |
-| Collection iteration, `first()`, `get()`, `add()`, `delete()`/`deleteAll()`, `clone($file)` | Native-style access and mutation with Flex ownership checks |
+| Collection iteration, `first()`, `get()`, `add()`, `delete()`/`deleteAll()`, `clone($file, $options)` | Native-style access and mutation with Flex ownership checks; `clone()` also supports `'pagefiles' => $targetCollection` |
 | `$file->rename($name)` / `$files->rename($file, $name)` | Effective sanitized/collision-safe basename; preserves identity/order/metadata; save field to commit |
 | `$file->save()` | Save committed metadata without publishing other pending Flex edits; stale changes fail |
-| `$type->saveFile($page, $field, $file, $columns = []): bool` | Select metadata columns; empty list means all supported columns |
+| `$type->saveFile($page, $field, $file, $columns = []): bool` | Select metadata columns; empty list saves all supported columns, unknown columns are ignored |
 | Image `size()`, `width()`, `height()`, `crop()`, `focus()` | Native image operations |
 
 `saveFile()` requires an unformatted owned original and live Page. Columns: `description`, `tags`, `filedata`, `values`, `modified`, `modified_users_id`. New/replaced files require a field save. See [[Pagefiles]], [Pagefile](https://processwire.com/api/ref/pagefile/) and [Pageimage](https://processwire.com/api/ref/pageimage/) for native URLs, filenames, descriptions, tags and image methods.
 
-Settings include `extensions`, `maxFiles`, `maxFilesize` (bytes; zero adds no size limit), image dimensions, descriptions and free tags (`useTags`). File requires extensions; Image defaults to JPG/JPEG/GIF/PNG (configure WebP originals explicitly). Imports enforce path/extension/size/count; editor processing adds native validation.
+Settings include `extensions`, `maxFiles`, `maxFilesize` (bytes; zero adds no size limit), image dimensions, descriptions and free tags (`useTags`). File defaults to ProcessWire's standard extensions (`pdf doc docx xls xlsx gif jpg jpeg png`) when omitted; Image defaults to JPG/JPEG/GIF/PNG (configure WebP originals explicitly). Imports enforce extension/size/count; editor processing adds native validation.
 
 Unsupported: overwrite, `unzip`, property `useLanguages`, predefined tags, native custom metadata templates and string output. Use `noLang` for descriptions. TinyMCE drag/drop uploads need a regular ProcessWire Image field. Description Textformatters apply after language selection, including variations; absent/empty lists leave text unescaped. Native `description(true)`/`description(true, true)` remain raw exports.
 
@@ -484,7 +484,7 @@ $page->of(true);
 echo $page->content->gallery->first()->copyright;
 ```
 
-Supported: text/HTML/TinyMCE, Hidden, Email/URL, numbers, choices, Checkbox/Toggle, Datetime, TextTags and Page (Select/AsmSelect only). Ordinary fieldsets/Markup organize inputs. Objects, Rows, nested media and unsupported third-party inputs are rejected. Native names are reserved except `description` and `tags` overrides.
+Supported: text/HTML/TinyMCE, Hidden, Email/URL, numbers, choices, Checkbox/Toggle, Datetime, TextTags, Page (Select/AsmSelect only) and compatible Inputfield subclasses. Ordinary fieldsets/Markup organize inputs. Objects, Rows, nested media and wrappers are rejected. Native names are reserved except `description` and `tags` overrides.
 
 Values follow ordinary Flex typing, formatting, languages, defaults, validation and rename rules. Formatted views are read-only. `getFieldValue($name, false|true|null)` explicitly reads raw/formatted/current-view values; unknown names return null. `setFieldValue($name, $value): bool` returns false for unknown names.
 
@@ -507,7 +507,7 @@ $pages->find('content.blocks.count>=3');
 $pages->find('content.blocks.text.count>0');
 ```
 
-Use `FIELD.COLLECTION.TYPE.PROPERTY`, including each type for deeper collections. Objects add their property name. Collection/type/media scopes support blank checks and `.count`. SQL `COLLECTION._type` accepts `=`/`!=` with a declared type or blank; unknown types raise `PageFinderSyntaxException`.
+Use `FIELD.COLLECTION.TYPE.PROPERTY`, including each type for deeper collections. Objects add their property name. Collection/type/media scopes support blank checks and `.count`. SQL `COLLECTION._type` accepts `=`/`!=` with any type string or blank (unknown types return no matches for `=`, matching `FlexRows::find()`). Non-numeric values in numeric/count selectors and invalid date strings return no matches (or match all pages for `!=`) instead of throwing, while unknown property paths and unsupported operators raise `PageFinderSyntaxException`.
 
 ### Operators and matching semantics
 
@@ -588,7 +588,7 @@ Definitions reuse native [[Inputfield]] settings, not Fieldtype storage. See the
 | `useLanguages` | `false` (default), `true`, `'auto'` |
 | `derefAsPage` | `0` PageArray, `1` Page/false, `2` Page/NullPage |
 | `dateInputFormat`, `dateOutputFormat` | Native date parsing / formatted output |
-| `inheritField` | Settings from an existing same-Inputfield-type Field |
+| `inheritField` | Settings from an existing Field (optional `type` may be omitted or a compatible base type) |
 | `textformatters` | Ordered installed formatter module names; `[]` disables |
 
 ### Dependency contexts

@@ -8,7 +8,6 @@ interface ClipboardResponse {clipboard: string; error?: boolean; message?: strin
 interface UploadItem {markup: string; error?: boolean; message?: string;}
 interface RowState { title?: TitleData; removalReady?: boolean; load?: Promise<boolean>; }
 const state = new WeakMap<HTMLElement, RowState>();
-const titleRequests = new WeakMap<HTMLElement, {revision: number; timer?: number; queued: boolean}>();
 const disabledBeforeRemoval = new WeakMap<Control, boolean>();
 const busyTrees = new WeakSet<HTMLElement>();
 const overlayMenus = '.flex-table-more, .flex-collection-menu';
@@ -92,7 +91,6 @@ function setTreeBusy(scope: HTMLElement, busy: boolean): void {
     if(busy) busyTrees.add(tree); else busyTrees.delete(tree);
     tree.setAttribute('aria-busy', String(busy)); all(tree, '.flex-rows').forEach(updateActions);
     const form = closest(tree, 'form');
-    if(!busy && titleRequests.get(tree)?.queued) queueTitleRefresh(tree);
     if(!busy && !form.querySelector('.InputfieldFlex[aria-busy="true"], .flex-row[data-flex-load-failed="1"]')) all(form, ':scope > .flex-form-request-error').forEach(error => error.remove());
 }
 function updateActions(set: HTMLElement): void {
@@ -175,55 +173,6 @@ function loadRow(row: HTMLElement): Promise<boolean> {
 }
 function requestHeaders(set: HTMLElement): Record<string, string> {
     return {'X-Requested-With': 'XMLHttpRequest', 'X-FIELDNAME': attr(set, 'data-flex-field'), 'X-FLEX-DRAFT': attr(set, 'data-flex-draft')};
-}
-function externalTitleDependencies(tree: HTMLElement): Set<string> {
-    return new Set(all(tree, '[data-flex-external-dependencies]').flatMap(input => attr(input, 'data-flex-external-dependencies').split(' ')));
-}
-function dependencyName(name: string): string { return name.replace(/\[\]$|^_|_$/g, '').replace(/__\d+$/, ''); }
-function queueTitleRefresh(tree: HTMLElement): void {
-    if(!tree.querySelector('.flex-row[data-flex-title-refresh]')) return;
-    const request = titleRequests.get(tree) ?? {revision: 0, queued: false};
-    titleRequests.set(tree, request);
-    const revision = ++request.revision;
-    clearTimeout(request.timer);
-    request.queued = true;
-    if(treeBusy(tree)) return;
-    request.timer = window.setTimeout(async () => {
-        if(!tree.isConnected || treeBusy(tree)) return;
-        request.queued = false;
-        const targets = all(tree, '.flex-row[data-flex-title-refresh]').filter(row =>
-            row.closest('.InputfieldFlex') === tree && !row.closest('.flex-row-remove-pending'));
-        if(!targets.length) return;
-        const set = closest(targets[0], '.flex-rows');
-        const addresses = targets.map(row => [attr(closest(row, '.flex-rows'), 'data-flex-set'), attr(row, 'data-flex-row')]);
-        const token = csrf(), draft = attr(set, 'data-flex-draft');
-        if(!token || !draft) return;
-        classic.saveReady(tree);
-        const data = new URLSearchParams(serialize(tree));
-        const dependencies = externalTitleDependencies(tree);
-        if(dependencies.size) {
-            serialize(closest(tree, 'form')).forEach(([name, value]) => {
-                if(name !== 'id' && (dependencies.has(name) || dependencies.has(dependencyName(name)))) data.append(name, value);
-            });
-        }
-        data.set(token.name, token.value);
-        data.set('flex_action', 'row-titles');
-        data.set('flex_title_rows', JSON.stringify(addresses));
-        data.set('flex_complete', draft);
-        try {
-            const response = await fetch(attr(set, 'data-flex-page-url'), {method: 'POST', credentials: 'same-origin', headers: requestHeaders(set), body: data});
-            const result: {error: boolean; titles: Record<string, Pick<TitleData, 'custom' | 'override'>>} = await response.json();
-            if(!response.ok || result.error || request.revision !== revision || !tree.isConnected) return;
-            targets.forEach((row, index) => {
-                const title = rowTitleData(row), update = result.titles[addresses[index].join('.')];
-                if(!title || !update || !row.isConnected) return;
-                Object.assign(title, update);
-                renderTitle(row, title, rows(closest(row, '.flex-rows')).indexOf(row) + 1);
-            });
-        } catch {
-            // Retain the last title if the draft or network is unavailable.
-        }
-    }, 240);
 }
 function moved(set: HTMLElement, row: HTMLElement): void {
     const status = one(set, ':scope > .flex-rows-status');
@@ -486,7 +435,6 @@ delegate('click', '[data-flex-selection-action]', (event, control) => {
     } else if(action === 'hide') {
         chosen.forEach(row => setVisibility(row, true));
         closest(set, '.InputfieldFlex').classList.add('InputfieldStateChanged');
-        queueTitleRefresh(closest(set, '.InputfieldFlex'));
         updateActions(set);
     } else if(action === 'remove' && activeRows(set).length - chosen.length >= Number(attr(set, 'data-flex-min'))) {
         window.tinymce?.triggerSave();
@@ -494,7 +442,6 @@ delegate('click', '[data-flex-selection-action]', (event, control) => {
         current.rows.clear();
         current.anchor = undefined;
         order(set);
-        queueTitleRefresh(closest(set, '.InputfieldFlex'));
     }
 });
 function formError(form: HTMLFormElement, text: string, pending: boolean): void {
@@ -760,20 +707,7 @@ delegate('keydown', '.flex-row-sort', async (event, button) => {
 });
 function titlesChanged(target: HTMLElement): void {
     const tree = target.closest<HTMLElement>('.InputfieldFlex');
-    if(tree) {
-        all(tree, '.flex-row[data-flex-title]').forEach(row => syncTitleSources(row, target));
-        queueTitleRefresh(tree);
-        return;
-    }
-    const form = target.closest('form');
-    if(!form) return;
-    const name = attr(target, 'name');
-    if(!name) return;
-    all(form, '.InputfieldFlex').forEach(field => {
-        if(!field.querySelector('[data-flex-title-refresh]')) return;
-        const dependencies = externalTitleDependencies(field);
-        if(dependencies.has(name) || dependencies.has(dependencyName(name))) queueTitleRefresh(field);
-    });
+    if(tree) all(tree, '.flex-row[data-flex-title]').forEach(row => syncTitleSources(row, target));
 }
 ['input', 'change'].forEach(name => document.addEventListener(name, event => {
     const input = event.target;
@@ -845,7 +779,7 @@ async function rowAction(event: Event, control: HTMLButtonElement | HTMLSelectEl
     }
     if(action === 'remove' && row) {
         const removed = !row.matches('.flex-row-remove-pending'); window.tinymce?.triggerSave(); if(removed) openRow(row, false);
-        removalState(row, removed); rowState(row).removalReady = true; order(set); queueTitleRefresh(closest(set, '.InputfieldFlex')); control.focus(); return;
+        removalState(row, removed); rowState(row).removalReady = true; order(set); control.focus(); return;
     }
     if(row) closeRowEditors(row);
     if(action === 'duplicate' && row && attr(row, 'data-flex-loaded') === '0' && !(await loadRow(row))) return;
@@ -854,21 +788,29 @@ async function rowAction(event: Event, control: HTMLButtonElement | HTMLSelectEl
     try {
         const clipboard = pasting ? await readClipboard() : '';
         window.tinymce?.triggerSave();
-        const data = new URLSearchParams({flex_action: action, flex_set: attr(set, 'data-flex-set'), flex_order: activeRows(set).map(row => attr(row, 'data-flex-row')).join(',')});
+        // Use FormData when pasting so inline Base64 media is not percent-encoded.
+        const data: URLSearchParams | FormData = pasting ? new FormData() : new URLSearchParams();
+        data.set('flex_action', action);
+        data.set('flex_set', attr(set, 'data-flex-set'));
+        data.set('flex_order', activeRows(set).map(row => attr(row, 'data-flex-row')).join(','));
         const orders: Record<string, string[]> = {};
         all(closest(set, '.InputfieldFlex'), '.flex-rows').forEach(current => {
             if(!current.closest('.flex-row-remove-pending')) orders[attr(current, 'data-flex-set')] = activeRows(current).map(row => attr(row, 'data-flex-row'));
         });
         data.set('flex_orders', JSON.stringify(orders));
         if(action === 'add') data.set('flex_type', type);
-        else if(action === 'duplicate' && row) appendSource(data, row);
+        else if(action === 'duplicate' && row) appendSource(data as URLSearchParams, row);
         if(pasting) {
             data.set('flex_clipboard', clipboard);
             if(action !== 'paste-end' && row) data.set('flex_source', attr(row, 'data-flex-row'));
         }
         const token = csrf(); if(token) data.set(token.name, token.value); data.set('flex_complete', attr(set, 'data-flex-draft'));
         const response = await fetch(attr(set, 'data-flex-page-url'), {method: 'POST', credentials: 'same-origin', headers: requestHeaders(set), body: data});
-        const result: RowResponse = await response.json();
+        const parsed = await response.json().catch(() => null) as RowResponse | null;
+        if(response.status === 413) {
+            throw new Error(parsed?.message || message('clipboardTooLarge', 'The clipboard content exceeds the server upload limit.'));
+        }
+        const result: RowResponse = parsed ?? {html: '', error: true, message: message('unableToAdd', 'Unable to add item')};
         if(!response.ok || result.error) throw new Error(result.message || message('unableToAdd', 'Unable to add item'));
         if(!set.isConnected) return;
         const inserted = (result.rows ?? [result]).map(item => parseHTML(item.html));
@@ -885,7 +827,6 @@ async function rowAction(event: Event, control: HTMLButtonElement | HTMLSelectEl
             [fresh, ...all(fresh, '.flex-row[data-flex-title]')].forEach(row => syncTitleSources(row));
             classic.added(fresh);
         }
-        queueTitleRefresh(closest(set, '.InputfieldFlex'));
         focus = inserted[0]?.querySelector<HTMLElement>(':scope > .flex-row-header .flex-row-toggle, :scope > .flex-table-actions summary') || undefined;
         if(pasting) {
             const pasted = inserted.length === 1 ? message('rowPasted', 'Row pasted.') : message('rowsPasted', 'Rows pasted.');

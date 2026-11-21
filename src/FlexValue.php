@@ -193,22 +193,71 @@ class FlexValue extends WireData implements \JsonSerializable {
 	}
 
 	/**
-	 * Validate all collection limits and total tree budgets before persistence side effects.
+	 * Validate tree budgets and optionally collection min/max limits before persistence.
 	 *
-	 * @param bool $minimum Also require collection minima; false for incomplete drafts.
+	 * @param bool $limits Also enforce collection minItems/maxItems (used for editor submissions).
+	 * @param FlexValue|null $baseline Pre-submit value whose existing row IDs may stay above a lowered maxItems.
 	 * @return void
 	 * #pw-internal
 	 * @internal
 	 */
-	public function validateTree(bool $minimum = true): void {
+	public function validateTree(bool $limits = false, ?FlexValue $baseline = null): void {
 		FlexPath::validate($this->rawArray(), $this->flexField);
+		if(!$limits) return;
 		foreach($this->definitions->properties() as $name => $definition) {
 			$item = $this->getUnformatted($name);
-			if($item instanceof FlexValue) $item->validateTree($minimum);
+			$base = $baseline && $baseline->definitions()->property($name) ? $baseline->getUnformatted($name) : null;
+			if($item instanceof FlexValue) $item->validateTree(true, $base instanceof FlexValue ? $base : null);
 			if($item instanceof FlexRows) {
-				$item->checkLimit($minimum);
+				$existingIds = [];
+				if($base instanceof FlexRows) {
+					foreach($base as $existingRow) $existingIds[$existingRow->rowId()] = true;
+				}
+				$item->checkLimit(true, $existingIds);
 				foreach($item as $row) {
-					$row->validateTree($minimum);
+					$baseRow = $base instanceof FlexRows ? $base->getById($row->rowId()) : null;
+					$row->validateTree(true, $baseRow);
+				}
+			}
+		}
+	}
+
+	/**
+	 * Enforce maxItems and maxFiles for newly introduced entries during bulk API assignment.
+	 *
+	 * @param FlexValue|null $baseline Previously stored value whose existing IDs remain allowed.
+	 * @return void
+	 * #pw-internal
+	 * @internal
+	 */
+	public function checkMaxLimits(?FlexValue $baseline = null): void {
+		foreach($this->definitions->properties() as $name => $definition) {
+			$item = $this->getUnformatted($name);
+			$base = $baseline && $baseline->definitions()->property($name) ? $baseline->getUnformatted($name) : null;
+			if($item instanceof FlexValue) {
+				$item->checkMaxLimits($base instanceof FlexValue ? $base : null);
+			} else if($item instanceof FlexRows) {
+				$existingIds = [];
+				if($base instanceof FlexRows) {
+					foreach($base as $existingRow) $existingIds[$existingRow->rowId()] = true;
+				}
+				$item->checkLimit(false, $existingIds);
+				foreach($item as $row) {
+					$baseRow = $base instanceof FlexRows ? $base->getById($row->rowId()) : null;
+					$row->checkMaxLimits($baseRow);
+				}
+			} else if($item instanceof Pagefiles) {
+				$max = (int) ($definition['settings']['maxFiles'] ?? 0);
+				if($max && count($item) > $max) {
+					$existingIds = [];
+					if($base instanceof Pagefiles) {
+						foreach($base as $existingFile) $existingIds[$existingFile->assetId()] = true;
+					}
+					foreach($item as $file) {
+						if(!isset($existingIds[$file->assetId()])) {
+							throw new WireException($this->_('Maximum Flex file count reached'));
+						}
+					}
 				}
 			}
 		}
@@ -560,9 +609,11 @@ class FlexValue extends WireData implements \JsonSerializable {
 		if($def && $def['kind'] === 'date') {
 			$timestamp = $value === '' ? '' : strtotime($value);
 			if(!$this->formatted) return $timestamp;
+			if($timestamp === '' || $timestamp === false) return '';
 			$language = $this->wire()->user->language;
 			$format = $language && !$language->isDefault() ? $def['input']->get('dateOutputFormat' . $language->id) : '';
-			return $this->wire()->datetime->formatDate($timestamp, $format ?: $def['input']->dateOutputFormat);
+			$outputFormat = (string) ($format ?: $def['input']->dateOutputFormat);
+			return $this->wire()->datetime->formatDate($timestamp, $outputFormat);
 		}
 		if($def && $def['input'] instanceof InputfieldToggle) {
 			$format = $def['settings']['formatType'];
@@ -862,7 +913,23 @@ class FlexValue extends WireData implements \JsonSerializable {
 		$input = $def['input'];
 		if(in_array($def['kind'], ['file', 'image'], true)) {
 			$class = $def['kind'] === 'image' ? FlexImages::class : FlexFiles::class;
-			return new $class($this->flexPage, $this->flexField, $this->flexAddress === '' ? $name : "$this->flexAddress.$name", $def, $value);
+			$files = new $class($this->flexPage, $this->flexField, $this->flexAddress === '' ? $name : "$this->flexAddress.$name", $def, $value);
+			if($assignment) {
+				$max = (int) ($def['settings']['maxFiles'] ?? 0);
+				if($max && count($files) > $max) {
+					$existingIds = [];
+					$current = parent::get($name);
+					if($current instanceof Pagefiles) {
+						foreach($current as $existingFile) $existingIds[$existingFile->assetId()] = true;
+					}
+					foreach($files as $file) {
+						if(!isset($existingIds[$file->assetId()])) {
+							throw new WireException($this->_('Maximum Flex file count reached'));
+						}
+					}
+				}
+			}
+			return $files;
 		}
 		if($def['kind'] === 'object') {
 			$address = $this->flexAddress === '' ? $name : "$this->flexAddress.$name";
@@ -876,13 +943,30 @@ class FlexValue extends WireData implements \JsonSerializable {
 			if(!is_array($raw) || ($raw && array_is_list($raw))) throw new WireException(__('Object value must be a property map'));
 			$object = new self($this->flexPage, $this->flexField, $def['schema'], $raw, $address);
 			if($source && ($source->ownerPage() !== $this->flexPage || $source->address() !== $address || !$source->belongsTo($this->flexPage, $this->flexField))) $object->copyValuesFrom($source);
+			if($assignment) {
+				$current = parent::get($name);
+				$object->checkMaxLimits($current instanceof FlexValue ? $current : null);
+			}
 			return $object;
 		}
 		if($def['kind'] === 'rows') {
-			if($value instanceof FlexRows && $value->belongsTo($this->flexPage, $this->flexField, $this->flexAddress === '' ? $name : "$this->flexAddress.$name")) {
-				return clone $value;
+			$address = $this->flexAddress === '' ? $name : "$this->flexAddress.$name";
+			$rows = ($value instanceof FlexRows && $value->belongsTo($this->flexPage, $this->flexField, $address))
+				? clone $value
+				: new FlexRows($this->flexPage, $this->flexField, $address, $def, $value);
+			if($assignment) {
+				$existingIds = [];
+				$current = parent::get($name);
+				if($current instanceof FlexRows) {
+					foreach($current as $existingRow) $existingIds[$existingRow->rowId()] = true;
+				}
+				$rows->checkLimit(false, $existingIds);
+				foreach($rows as $row) {
+					$baseRow = $current instanceof FlexRows ? $current->getById($row->rowId()) : null;
+					$row->checkMaxLimits($baseRow);
+				}
 			}
-			return new FlexRows($this->flexPage, $this->flexField, $this->flexAddress === '' ? $name : "$this->flexAddress.$name", $def, $value);
+			return $rows;
 		}
 		// Hydrate known leaves after renames; runtime exports and assignments stay awake.
 		$value = FlexMarkup::value($this->flexPage, $this->flexField, $name, $def, $value, false);
@@ -938,7 +1022,9 @@ class FlexValue extends WireData implements \JsonSerializable {
 					? $value->getLanguageValue($defaultId) : ($value[$defaultId] ?? '');
 			}
 		}
-		if($def['kind'] === 'date' && $value instanceof \DateTime) $value = $value->getTimestamp();
+		if($def['kind'] === 'date' && $value instanceof \DateTimeInterface) {
+			$value = $value->getTimestamp();
+		}
 		if(is_array($value) || (is_object($value) && !$value instanceof \Stringable)) {
 			throw new WireException(sprintf($this->_("Flex '%s' requires a scalar value"), $name));
 		}
@@ -952,11 +1038,12 @@ class FlexValue extends WireData implements \JsonSerializable {
 			$timestamp = $isTimestamp ? (int) $value : ($canonical
 				? strtotime($value)
 				: $this->wire()->datetime->stringToTimestamp((string) $value, $input->dateInputFormat));
-			if(!$timestamp) {
+			if($timestamp === false || $timestamp === '' || $timestamp === null) {
 				$timestamp = strtotime((string) $value);
 			}
-			if($timestamp === false || !$timestamp) {
-				throw new WireException(sprintf($this->_("Invalid date for Flex '%s'"), $name));
+			// Match FieldtypeDatetime::sleepValue() / InputfieldDatetime, which treat Unix epoch 0 as blank.
+			if($timestamp === false || $timestamp === 0) {
+				return '';
 			}
 			$time = ($isTimestamp && date('His', $timestamp) !== '000000') || $input->timeInputFormat || in_array($input->htmlType, ['datetime', 'time'], true)
 							|| preg_match('/[HGhis]/', (string) $input->dateInputFormat) || preg_match('/\d{2}:\d{2}/', (string) $value);
@@ -972,10 +1059,7 @@ class FlexValue extends WireData implements \JsonSerializable {
 		}
 		if($def['kind'] === 'integer' || $def['kind'] === 'float') {
 			if(is_bool($value)) $value = $value ? 1 : '';
-			if($value === '') return '';
-			if(!is_numeric($value)) {
-				throw new WireException(sprintf($this->_("Flex '%s' requires a number"), $name));
-			}
+			if($value === '' || !is_numeric($value)) return '';
 			if($def['kind'] === 'integer') return (int) $value;
 			$precision = $input->precision;
 			return $precision === null || $precision === '' || $precision < 0 ? (float) $value : round((float) $value, (int) $precision);

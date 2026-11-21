@@ -473,10 +473,9 @@ class FieldtypeFlex extends Fieldtype implements ConfigurableModule, FieldtypeHa
 			throw new WireException($this->_('Save an unformatted, owned Flex file on a live page'));
 		}
 		$allowed = ['description', 'tags', 'filedata', 'values', 'modified', 'modified_users_id'];
-		foreach($columns as $column) {
-			if(!in_array($column, $allowed, true)) {
-				throw new WireException($this->_('Unsupported Flex file metadata column'));
-			}
+		$selected = $columns ? array_values(array_intersect($columns, $allowed)) : $allowed;
+		if($columns && !$selected) {
+			return true;
 		}
 		// A retained file can outlive pending removal of its containing Row.
 		// Resolve optional root tracking before writing, never after commit.
@@ -493,7 +492,7 @@ class FieldtypeFlex extends Fieldtype implements ConfigurableModule, FieldtypeHa
 		$meta = FlexMarkup::sleepFile($page, $field, $file->pagefiles->metadataSchema(), FlexMedia::describe($file, $file->assetId()));
 		$own = !$this->wire()->database->inTransaction();
 		$this->storage()->requireTransactional($field);
-		$committed = $this->storage()->atomic(function() use ($page, $field, $file, $meta, $columns, $allowed) {
+		$committed = $this->storage()->atomic(function() use ($page, $field, $file, $meta, $selected) {
 			$raw = $this->storage()->persisted($page, $field, true);
 			$previousRevision = FlexStorage::revision($raw);
 			$collection =& FlexPath::rawProperty($raw, $file->pagefiles->address());
@@ -503,7 +502,7 @@ class FieldtypeFlex extends Fieldtype implements ConfigurableModule, FieldtypeHa
 					if(FlexStorage::revision($stored) !== FlexStorage::revision($file->baseline())) {
 						throw new WireException($this->_('Flex file changed; reload before saving metadata'));
 					}
-					foreach($columns ?: $allowed as $key) {
+					foreach($selected as $key) {
 						if(array_key_exists($key, $meta)) $collection['items'][$n][$key] = $meta[$key];
 						else unset($collection['items'][$n][$key]);
 					}
@@ -910,32 +909,7 @@ class FieldtypeFlex extends Fieldtype implements ConfigurableModule, FieldtypeHa
 	 * @return FlexValue|FlexInvalidValue
 	 */
 	public function sanitizeValue(Page $page, Field $field, $value) {
-		if($value instanceof FlexInvalidValue) {
-			if($value->belongsTo($page, $field) && $this->isPageEditRequest()) {
-				return $value;
-			}
-			throw $value->definitionError();
-		}
-		if($value instanceof FlexValue) {
-			if($value->belongsTo($page, $field)) {
-				return $value;
-			}
-			$value = $value->rawArray();
-		}
-		if($value === '' || $value === null) {
-			$value = [];
-		}
-		if(!is_array($value)) {
-			throw new WireException($this->_('Flex page values must be arrays or FlexValue objects'));
-		}
-		try {
-			return new FlexValue($page, $field, $this->getDefinitions($field, $page), $value);
-		} catch(FlexDefinitionException $e) {
-			if(!$this->isPageEditRequest()) {
-				throw $e;
-			}
-			return $this->invalidValue($page, $field, $value, $e);
-		}
+		return $this->hydratePageValue($page, $field, $value, true);
 	}
 
 	/**
@@ -960,7 +934,41 @@ class FieldtypeFlex extends Fieldtype implements ConfigurableModule, FieldtypeHa
 				throw new WireException($this->_('Stored Flex data must be a JSON object'));
 			}
 		}
-		return $this->sanitizeValue($page, $field, $value);
+		return $this->hydratePageValue($page, $field, $value, false);
+	}
+
+	private function hydratePageValue(Page $page, Field $field, $value, bool $checkMax) {
+		if($value instanceof FlexInvalidValue) {
+			if($value->belongsTo($page, $field) && $this->isPageEditRequest()) {
+				return $value;
+			}
+			throw $value->definitionError();
+		}
+		if($value instanceof FlexValue) {
+			if($value->belongsTo($page, $field)) {
+				return $value;
+			}
+			$value = $value->rawArray();
+		}
+		if($value === '' || $value === null) {
+			$value = [];
+		}
+		if(!is_array($value)) {
+			throw new WireException($this->_('Flex page values must be arrays or FlexValue objects'));
+		}
+		try {
+			$result = new FlexValue($page, $field, $this->getDefinitions($field, $page), $value);
+			if($checkMax && !$page->get('_cloning') instanceof Page) {
+				$previous = $page->data($field->name);
+				$result->checkMaxLimits($previous instanceof FlexValue ? $previous : null);
+			}
+			return $result;
+		} catch(FlexDefinitionException $e) {
+			if(!$this->isPageEditRequest()) {
+				throw $e;
+			}
+			return $this->invalidValue($page, $field, $value, $e);
+		}
 	}
 
 	/**

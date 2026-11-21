@@ -74,12 +74,12 @@ $same(2, count($formatted->rawArray()['prices']['values']['rows']['items']), 'fo
 // Validate effective native inputs, not just the public type string.
 $valid = ['type' => 'table', 'columns' => ['value' => ['type' => 'text']]];
 $badTables = [
- ['columns' => []], ['columns' => ['value']], ['editableHeaders' => 1], ['editableHeaders' => null], ['rowLabels' => []],
+ ['columns' => []], ['columns' => ['value']],
  ['minItems' => -1], ['minItems' => 3, 'maxItems' => 2], ['types' => []], ['rowLazyLoad' => true],
  ['columns' => ['row_label' => ['type' => 'text']]],
 ];
 foreach(['100%', 'auto', '-2rem', '0px', '1em', '1rem;display:none', 12] as $width) $badTables[] = ['columns' => ['value' => ['width' => $width]]];
-foreach(['fieldset', 'Markup', 'Hidden', 'Icon', 'Selector'] as $inputType) $badTables[] = ['columns' => ['value' => ['type' => $inputType]]];
+foreach(['fieldset', 'Markup', 'Hidden', 'Selector'] as $inputType) $badTables[] = ['columns' => ['value' => ['type' => $inputType]]];
 foreach([10, 11, 20, 21, 22] as $collapsed) $badTables[] = ['columns' => ['value' => ['type' => 'text', 'collapsed' => $collapsed]]];
 $badTables[] = ['columns' => ['value' => ['type' => 'object', 'children' => []]]];
 $badTables[] = ['columns' => ['value' => ['type' => 'rows', 'types' => ['item' => ['children' => []]]]]];
@@ -88,6 +88,12 @@ foreach($badTables as $index => $override) {
  $bad = clone $tf; $bad->flexDefinition = json_encode(['prices' => array_replace($valid, $override)]);
  $throws(fn() => $type->getDefinitions($bad, $page), "invalid table definition $index is rejected", FlexDefinitionException::class);
 }
+$coerced = clone $tf;
+$coerced->flexDefinition = json_encode(['prices' => ['type' => 'table', 'editableHeaders' => 1, 'rowLabels' => 1, 'columns' => ['slug' => ['type' => 'Name']]]]);
+$coercedDefs = $type->getDefinitions($coerced, $page);
+$assert($coercedDefs->property('prices.headers') !== null, 'truthy editableHeaders coerces to boolean');
+$assert($coercedDefs->property('prices.rows.row.row_label') !== null, 'truthy rowLabels coerces to boolean');
+$assert($coercedDefs->getPropertyInputfield('prices.rows.row.slug') instanceof InputfieldName, 'table columns accept InputfieldText subclasses structurally');
 $bad = clone $tf;
 $bad->flexDefinition = json_encode(['prices' => ['type' => 'table', 'columns' => ['body' => ['type' => 'TinyMCE', 'inheritField' => $sourceField->name]]]]);
 $same('InputfieldTinyMCE', $type->getDefinitions($bad, $page)->getPropertyInputfield('prices.rows.row.body')->className(), 'table supports inherited TinyMCE settings');

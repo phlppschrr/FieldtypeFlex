@@ -38,4 +38,19 @@ $page = $wire->pages->get($id);
 $page->of(false);
 $same('changed@example.test', $page->flex_test->email, 'nested mutation persisted by full page save');
 $throws(fn() => $page->flex_test->set('unknown', 'x'), 'unknown API property rejected');
-$throws(fn() => $page->flex_test->set('age', 'twelve'), 'invalid numeric API input rejected');
+$page->flex_test->set('age', 'twelve');
+$same('', $page->flex_test->age, 'invalid numeric API input sanitizes to blank');
+$page->flex_test->set('date', 'not-a-date');
+$same('', $page->flex_test->date, 'invalid date API input sanitizes to blank');
+$page->flex_test->set('date', 0);
+$same('', $page->flex_test->date, 'numeric 0 date becomes blank matching FieldtypeDatetime');
+$prevTz = date_default_timezone_get();
+date_default_timezone_set('UTC');
+try {
+	$page->flex_test->set('date', '1970-01-01');
+	$same('', $page->flex_test->rawArray()['date'], 'Unix epoch 0 ISO date sanitizes to blank matching FieldtypeDatetime::sleepValue()');
+	$page->flex_test->set('date', new \DateTime('@0'));
+	$same('', $page->flex_test->rawArray()['date'], 'DateTime(@0) sanitizes to blank matching FieldtypeDatetime::sleepValue()');
+} finally {
+	date_default_timezone_set($prevTz);
+}

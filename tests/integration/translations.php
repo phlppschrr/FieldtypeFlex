@@ -27,7 +27,7 @@ $translationSources = [
 	'src/FlexAdmin.php'           => ['Uploads are disabled for this property'],
 	'src/FlexQuery.php'           => ['Item count', 'Unsupported Flex selector operator: %s'],
 	'src/FlexRows.php'            => ['Maximum repeatable item count reached', 'Invalid Flex row ID'],
-	'src/FlexValue.php'           => ["Invalid date for Flex '%s'"],
+	'src/FlexValue.php'           => ['Unknown Flex property: %s'],
 	'src/InputfieldFlexMedia.php' => ['Rotate 90°', 'Flip vertically'],
 ];
 
