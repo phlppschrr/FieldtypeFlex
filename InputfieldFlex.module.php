@@ -17,7 +17,7 @@ class InputfieldFlex extends Inputfield implements BridgeComponent {
 	public static function getModuleInfo() {
 		return [
 			'title'    => __('Flex'),
-			'version'  => '1.0.0-beta.6',
+			'version'  => '1.0.0-beta.7',
 			'summary'  => __('Schema-defined compound input'),
 			'requires' => ['ProcessWire>=3.0.259', 'PHP>=8.1.0', 'FieldtypeFlex'],
 		];

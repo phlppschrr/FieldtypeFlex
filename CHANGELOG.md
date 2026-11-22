@@ -2,6 +2,8 @@
 
 ## WIP
 
+## 1.0.0-beta.7 - 2026-11-22
+
 ### Added
 
 - Support adding remote `http://` and `https://` file URLs directly via `FlexFiles::add()` and `FlexImages::add()` using native `WireHttp::download()`.
@@ -25,6 +27,7 @@
 - Migrate TypeScript admin sources from legacy `outFile` namespaces to standard ES modules bundled with `esbuild` (`tsc --noEmit` for strict type checking, IIFE output without a global `FieldtypeFlex` namespace leak, shared DOM helpers in `FlexMaintenance.js`, and slice-free JS tests).
 - Refine `type => 'table'` editor chrome: reveal manual column-sort arrows only on header hover/focus (while keeping active and `sortOnSave` arrows visible) and omit the entire drag-sort column when `sortOnSave` is configured, placing bulk-selection checkboxes in the actions column.
 - Collapse expanded card rows while dragging to reorder and restore their open state on drop for clearer reordering of tall rows.
+- Refresh `README.md` with light/dark wordmarks and a concise feature overview, and streamline `API.md` (adding clipboard copy/paste, a central `Hooks` table, `table` value types, and `Pages Export/Import` compatibility notes).
 
 ### Removed
 
