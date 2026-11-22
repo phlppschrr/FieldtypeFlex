@@ -507,6 +507,12 @@ class FlexQuery extends Wire {
 			}
 			break;
 		} while(true);
+		if($mode === 'count') {
+			$this->assertOperator($operator, self::NUMBER_OPERATORS);
+			if(!is_numeric($value)) {
+				return $operator === '!=' ? '1=1' : '1=0';
+			}
+		}
 		$from = 'FROM fieldtype_flex_rows AS ' . $nodes[0]['alias'];
 		$conditions = [];
 		$fieldKey = $query->bindValueGetKey((int) $query->field->id);
@@ -527,10 +533,6 @@ class FlexQuery extends Wire {
 		$conditions[] = $parent === null ? "$first.parent_row_key=''" : "$first.parent_row_key=$parent.row_key";
 		$from .= ' WHERE ' . implode(' AND ', $conditions);
 		if($mode === 'count') {
-			$this->assertOperator($operator, self::NUMBER_OPERATORS);
-			if(!is_numeric($value)) {
-				return $operator === '!=' ? '1=1' : '1=0';
-			}
 			return $this->compare($query, "(SELECT COUNT(*) $from)", $operator, 0 + $value, self::NUMBER_OPERATORS);
 		}
 		if($mode === '_type') {
