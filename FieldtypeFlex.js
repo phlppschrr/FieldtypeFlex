@@ -291,8 +291,10 @@
         tolerance: "pointer",
         placeholder: "flex-row-placeholder",
         start(_event, ui) {
-          ui.placeholder.height(ui.item[0].getBoundingClientRect().height);
           start(ui.item[0]);
+          ui.item[0].style.height = "";
+          ui.placeholder.height(ui.item[0].getBoundingClientRect().height);
+          $(list).sortable("refreshPositions");
         },
         stop(_event, ui) {
           stop(ui.item[0]);
@@ -510,6 +512,7 @@
     const bodies = rowBodies(row);
     const transport = row.querySelector(":scope > .flex-table-actions .flex-row-transport") || row;
     row.classList.toggle("flex-row-remove-pending", removed);
+    if (removed) row.querySelector(":scope > .flex-row-header .flex-table-more")?.removeAttribute("open");
     one(row, ":scope > .flex-row-header").classList.toggle("ui-state-error", removed);
     one(row, ":scope > .flex-row-remove-value, :scope > .flex-table-actions .flex-row-remove-value").value = removed ? "1" : "0";
     all(transport, ":scope > .flex-row-remove-mirror").forEach((input) => input.remove());
@@ -831,11 +834,24 @@
       });
       if (errorPreview && !tableEditors.has(set)) openTableEditor(errorPreview, false);
       if (!set.matches(".flex-table-auto")) {
-        sortable.init(rowList(set), teardown, async (row) => {
-          order(set);
-          await classic.setup(row);
-          moved(set, row);
-        });
+        sortable.init(
+          rowList(set),
+          (row) => {
+            teardown(row);
+            if (row.tagName !== "TR" && !row.matches(".InputfieldStateCollapsed")) {
+              rowState(row).reopenAfterSort = true;
+              openRow(row, false);
+            }
+          },
+          async (row) => {
+            const reopen = !!rowState(row).reopenAfterSort;
+            delete rowState(row).reopenAfterSort;
+            order(set);
+            if (reopen && !row.matches(".flex-row-remove-pending")) openRow(row, true);
+            await classic.setup(row);
+            moved(set, row);
+          }
+        );
       }
       updateLabels(set);
       updateActions(set);

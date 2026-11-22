@@ -36,7 +36,13 @@ export const sortable = {
         }).sortable({
             items: '> .flex-row[data-flex-row]', handle: '.flex-row-sort', cancel: ':input:not(.flex-row-sort), a',
             axis: 'y', distance: 5, tolerance: 'pointer', placeholder: 'flex-row-placeholder',
-            start(_event, ui) { ui.placeholder.height(ui.item[0].getBoundingClientRect().height); start(ui.item[0]); },
+            start(_event, ui) {
+                start(ui.item[0]);
+                // Clear jQuery UI's pre-captured helper height so collapsed cards shrink to header height.
+                ui.item[0].style.height = '';
+                ui.placeholder.height(ui.item[0].getBoundingClientRect().height);
+                $(list).sortable('refreshPositions');
+            },
             stop(_event, ui) { stop(ui.item[0]); }
         });
     },

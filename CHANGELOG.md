@@ -23,6 +23,8 @@
 - Evaluate Flex definitions once per selector predicate and sort expression in `FlexQuery`, deduplicating nested object path traversal.
 - Skip transient `Field` allocation in `FlexMediaCollection::formatDescription()` when no textformatters are configured, read formatted custom metadata without cloning the whole `FlexValue`, target known native POST keys in `InputfieldFlexMedia`, and avoid describing unchanged files during metadata processing.
 - Migrate TypeScript admin sources from legacy `outFile` namespaces to standard ES modules bundled with `esbuild` (`tsc --noEmit` for strict type checking, IIFE output without a global `FieldtypeFlex` namespace leak, shared DOM helpers in `FlexMaintenance.js`, and slice-free JS tests).
+- Refine `type => 'table'` editor chrome: reveal manual column-sort arrows only on header hover/focus (while keeping active and `sortOnSave` arrows visible) and omit the entire drag-sort column when `sortOnSave` is configured, placing bulk-selection checkboxes in the actions column.
+- Collapse expanded card rows while dragging to reorder and restore their open state on drop for clearer reordering of tall rows.
 
 ### Removed
 
@@ -31,6 +33,7 @@
 
 ### Fixed
 
+- Preserve the table row action menu slot width when a row is marked pending removal so double-clicking the remove icon reliably marks or restores all table rows.
 - Reuse the request-local admin service instance in `FieldtypeFlex::admin()`.
 - Include nested `object` and `table` children in `flex schema` inspection output.
 - Reserve native `Pagefile`/`Pageimage` magic properties with an explicit list instead of reading runtime PHPDoc comments, preserving validation when `opcache.save_comments` is disabled.

@@ -10,6 +10,7 @@ export interface LegacyCollection {
     dialog(action: string): void;
     hasClass(name: string): boolean;
     sortable(options: SortOptions): LegacyCollection;
+    sortable(action: string): LegacyCollection;
     sortable(action: string, option: string, value: boolean): LegacyCollection;
 }
 export interface LegacyJQuery {

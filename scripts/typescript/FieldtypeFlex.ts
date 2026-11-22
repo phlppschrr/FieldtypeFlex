@@ -6,7 +6,7 @@ import {sourceMatches, titleFragment, titleParts, titleSourceValue, type TitleDa
 interface RowResponse {html: string; rows?: {html: string}[]; error?: boolean; message?: string; warning?: string;}
 interface ClipboardResponse {clipboard: string; error?: boolean; message?: string;}
 interface UploadItem {markup: string; error?: boolean; message?: string;}
-interface RowState { title?: TitleData; removalReady?: boolean; load?: Promise<boolean>; }
+interface RowState { title?: TitleData; removalReady?: boolean; reopenAfterSort?: boolean; load?: Promise<boolean>; }
 const state = new WeakMap<HTMLElement, RowState>();
 const disabledBeforeRemoval = new WeakMap<Control, boolean>();
 const busyTrees = new WeakSet<HTMLElement>();
@@ -32,6 +32,7 @@ function removalState(row: HTMLElement, removed: boolean): void {
     const bodies = rowBodies(row);
     const transport = row.querySelector<HTMLElement>(':scope > .flex-table-actions .flex-row-transport') || row;
     row.classList.toggle('flex-row-remove-pending', removed);
+    if(removed) row.querySelector<HTMLDetailsElement>(':scope > .flex-row-header .flex-table-more')?.removeAttribute('open');
     one(row, ':scope > .flex-row-header').classList.toggle('ui-state-error', removed);
     one<HTMLInputElement>(row, ':scope > .flex-row-remove-value, :scope > .flex-table-actions .flex-row-remove-value').value = removed ? '1' : '0';
     all(transport, ':scope > .flex-row-remove-mirror').forEach(input => input.remove());
@@ -318,7 +319,24 @@ function initRows(context: ParentNode): void {
         });
         if(errorPreview && !tableEditors.has(set)) openTableEditor(errorPreview, false);
         if(!set.matches('.flex-table-auto')) {
-            sortable.init(rowList(set), teardown, async row => { order(set); await classic.setup(row); moved(set, row); });
+            sortable.init(
+                rowList(set),
+                row => {
+                    teardown(row);
+                    if(row.tagName !== 'TR' && !row.matches('.InputfieldStateCollapsed')) {
+                        rowState(row).reopenAfterSort = true;
+                        openRow(row, false);
+                    }
+                },
+                async row => {
+                    const reopen = !!rowState(row).reopenAfterSort;
+                    delete rowState(row).reopenAfterSort;
+                    order(set);
+                    if(reopen && !row.matches('.flex-row-remove-pending')) openRow(row, true);
+                    await classic.setup(row);
+                    moved(set, row);
+                }
+            );
         }
         updateLabels(set); updateActions(set);
     });

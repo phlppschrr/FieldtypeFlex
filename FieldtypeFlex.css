@@ -45,7 +45,6 @@
 .flex-table-grid .flex-table-column-sort { cursor: pointer; }
 .flex-table-grid .flex-table-column-sort:disabled { opacity: .35; cursor: default; }
 .flex-table-grid .flex-table-column-sort:focus-visible { outline: 2px solid currentColor; }
-.flex-table-auto > .flex-table-scroll > table > thead > tr > .flex-table-sort { padding: 0; }
 .flex-table-grid .flex-table-resize {
     position: absolute;
     inset-block: 0;
@@ -397,8 +396,8 @@
 }
 .flex-rows .flex-row input.flex-row-select[hidden] { display: none; }
 .flex-rows .flex-row .flex-row-select:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
-.flex-table-sort > .flex-row-select { vertical-align: middle; }
-.flex-selection-active > .flex-table-scroll > table > tbody > .flex-row > .flex-table-sort { vertical-align: middle; }
+:is(.flex-table-sort, .flex-table-actions) > .flex-row-select { vertical-align: middle; }
+.flex-selection-active > .flex-table-scroll > table > tbody > .flex-row > :is(.flex-table-sort, .flex-table-actions) { vertical-align: middle; }
 .flex-row-controls {
     display: inline-flex;
     flex: none;
@@ -421,6 +420,9 @@
     .flex-row:not(:hover) > .flex-row-header:not(:focus-within) > .flex-row-bar > .flex-row-toggle > .flex-row-chevron {
         opacity: 0;
         pointer-events: none;
+    }
+    .flex-table-grid > thead > tr > th:not(:hover, :focus-within, [aria-sort]) .flex-table-column-sort {
+        opacity: 0;
     }
 }
 .flex-row.InputfieldStateCollapsed > .flex-row-header .flex-row-chevron {
@@ -536,7 +538,11 @@
 .flex-row-remove-pending > .flex-row-header .flex-row-title {
     text-decoration: line-through;
 }
-.flex-row-remove-pending > .flex-table-actions .flex-table-more,
+.flex-row-remove-pending > .flex-table-actions .flex-table-more {
+    /* Preserve slot width so double-clicking the adjacent remove icon stays under the pointer. */
+    visibility: hidden;
+    pointer-events: none;
+}
 .flex-row-remove-pending > .flex-row-header .flex-row-action:not([data-flex-row-action="remove"]) {
     display: none;
 }
