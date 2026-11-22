@@ -321,19 +321,22 @@ class InputfieldFlexRows extends Inputfield implements BridgeComponent {
 			$cells .= '<' . $tag . ' class="flex-table-cell"' . ($tag === 'th' ? ' scope="row"' : '') . $key . '>' . $this->tableCell($input, $readOnly) . '</' . $tag . '>';
 		}
 		if($readOnly) return '<tr>' . $cells . '</tr>';
-		$handle = '';
-		if(!$automatic) {
+		$sortCell = '';
+		$selectInActions = '';
+		if($automatic) {
+			$selectInActions = $this->rowSelectionCheckbox();
+		} else {
 			$sortLabel = $entities($this->_('Drag to reorder; use Up and Down arrow keys when focused'));
 			$handle = '<button type="button" class="flex-row-sort" title="' . $sortLabel . '" aria-label="' . $sortLabel . '"><i class="fa fa-fw fa-arrows" aria-hidden="true"></i></button>';
+			$sortCell = '<td class="flex-table-sort">' . $handle . $this->rowSelectionCheckbox() . '</td>';
 		}
 		$transport = '';
 		foreach(['remove' => $removed, 'hidden' => $row->isHidden()] as $control => $state) {
 			$transport .= '<input type="hidden" class="flex-row-' . $control . '-value" name="' . $entities(FlexPath::controlName($this->flexInputName ?: $this->name, $row->address(), $control)) . '" value="' . ($state ? '1' : '0') . '">';
 		}
 		return '<tr class="flex-row' . ($row->isHidden() ? ' flex-row-hidden' : '') . ($removed ? ' flex-row-remove-pending' : '') . '" data-flex-row="' . $id . '" data-flex-type="' . $entities($row->rowType()) . '">' .
-			'<td class="flex-table-sort">' . $handle .
-			$this->rowSelectionCheckbox() . '</td>' . $cells .
-			'<td class="flex-row-header flex-table-actions"><div class="flex-row-controls">' . $this->rowActions($row, $removed, true) . '</div><span class="flex-row-transport">' . $transport . '</span></td></tr>';
+			$sortCell . $cells .
+			'<td class="flex-row-header flex-table-actions"><div class="flex-row-controls">' . $this->rowActions($row, $removed, true) . '</div>' . $selectInActions . '<span class="flex-row-transport">' . $transport . '</span></td></tr>';
 	}
 
 	/** Headers use the same prepared inputs as normal Object form processing. */
@@ -374,11 +377,9 @@ class InputfieldFlexRows extends Inputfield implements BridgeComponent {
 		}
 		$sortSettings = '';
 		if(!$readOnly) {
-			$cols = '<col>' . $cols . '<col>';
-			$rowControl = $sort
-				? $this->_('Select row')
-				: $this->_('Reorder rows');
-			$head = '<th class="flex-table-sort" scope="col"><span class="flex-table-sr">' . $entities($rowControl) . '</span></th>' . $head .
+			$cols = ($sort ? '' : '<col>') . $cols . '<col>';
+			$sortHead = $sort ? '' : '<th class="flex-table-sort" scope="col"><span class="flex-table-sr">' . $entities($this->_('Reorder rows')) . '</span></th>';
+			$head = $sortHead . $head .
 				'<th class="flex-table-actions" scope="col"><span class="flex-table-sr">' . $entities($this->_('Row actions')) . '</span></th>';
 			$sortSettings = $sort ? '' : ' data-flex-sort-locale="' . $entities(FlexTableSort::locale($this->flexRoot->ownerPage())) . '" data-flex-sort-decimal="' . $entities(localeconv()['decimal_point']) . '"';
 		}

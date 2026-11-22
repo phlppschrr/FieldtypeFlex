@@ -527,19 +527,36 @@ test('TinyMCE move lifecycle saves/removes editors and retains unrelated inline 
     h.flex.test.teardown(h.document.querySelector('.flex-row'));
     assert.deepEqual(calls,['save:editor','remove:editor']); assert(!h.document.querySelector('textarea').matches('.InputfieldTinyMCELoaded')); h.close();
 });
-test('classic sortable adapter passes native Elements and does not initialize twice', async () => {
-    let options, initCount = 0, disabled;
+test('classic sortable adapter passes native Elements, collapses expanded rows during drag and restores them on drop', async () => {
+    let options, initCount = 0, disabled, refreshed = 0;
     const collections = new WeakMap();
-    const h = await harness(set(), {internals: true, before(w) {
+    const h = await harness(set(row('a', 'Open') + row('b', 'Closed')), {internals: true, before(w) {
         function $(element) {
-            if(!collections.has(element)) collections.set(element, {0:element,on(){return this;},trigger(){return this;},hasClass:name=>element.classList.contains(name),sortable(...args){if(typeof args[0]==='object'){options=args[0];initCount++;element.classList.add('ui-sortable');}else disabled=args[2];return this;}});
+            if(!collections.has(element)) collections.set(element, {0:element,on(){return this;},trigger(){return this;},hasClass:name=>element.classList.contains(name),sortable(...args){if(typeof args[0]==='object'){options=args[0];initCount++;element.classList.add('ui-sortable');}else if(args[0]==='refreshPositions'){refreshed++;}else if(args[0]==='option'){disabled=args[2];}return this;}});
             return collections.get(element);
         }
         $.fn = {sortable:true}; w.jQuery = $;
     }});
     assert.equal(initCount,1); h.flex.test.initRows(h.document); assert.equal(initCount,1); assert.equal(disabled,false);
+    const openRow = h.document.querySelector('[data-flex-row="a"]');
+    const closedRow = h.document.querySelector('[data-flex-row="b"]');
+    closedRow.classList.add('InputfieldStateCollapsed');
+    let collapsedBeforePlaceholder = false, clearedHeightBeforePlaceholder = false;
+    openRow.style.height = '566px';
+    options.start({}, {item:{0:openRow}, placeholder:{height(){ collapsedBeforePlaceholder = openRow.matches('.InputfieldStateCollapsed'); clearedHeightBeforePlaceholder = openRow.style.height === ''; }}});
+    assert(collapsedBeforePlaceholder, 'expanded row collapses before placeholder height is measured');
+    assert(clearedHeightBeforePlaceholder, 'jQuery UI pre-captured helper height is cleared before placeholder measurement');
+    assert.equal(openRow.querySelector('.flex-row-toggle').getAttribute('aria-expanded'), 'false');
+    assert.equal(refreshed, 1);
+    await options.stop({}, {item:{0:openRow}});
+    assert(!openRow.matches('.InputfieldStateCollapsed'), 'expanded row reopens on drop');
+    assert.equal(openRow.querySelector('.flex-row-toggle').getAttribute('aria-expanded'), 'true');
+    options.start({}, {item:{0:closedRow}, placeholder:{height(){}}});
+    assert(closedRow.matches('.InputfieldStateCollapsed'));
+    await options.stop({}, {item:{0:closedRow}});
+    assert(closedRow.matches('.InputfieldStateCollapsed'), 'already collapsed row remains collapsed after drop');
     let moved; const list=h.document.createElement('div'); h.flex.sortable.init(list, row=>moved=row, ()=>{});
-    const rowElement=h.document.querySelector('.flex-row'); options.start({}, {item:{0:rowElement},placeholder:{height(){}}}); assert.equal(moved,rowElement); h.close();
+    options.start({}, {item:{0:openRow},placeholder:{height(){}}}); assert.equal(moved,openRow); h.close();
 });
 test('maintenance preview invalidates changed cleanup selection and displays server text safely', async () => {
     const dom = new JSDOM(`<form><input class="_post_token" name="TOKEN" value="secret"><div class="FlexMaintenance" data-field="1" data-messages='{"retry":"Retry"}'><section class="FlexMaintenanceTask"><button data-flex-maintenance="orphans">Scan</button><div class="FlexMaintenancePaths"></div><button data-flex-maintenance="cleanup" hidden>Preview</button><button data-flex-maintenance="applyCleanup" hidden>Apply</button><div class="FlexMaintenanceReport"></div><p class="FlexMaintenanceProgress"></p></section></div></form>`,{runScripts:'outside-only',url:'https://fixture.test/'});
@@ -966,6 +983,34 @@ test('table selection uses the whole row and suspends cell editing without chang
     assert.equal(input.closest('[inert]'), null);
     input.focus();
     assert.equal(d.activeElement, input);
+    h.close();
+});
+
+test('sortOnSave table bulk selection works without a sort column and double-clicking remove marks/undoes all rows', async () => {
+    const autoRow = (id, text = 'Cell') => tableRow(id, text)
+        .replace(/<td class="flex-table-sort">.*?<\/td>/, '')
+        .replace('<span class="flex-row-transport">', rowCheckbox + '<span class="flex-row-transport">');
+    const html = collectionSet('blocks', tableSet(autoRow('a', 'One') + autoRow('b', 'Two') + autoRow('c', 'Three')))
+        .replace('flex-table"', 'flex-table flex-table-auto"')
+        .replace('<th>Sort</th>', '');
+    const h = await harness(html, {before(w) {w.confirm = () => true;}});
+    const d = h.document;
+    assert.equal(d.querySelector('.flex-table-sort'), null);
+    d.querySelector('[data-flex-selection-action="start"]').click();
+    assert(!d.querySelector('[data-flex-row="a"] .flex-row-select').hidden);
+    d.querySelector('[data-flex-row="a"] .flex-table-cell').click();
+    assert(d.querySelector('[data-flex-row="a"] .flex-row-select').checked);
+    d.querySelector('[data-flex-selection-action="done"]').click();
+    assert(d.querySelector('[data-flex-row="a"] .flex-row-select').hidden);
+    const remove = d.querySelector('[data-flex-row="a"] [data-flex-row-action="remove"]');
+    const more = d.querySelector('[data-flex-row="a"] .flex-table-more');
+    more.open = true;
+    // Simulate a real browser double-click sequence: click, click, dblclick.
+    remove.click(); remove.click(); remove.dispatchEvent(new h.window.MouseEvent('dblclick', {bubbles: true}));
+    assert.equal(d.querySelectorAll('.flex-row-remove-pending').length, 3);
+    assert(!more.open);
+    remove.click(); remove.click(); remove.dispatchEvent(new h.window.MouseEvent('dblclick', {bubbles: true}));
+    assert.equal(d.querySelectorAll('.flex-row-remove-pending').length, 0);
     h.close();
 });
 

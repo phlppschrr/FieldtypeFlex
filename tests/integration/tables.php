@@ -244,7 +244,9 @@ $autoHtml = $renderSort('auto');
 $same(3, substr_count($manualHtml, 'class="flex-table-column-sort"'), 'only Text, Integer and Float headings have a manual sort control');
 $assert(str_contains($manualHtml, 'class="flex-row-sort"'), 'manual tables still offer row drag handles');
 $assert(str_contains($autoHtml, 'Sorted by Price in descending order on save') && !str_contains($autoHtml, 'class="flex-table-column-sort"'), 'automatic table heading explains the fixed order and omits manual sorts');
-$assert(!str_contains($autoHtml, 'class="flex-row-sort"') && str_contains($autoHtml, 'class="flex-row-select '), 'automatic tables omit drag handles while retaining bulk selection');
+$assert(!str_contains($autoHtml, 'class="flex-row-sort"') && !str_contains($autoHtml, 'class="flex-table-sort"') && str_contains($autoHtml, 'class="flex-row-select '), 'automatic tables omit the entire sort column while retaining bulk selection in actions');
+$same(6, preg_match_all('~<col\b~', $manualHtml), 'manual table renders colgroup entries for sort, 4 data columns and actions');
+$same(5, preg_match_all('~<col\b~', $autoHtml), 'automatic table omits the sort colgroup entry (4 data columns and actions only)');
 foreach(['date', '-date', 'missing', '--price', '+price', '-', '', ['column' => 'price', 'direction' => 'desc']] as $invalidSort) {
 	$bad->flexDefinition = json_encode(['grid' => $manualTable + ['sortOnSave' => $invalidSort]]);
 	$throws(fn() => $type->getDefinitions($bad, $page), 'unsupported automatic sort definition is rejected', FlexDefinitionException::class);
