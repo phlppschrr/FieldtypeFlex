@@ -1,51 +1,61 @@
-# FieldtypeFlex
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/wordmark-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="docs/images/wordmark-light.svg">
+  <img alt="FieldtypeFlex" src="docs/images/wordmark-light.svg" height="48">
+</picture>
 
-**Structured content in one ProcessWire field.**
+**Schema-defined structured content in a single ProcessWire field.**
 
-FieldtypeFlex lets you define structured content in PHP or JSON and edit it using native ProcessWire Inputfields. Instead of creating separate fields for every property, you can keep related values together in a single field.
+[![Version](https://img.shields.io/github/v/release/phlppschrr/FieldtypeFlex?include_prereleases&label=version&color=eb1d61)](https://github.com/phlppschrr/FieldtypeFlex/releases)
+![ProcessWire 3.0.259+](https://img.shields.io/badge/ProcessWire-3.0.259%2B-1f2328)
+![PHP 8.1+](https://img.shields.io/badge/PHP-8.1%2B-777bb4)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-Use it for anything from a simple group of properties to nested content blocks with different types, images and Page references. Values are accessible through the familiar ProcessWire API and can be queried with selectors.
-
-**Version:** 1.0.0-beta.6
+Define objects, typed repeatable blocks, and editable tables in PHP or JSON — version-controlled in Git, rendered with native ProcessWire Inputfields, and stored without extra Repeater pages or separate fields. Read values through the familiar ProcessWire API and query them with standard selectors.
 
 https://github.com/user-attachments/assets/eb40e7a9-d51c-47b3-b798-db6acb97651a
 
-[View a static screenshot](docs/images/editor.jpg).
+[View a static screenshot](docs/images/editor.jpg)
+
+---
+
+## Building blocks
+
+Combine four composable structures inside a single Flex field:
+
+| Structure | What it gives you |
+| --- | --- |
+| **Native inputs** | Regular ProcessWire Inputfields (TinyMCE, Images, Files, Page references, Multilingual, conditional `showIf`/`requiredIf`) with familiar settings. |
+| **Objects** | Fixed, nested property groups that keep related values together without creating separate ProcessWire fields. |
+| **Rows** | Repeatable, typed, and nestable content blocks with dynamic titles — no extra Repeater pages required. |
+| **Tables** | Fixed columns with inline editing, optional editable headings and row labels, column sorting, and expandable detail rows for rich text, images, files, and page trees. |
 
 ## Features
 
-- **Define structures in code.** Use PHP, JSON or native Inputfield objects. PHP definitions support reusable schemas, translations and page-aware configuration.
-- **Native ProcessWire inputs.** Use TinyMCE, images, Page references, multilingual fields, conditional inputs and familiar editor layouts.
-- **Native Bridge support.** Use AdminThemeBridge 0.24.0+ without jQuery for native child Inputfields; classic ProcessWire admin themes remain supported.
-- **Language alternates.** Define siblings such as `image` and `image_de`; formatted reads select the current language with native fallback. See [Language Alternate Fields](API.md#language-alternate-fields).
-- **Structured Objects.** Group related properties into fixed, nested structures without creating separate ProcessWire fields.
-- **Typed and nested Rows.** Mix different block types, each with its own fields. Editors can add, duplicate, reorder and hide rows without separate Repeater Pages.
-- **Tables.** Use fixed columns with optional editable headings and row labels. Edit files, images, page trees and rich text in a detail row below the cells. See the [table examples](examples/08-tables.php).
-- **Files and images.** Use ProcessWire-compatible `Pagefile` and `Pageimage` objects, image resizing and custom metadata for individual files.
-- **ProcessWire selectors.** Find pages by properties inside Objects and Rows, including nested values and block types.
-- **Schema changes without data loss.** Unknown properties survive normal saves. Use `renamedFrom` and maintenance tools to handle renamed or obsolete properties.
+### Schema as code & developer experience
+- **Git-friendly definitions.** Author schemas in PHP, JSON, or native `InputfieldWrapper` objects — with reusable parts, page-aware logic, and `inheritField` to reuse existing field settings.
+- **IDE autocompletion.** Generate ready-to-use PHPDoc class stubs directly from the field settings (or programmatically via `getPhpDoc()`).
+- **Safe schema evolution.** Unknown properties survive normal saves, and `renamedFrom` plus built-in maintenance tools handle renames and cleanup without data loss.
 
-Flex fields also work inside native ProcessWire Repeaters.
+### Native editor experience
+- **Feels like core ProcessWire.** Uses native ProcessWire Inputfields, editor layouts, and scoped dependencies (`parent.`, `root.`, `page.`, `forpage.`). Also works inside native ProcessWire Repeaters.
+- **Copy, paste, and bulk actions.** Copy and paste single or multiple rows — even across different ProcessWire installations, with automatic resolution of Page references, language values, and media. Select multiple rows to copy, hide, or mark them for removal in one step.
+- **Smooth row & table workflows.** Add, duplicate, hide, reorder via drag-and-drop, and sort tables manually from column headers or automatically on save (`sortOnSave`).
 
-## Installation
+### Media, languages & querying
+- **First-class files and images.** Returns ProcessWire-compatible `Pagefile` and `Pageimage` objects with resizing and per-file custom metadata fields.
+- **Multilingual & Language Alternates.** Supports ProcessWire's native multilingual inputs as well as sibling Language Alternate fields (such as `image` and `image_de`) with automatic fallback.
+- **Full ProcessWire selectors.** Find pages by properties inside Objects, Rows, and Tables — including nested values, block types, and row counts.
 
-Requires **ProcessWire 3.0.259+**, **PHP 8.1+**, **MySQL 8.0+ or MariaDB 10.11+**, and **InnoDB**.
-
-1. Copy the module to `/site/modules/FieldtypeFlex/`.
-2. In ProcessWire Admin, go to **Modules → Refresh** and install **FieldtypeFlex**.
-3. Create a field using FieldtypeFlex and add it to a page template.
-
-Translations for German, French and Spanish are available on the module page.
+---
 
 ## Quick start
 
-Let's create a `content` field with an introduction and two types of content blocks: Text and Gallery.
+Let's build a `content` field with an introduction and two repeatable block types: **Text** and **Gallery**.
 
-### Define your content
+### 1. Define the schema
 
-Create a Flex field named `content` and add it to your page template. Make sure InputfieldTinyMCE is installed.
-
-Save this definition as `site/templates/flex-fields/content.php`:
+Create a Flex field named `content`, add it to your template (with `InputfieldTinyMCE` installed), and save this definition as `site/templates/flex-fields/content.php`:
 
 ```php
 <?php namespace ProcessWire;
@@ -61,7 +71,8 @@ return [
         'types' => [
             'text' => [
                 'label' => 'Text',
-                'rowTitle' => '[#{@index}]{.flex-muted} {heading|"Untitled"}',
+                // Dynamic row header with fallback value
+                'rowTitle' => '#{@index} {heading|"No heading"}',
                 'children' => [
                     'heading' => [
                         'type' => 'text',
@@ -98,82 +109,81 @@ return [
 ];
 ```
 
-### Access your content
+### 2. Render in your template
 
-Flex properties are accessible through the usual ProcessWire API. These examples assume output formatting is enabled, as it is in page templates:
+Read Flex values through the standard ProcessWire API (with output formatting enabled):
 
 ```php
 echo $page->content->intro;
 
 foreach($page->content->blocks as $block) {
     if($block->rowType() === 'text') {
-        echo $block->heading;
+        echo "<h2>{$block->heading}</h2>";
         echo $block->body;
-    } elseif($block->rowType() === 'gallery') {
-        echo $block->layout;
+    } else if($block->rowType() === 'gallery') {
+        echo "<div class='gallery gallery--{$block->layout}'>";
 
         foreach($block->images as $image) {
-            echo $image->size(800, 600)->url;
-            echo $image->description;
+            $thumb = $image->size(800, 600);
+            echo "<img src='{$thumb->url}' alt='{$image->description}'>";
         }
+
+        echo "</div>";
     }
 }
 ```
 
-### Query your content
+### 3. Query with selectors
 
-Flex properties can also be used in ProcessWire selectors:
+Search across structured properties using standard ProcessWire selectors:
 
 ```php
-// Find pages containing a text block with a matching heading.
+// Find pages with a Text block whose heading matches "Architecture"
 $matches = $pages->find('content.blocks.text.heading*=Architecture');
 
-// Find pages containing more than one Gallery block.
+// Find pages containing more than one Gallery block
 $withGalleries = $pages->find('content.blocks.gallery.count>1');
 ```
 
-## Copy and paste rows
+> **Tip:** Open the Flex field's settings in ProcessWire Admin to copy generated PHPDoc stubs for full IDE autocompletion.
 
-Use a row's clipboard menu or a table row's **More row actions** menu to copy
-a row or paste above or below it. **Actions → Paste from Clipboard** below the
-rows appends copied rows even when the collection is empty.
-To add a new row, choose a type in **Add item**. Collections with one type
-show a direct **Add item** button.
+---
 
-Choose **Actions → Select rows** below the rows. Checkboxes show which rows are
-selected. Click a card header or anywhere in a table row to toggle selection.
-Use Shift-click to extend the selection to a range. Open **Actions** again to
-copy, hide, or mark the selected rows for removal. The selection count appears
-on the right. **Done** restores previously expanded cards. Copies use current
-editor values and collection order. Paste uses the target collection's types,
-settings and defaults. Save the page to commit added rows, removed rows,
-visibility and media.
+## Installation
 
-Clipboard access needs HTTPS and browser permission. When copying across
-installations, language values match by language name. Page references resolve
-to existing pages with the same full path, parent path and template name. The
-destination field's local parent, template, selector and access rules still
-apply. Relative rich-text links retain their source URL. Media uses owned
-local originals on the same installation when available and embeds original
-files inline as base64 in the clipboard JSON for cross-site paste (up to the
-16 MB raw-data budget, bounded by PHP `post_max_size`). Any skipped contents
-are reported in the editor.
+**Requirements:** ProcessWire 3.0.259+, PHP 8.1+, MySQL 8.0+ or MariaDB 10.11+ (InnoDB).
 
-## Examples and documentation
+1. Copy the module to `/site/modules/FieldtypeFlex/`.
+2. In ProcessWire Admin, go to **Modules → Refresh** and install **FieldtypeFlex**.
+3. Create a field of type **Flex** and add it to a template.
 
-The [examples](examples/README.md) cover PHP, JSON and native Inputfield definitions, from basic properties to nested Rows, conditional inputs and custom media fields.
+Bundled German, French, and Spanish admin translations can be installed from the module's Languages section.
 
-See the [API reference](API.md) for supported settings, value types, selectors and methods.
+---
 
-## Current limitations
+## Examples & documentation
 
-FieldtypeFlex is still a pre-release. Some ProcessWire features and integrations are not supported:
+- **[Configuration examples](examples/README.md)** — ready-to-use PHP, JSON, and native Inputfield definitions covering Objects, nested Rows, Tables, conditional inputs, and custom media metadata.
+- **[API reference](API.md)** — full reference for settings, value types, selectors, clipboard behavior, maintenance tools, and compatibility details.
+
+## Known limitations
+
+FieldtypeFlex is currently in beta — feature-complete for 1.0, with a focus on stability and real-world testing. The following ProcessWire features are not supported:
 
 - SQLite and PostgreSQL databases.
-- Native ProcessWire page-version save/restore.
-- Page-reference selector traversal from typed Rows, across multiple hops or into unsupported target fields.
-- Certain media options, including overwrite mode and native ProcessWire custom-field templates for files and images. TinyMCE drag-and-drop uploads require a regular ProcessWire Image field as their destination.
+- Native ProcessWire page-version save/restore and the **Pages Export/Import** module.
+- Automatic backlink discovery (`$page->links()`) and direct Fieldtype conversion to or from other Fieldtypes.
+- Compound or table-backed fields (`Repeater`, `RepeaterMatrix`, `PageTable`, `Password`, or nested `Flex`) as Flex properties — though Flex fields work inside native Repeaters.
+- `CKEditor` (use `TinyMCE` instead).
+- Page-reference selector traversal from typed Rows, across multiple hops, or into unsupported target fields.
+- Media overwrite mode, native custom-field templates for files/images (use Flex `customFields` instead), and TinyMCE drag-and-drop uploads (which require a regular ProcessWire Image field as their target).
 
-See [API.md](API.md) for the full compatibility details.
+See [API.md](API.md) for full compatibility details.
 
-Bug reports, ideas and contributions are welcome. Feel free to [open an issue](https://github.com/phlppschrr/FieldtypeFlex/issues) or see [CONTRIBUTING.md](CONTRIBUTING.md) if you'd like to help.
+## Feedback & contributing
+
+Bug reports, real-world feedback, and contributions are welcome. Feel free to [open an issue](https://github.com/phlppschrr/FieldtypeFlex/issues) or see [CONTRIBUTING.md](CONTRIBUTING.md) if you'd like to help.
+
+## License
+
+Released under the [MIT License](LICENSE).
